@@ -1,0 +1,729 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#131A2E">
+<title>Pile Poil</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#131A2E;--panel:#1D2742;--line:#4A5880;--glass:rgba(255,255,255,.05);
+  --ink:#F4F1E8;--dim:#A9B4D0;--gold:#FFC53D;--gold-ink:#231A00;--off:#3A4567;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);overscroll-behavior:none}
+body{
+  position:fixed;top:0;right:0;bottom:0;left:0;color:var(--ink);
+  font:16px/1.25 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif;
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-text-size-adjust:100%;
+}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;touch-action:manipulation}
+button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+svg{display:block}
+
+#app{
+  position:absolute;top:0;right:0;bottom:0;left:0;display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+header{display:flex;align-items:center;gap:8px;padding:8px 12px 4px;flex:none}
+.icon{width:48px;height:48px;border-radius:14px;background:var(--panel);display:flex;align-items:center;justify-content:center;flex:none}
+.icon svg{width:24px;height:24px;fill:var(--ink)}
+.ttl{flex:1;min-width:0;text-align:center}
+.brand{display:block;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+#lvl{display:block;font-size:20px;font-weight:800}
+.moves{width:48px;height:48px;border-radius:14px;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none}
+.moves b{font-size:19px;line-height:1;font-weight:800;font-variant-numeric:tabular-nums}
+.moves small{font-size:10px;color:var(--dim);margin-top:2px}
+
+#goal{flex:none;display:flex;align-items:center;justify-content:center;gap:6px;height:24px;font-size:13px;color:var(--dim)}
+#goal svg{width:14px;height:14px;fill:var(--gold)}
+
+#board{flex:1;min-height:0;position:relative;margin:0 8px;overflow:hidden}
+#stage{position:absolute}
+.tube{position:absolute;display:block;border-radius:12px}
+.tube i{
+  position:absolute;left:0;right:0;bottom:0;border:2px solid var(--line);border-top:0;background:var(--glass);
+  transition:border-color .2s,background-color .2s;
+}
+.tube i:before,.tube i:after{content:"";position:absolute;top:0;width:6px;height:2px;background:var(--line);transition:background-color .2s}
+.tube i:before{left:-6px;border-radius:2px 0 0 2px}
+.tube i:after{right:-6px;border-radius:0 2px 2px 0}
+.tube.sel i{border-color:var(--ink);background:rgba(255,255,255,.1)}
+.tube.sel i:before,.tube.sel i:after{background:var(--ink)}
+.tube.done i{border-color:var(--gold);background:rgba(255,197,61,.1)}
+.tube.done i:before,.tube.done i:after{background:var(--gold)}
+.tube.no{animation:no .28s}
+@keyframes no{25%{transform:translateX(-5px)}50%{transform:translateX(5px)}75%{transform:translateX(-3px)}}
+.ball{
+  position:absolute;left:0;top:0;border-radius:50%;pointer-events:none;will-change:transform;
+  transition:transform .13s ease-out;display:flex;align-items:center;justify-content:center;
+}
+.ball svg{width:58%;height:58%}
+.ball:after{content:"";position:absolute;left:16%;top:10%;width:34%;height:22%;border-radius:50%;background:rgba(255,255,255,.28);transform:rotate(-28deg)}
+.still .ball{transition:none}
+
+#hand{position:absolute;left:0;top:0;width:44px;height:44px;pointer-events:none;transition:transform .25s}
+#hand svg{width:44px;height:44px;animation:tap 1.1s ease-in-out infinite}
+@keyframes tap{0%,100%{transform:translateY(8px)}50%{transform:translateY(-4px) scale(.94)}}
+
+#msg{
+  flex:none;min-height:40px;margin:0 12px;display:flex;align-items:center;justify-content:center;text-align:center;
+  font-size:14px;font-weight:600;color:var(--dim);border-radius:12px;padding:4px 10px;
+}
+#msg.warn{color:#FFD9A0}
+#msg.stuck{background:#4A2530;color:#FFE1E4}
+footer{flex:none;display:flex;gap:10px;padding:6px 12px 12px}
+.btn{
+  flex:1;min-height:50px;border-radius:14px;background:var(--panel);font-weight:700;font-size:15px;
+  display:flex;align-items:center;justify-content:center;gap:8px;padding:0 10px;
+}
+.btn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.btn:active{transform:scale(.97)}
+.btn[disabled]{color:#66739A;cursor:default}
+.btn.gold{background:var(--gold);color:var(--gold-ink)}
+.btn.line{background:none;box-shadow:inset 0 0 0 2px var(--line)}
+.btn.need{box-shadow:inset 0 0 0 2px var(--gold);color:var(--gold)}
+
+.over{position:absolute;top:0;right:0;bottom:0;left:0;z-index:5;display:flex;align-items:center;justify-content:center;
+  background:rgba(12,17,32,.9);padding:16px;overflow:hidden;animation:fade .2s}
+@keyframes fade{from{opacity:0}}
+.card{position:relative;z-index:1;width:100%;max-width:330px;background:var(--panel);border-radius:22px;padding:22px 18px 16px;text-align:center;animation:pop .28s cubic-bezier(.2,1.3,.5,1)}
+@keyframes pop{from{transform:translateY(24px) scale(.94);opacity:0}}
+.card h2{font-size:26px;font-weight:800}
+.card p{color:var(--dim);margin-top:4px;font-size:15px}
+.stars{display:flex;justify-content:center;align-items:flex-end;gap:6px;margin:14px 0 6px}
+.stars svg{width:54px;height:54px;fill:var(--off)}
+.stars svg:nth-child(2){width:68px;height:68px}
+.stars svg.on{fill:var(--gold);animation:star .4s cubic-bezier(.2,1.6,.4,1) backwards}
+.stars svg.on:nth-child(2){animation-delay:.14s}
+.stars svg.on:nth-child(3){animation-delay:.28s}
+@keyframes star{from{transform:scale(.2) rotate(-40deg);opacity:0}}
+.big{font-size:44px;font-weight:800;line-height:1;margin-top:8px;font-variant-numeric:tabular-nums}
+.big small{font-size:16px;font-weight:600;color:var(--dim);margin-left:6px}
+.rec{min-height:20px}
+.acts{display:flex;flex-direction:column;gap:10px;margin-top:16px}
+.acts .row{display:flex;gap:10px}
+.bit{position:absolute;top:-24px;width:14px;height:14px;animation:fall 1.5s cubic-bezier(.3,.2,.6,1) forwards}
+.bit svg{width:100%;height:100%}
+@keyframes fall{to{transform:translate(var(--dx),105vh) rotate(var(--rot));opacity:.9}}
+
+#map{position:absolute;top:0;right:0;bottom:0;left:0;z-index:4;background:var(--bg);display:flex;flex-direction:column;
+  padding:calc(env(safe-area-inset-top) + 10px) calc(env(safe-area-inset-right) + 14px) calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 14px)}
+#map .top{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px}
+#map h1{font-size:26px;font-weight:800;color:var(--gold);letter-spacing:.01em}
+#map .sub{font-size:13px;color:var(--dim);margin-top:2px}
+.total{display:flex;align-items:center;gap:6px;background:var(--panel);border-radius:14px;height:44px;padding:0 12px;font-weight:800;font-variant-numeric:tabular-nums}
+.total svg{width:18px;height:18px;fill:var(--gold)}
+#grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,1fr));gap:8px;margin:12px 0}
+.cell{
+  position:relative;min-height:48px;max-height:84px;border-radius:16px;background:var(--panel);display:flex;align-items:center;gap:10px;
+  padding:0 10px;text-align:left;align-self:center;height:100%;overflow:hidden;
+}
+.cell .n{width:36px;height:36px;border-radius:50%;background:var(--off);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;flex:none}
+.cell .n svg{width:18px;height:18px;fill:var(--dim)}
+.cell .d{min-width:0}
+.cell .s{display:flex;gap:2px}
+.cell .s svg{width:17px;height:17px;fill:var(--off)}
+.cell .s svg.on{fill:var(--gold)}
+.cell .t{font-size:12px;color:var(--dim);margin-top:3px;white-space:nowrap}
+.cell.cur{box-shadow:inset 0 0 0 2px var(--gold)}
+.cell.cur .n{background:var(--gold);color:var(--gold-ink)}
+.cell.ok .n{background:#2F7D5B}
+.cell[disabled]{background:#182036;cursor:default}
+.cell[disabled] .t{color:#66739A}
+.cell:not([disabled]):active{transform:scale(.97)}
+
+@media (max-height:600px){
+  header{padding-top:4px}
+  #msg{min-height:34px}
+  footer{padding-bottom:8px}
+  .btn{min-height:46px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*:before,*:after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button class="icon" id="bMap" aria-label="Carte des niveaux">
+      <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
+    </button>
+    <div class="ttl"><span class="brand">Pile Poil</span><span id="lvl">Niveau 1</span></div>
+    <div class="moves" aria-label="Coups joués"><b id="mv">0</b><small>coups</small></div>
+  </header>
+  <div id="goal"></div>
+  <main id="board"><div id="stage"></div></main>
+  <div id="msg" role="status" aria-live="polite"></div>
+  <footer>
+    <button class="btn" id="bUndo"><svg viewBox="0 0 24 24"><path d="M9 7 4 12l5 5M4 12h10a6 6 0 0 1 0 12"  transform="translate(0 -3)"/></svg>Annuler</button>
+    <button class="btn" id="bReset"><svg viewBox="0 0 24 24"><path d="M4 5v6h6M5 11a8 8 0 1 1 2 7"/></svg>Recommencer</button>
+  </footer>
+
+  <section class="over" id="win" hidden aria-live="polite">
+    <div class="card">
+      <h2 id="wTitle">Pile poil !</h2>
+      <p id="wSub">Niveau 1 rangé</p>
+      <div class="stars" id="wStars"></div>
+      <div class="big"><span id="wMoves">0</span><small>coups</small></div>
+      <p class="rec" id="wRec"></p>
+      <div class="acts">
+        <button class="btn gold" id="bNext">Suivant</button>
+        <div class="row">
+          <button class="btn line" id="bShare">Partager</button>
+          <button class="btn line" id="bAgain">Rejouer</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="map" hidden>
+    <div class="top">
+      <div><h1>Pile Poil</h1><div class="sub">Une couleur par tube, pile poil.</div></div>
+      <div class="total" aria-label="Étoiles gagnées"><svg viewBox="0 0 24 24"><use href="#star"/></svg><span id="mTotal">0/30</span></div>
+    </div>
+    <div id="grid"></div>
+    <button class="btn gold" id="bBack" style="flex:none">Reprendre</button>
+  </section>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <path id="star" d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/>
+</defs></svg>
+
+<script>
+(function () {
+'use strict';
+
+var GAME = 'tri-couleurs';
+var NAME = 'Pile Poil';
+var KEY = 'mj:' + GAME + ':v1';
+
+/*LEVELS:BEGIN (generated by tools/gen-levels.js, do not edit by hand)*/
+var LEVELS=[
+  {cap:3,par:3,tubes:[[1,1,0],[0,0,1],[]]},
+  {cap:3,par:6,tubes:[[1,0,1],[1,0,2],[2,2,0],[],[]]},
+  {cap:4,par:13,tubes:[[2,2,3,1],[0,3,0,1],[0,2,0,3],[1,1,3,2],[],[]]},
+  {cap:4,par:17,tubes:[[1,1,4,0],[2,1,1,2],[3,0,2,2],[3,4,0,4],[0,3,4,3],[],[]]},
+  {cap:4,par:19,tubes:[[0,3,2,4],[0,3,1,0],[1,4,1,3],[2,1,2,4],[2,3,4,0],[],[]]},
+  {cap:4,par:21,tubes:[[2,5,3,1],[5,5,1,0],[4,2,0,0],[4,3,1,2],[5,3,1,4],[3,0,4,2],[],[]]},
+  {cap:4,par:24,tubes:[[6,6,0,4],[0,4,4,2],[3,2,2,3],[5,0,5,3],[6,4,6,5],[5,3,1,1],[2,1,0,1],[],[]]},
+  {cap:4,par:27,tubes:[[5,4,6,3],[3,0,4,2],[0,2,3,1],[0,1,5,1],[2,6,6,5],[2,3,4,1],[0,6,4,5],[],[]]},
+  {cap:4,par:29,tubes:[[2,1,4,7],[3,0,7,1],[5,4,6,5],[1,6,1,0],[6,3,4,3],[2,0,6,4],[7,7,5,0],[5,2,2,3],[],[]]},
+  {cap:4,par:34,tubes:[[5,2,4,4],[6,3,7,8],[1,6,0,3],[0,6,8,4],[5,5,8,3],[2,8,7,2],[2,7,1,0],[1,5,4,6],[3,1,7,0],[],[]]}
+];
+/* Solver solutions, [from,to] per move. Test use only. */
+var SOLUTIONS=[
+  [[1,2],[0,1],[2,0]],
+  [[2,3],[1,2],[1,3],[0,1],[0,3],[0,1]],
+  [[3,4],[3,5],[1,3],[0,3],[0,5],[4,0],[1,4],[1,5],[2,5],[2,1],[4,1],[2,0],[2,1]],
+  [[3,5],[2,6],[2,6],[1,6],[3,2],[3,5],[4,3],[4,5],[4,3],[2,4],[2,4],[2,3],[0,4],[0,5],[1,0],[1,0],[1,6]],
+  [[3,5],[2,6],[0,5],[3,0],[2,3],[2,5],[3,2],[3,2],[0,3],[0,3],[0,6],[4,0],[4,5],[4,6],[4,3],[1,0],[1,2],[1,6],[1,0]],
+  [[2,6],[2,6],[5,7],[3,7],[2,7],[5,2],[5,6],[4,2],[3,4],[3,5],[3,2],[4,3],[4,3],[4,5],[1,6],[1,3],[4,1],[0,3],[0,5],[0,1],[0,7]],
+  [[6,7],[5,7],[5,7],[2,5],[1,2],[1,8],[1,8],[6,1],[6,7],[2,6],[2,6],[2,6],[5,2],[5,2],[4,5],[3,2],[3,5],[3,1],[3,5],[0,8],[0,1],[4,0],[4,8],[4,0]],
+  [[2,7],[0,2],[0,8],[5,7],[0,5],[6,0],[4,0],[4,8],[4,8],[1,4],[6,1],[6,8],[3,7],[3,0],[3,7],[3,6],[5,3],[5,3],[1,3],[1,3],[1,6],[5,1],[5,4],[2,1],[2,1],[2,4],[2,6]],
+  [[6,8],[5,9],[2,6],[2,5],[2,9],[6,2],[6,2],[3,8],[1,3],[1,6],[1,8],[7,1],[4,1],[4,9],[4,1],[5,4],[5,4],[5,8],[7,5],[7,5],[7,2],[3,7],[3,7],[3,4],[3,7],[0,6],[0,9],[0,7],[0,5]],
+  [[8,9],[8,10],[6,9],[8,6],[4,8],[2,8],[2,9],[1,4],[1,10],[1,8],[7,1],[2,1],[6,2],[6,2],[6,10],[5,6],[5,10],[3,7],[5,3],[5,6],[4,5],[4,5],[3,5],[3,5],[3,1],[3,9],[7,3],[7,3],[7,4],[7,2],[0,3],[0,3],[0,6],[0,4]]
+];
+/*LEVELS:END*/
+
+// First-move hint of level 1 (animated hand): lift the top ball, drop it in the empty tube.
+var HINT = (function () {
+  var t = LEVELS[0].tubes, to = -1, i;
+  for (i = 0; i < t.length; i++) if (!t[i].length) to = i;
+  return [0, to];
+})();
+
+// Each colour carries its own symbol (never colour alone).
+var COLORS = [
+  { n: 'rouge, anneau',    bg: '#E5484D', fg: '#fff',    d: 'M12 4.5a7.5 7.5 0 1 0 0 15a7.5 7.5 0 0 0 0-15zm0 4.2a3.3 3.3 0 1 1 0 6.6a3.3 3.3 0 0 1 0-6.6z' },
+  { n: 'bleu, triangle',   bg: '#3E7BFA', fg: '#fff',    d: 'M12 4.5l8 14h-16z' },
+  { n: 'jaune, étoile',    bg: '#FFC93C', fg: '#5A3E00', d: 'M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z' },
+  { n: 'vert, carré',      bg: '#30A46C', fg: '#fff',    d: 'M5.5 5.5h13v13h-13z' },
+  { n: 'violet, losange',  bg: '#8E5BEF', fg: '#fff',    d: 'M12 2.5l7.5 9.5-7.5 9.5-7.5-9.5z' },
+  { n: 'orange, croix',    bg: '#F76B15', fg: '#fff',    d: 'M9.2 3.5h5.6v5.7h5.700v5.6h-5.700v5.7H9.2v-5.7H3.5V9.2h5.700z' },
+  { n: 'rose, cœur',       bg: '#F29AC2', fg: '#6B1740', d: 'M12 20.5s-8-4.900-8-10.700a4.500 4.500 0 0 1 8-2.700 4.500 4.500 0 0 1 8 2.700c0 5.800-8 10.700-8 10.700z' },
+  { n: 'turquoise, lune',  bg: '#2CC5D2', fg: '#053B41', d: 'M14.500 3.500a8.500 8.500 0 1 0 6 12.500 7 7 0 0 1-6-12.500z' },
+  { n: 'gris, barres',     bg: '#D9DEE9', fg: '#2A3350', d: 'M4.500 6h15v4.200h-15zM4.500 13.800h15V18h-15z' }
+];
+
+var $ = function (id) { return document.getElementById(id); };
+var board = $('board'), stage = $('stage');
+var reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+// ---- persistence (always guarded: the game works without storage) ------------
+var save = { level: 1, max: 1, stars: [], best: [], cur: null };
+function loadSave() {
+  try {
+    var s = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (!s || typeof s !== 'object') return;
+    var n = LEVELS.length;
+    var clamp = function (v) { v = v | 0; return v < 1 ? 1 : v > n ? n : v; };
+    save.max = clamp(s.max);
+    save.level = Math.min(clamp(s.level), save.max);
+    if (Array.isArray(s.stars)) save.stars = s.stars.slice(0, n).map(function (v) { v = v | 0; return v > 3 ? 3 : v < 0 ? 0 : v; });
+    if (Array.isArray(s.best)) save.best = s.best.slice(0, n).map(function (v) { return v > 0 ? v | 0 : 0; });
+    if (s.cur && Array.isArray(s.cur.hist)) save.cur = { level: s.cur.level | 0, hist: s.cur.hist };
+  } catch (e) { /* no storage: play without it */ }
+}
+function store() {
+  try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) { /* ignore */ }
+}
+
+// ---- game state --------------------------------------------------------------
+var level = 0;        // zero-based index
+var cap = 4;
+var tubes = [];       // arrays of colour indices, bottom -> top
+var els = [];         // ball elements, same shape as tubes
+var hist = [];        // [from,to] moves, unlimited undo
+var sel = -1;
+var won = false;
+var stuck = false;
+var tubeEls = [];
+var G = null;         // current geometry
+var winTimer = 0, msgTimer = 0;
+
+function canMove(from, to) {
+  if (from === to) return false;
+  var a = tubes[from], b = tubes[to];
+  if (!a.length || b.length >= cap) return false;
+  return !b.length || b[b.length - 1] === a[a.length - 1];
+}
+function tubeDone(t) {
+  if (t.length !== cap) return false;
+  for (var i = 1; i < t.length; i++) if (t[i] !== t[0]) return false;
+  return true;
+}
+function isWon() {
+  for (var i = 0; i < tubes.length; i++) if (tubes[i].length && !tubeDone(tubes[i])) return false;
+  return true;
+}
+function anyMove() {
+  for (var i = 0; i < tubes.length; i++)
+    for (var j = 0; j < tubes.length; j++) if (canMove(i, j)) return true;
+  return false;
+}
+function limits(lv) {
+  var p = LEVELS[lv].par;
+  return [p + Math.max(2, Math.ceil(p * 0.15)), p + Math.max(4, Math.ceil(p * 0.5))];
+}
+function starsFor(lv, moves) {
+  var l = limits(lv);
+  return moves <= l[0] ? 3 : moves <= l[1] ? 2 : 1;
+}
+
+// ---- layout: one or two rows, always inside the board, tubes >= 44 px wide ------
+var GAP = 6, ROWGAP = 8, MIN_TUBE = 44;
+function computeLayout() {
+  var W = board.clientWidth, H = board.clientHeight, n = tubes.length, best = null;
+  for (var rows = 1; rows <= 2; rows++) {
+    var cols = Math.ceil(n / rows);
+    var slot = Math.min(Math.floor(W / cols), 74);
+    var tubeW = slot - GAP;
+    if (tubeW < MIN_TUBE && rows === 1) continue;
+    var byH = Math.floor(((H - (rows - 1) * ROWGAP) / rows - 14) / (cap + 1));
+    var ball = Math.max(20, Math.min(tubeW - 8, byH, 54));
+    if (!best || ball > best.ball + 2) best = { rows: rows, cols: cols, ball: ball };
+  }
+  var g = best;
+  g.tubeW = Math.max(MIN_TUBE, g.ball + 8);
+  g.slot = Math.min(Math.floor(W / g.cols), g.tubeW + (g.rows === 1 ? 14 : 10));
+  g.tubeH = cap * g.ball + 8;
+  g.rowH = g.ball + 6 + g.tubeH;
+  g.w = g.cols * g.slot;
+  g.h = g.rows * g.rowH + (g.rows - 1) * ROWGAP;
+  g.x0 = Math.max(0, Math.round((W - g.w) / 2));
+  g.y0 = Math.max(0, Math.round((H - g.h) / 2));
+  g.last = n - g.cols * (g.rows - 1);
+  return g;
+}
+function tubeBox(i) {
+  var row = Math.floor(i / G.cols), col = i % G.cols;
+  var inRow = row === G.rows - 1 ? G.last : G.cols;
+  var off = (G.cols - inRow) * G.slot / 2;
+  return { x: Math.round(off + col * G.slot + (G.slot - G.tubeW) / 2), y: row * (G.rowH + ROWGAP) };
+}
+function slotPos(i, k) {
+  var b = tubeBox(i);
+  return { x: b.x + (G.tubeW - G.ball) / 2 + 1, y: b.y + G.rowH - 5 - (k + 1) * G.ball + 1 };
+}
+function liftPos(i) {
+  var b = tubeBox(i);
+  return { x: b.x + (G.tubeW - G.ball) / 2 + 1, y: b.y + 2 };
+}
+function tr(p) { return 'translate(' + p.x + 'px,' + p.y + 'px)'; }
+function put(el, p) { el.style.transform = tr(p); }
+
+function layout() {
+  G = computeLayout();
+  stage.className = 'still';
+  stage.style.cssText = 'left:' + G.x0 + 'px;top:' + G.y0 + 'px;width:' + G.w + 'px;height:' + G.h + 'px';
+  for (var i = 0; i < tubes.length; i++) {
+    var b = tubeBox(i), t = tubeEls[i];
+    t.style.cssText = 'left:' + b.x + 'px;top:' + b.y + 'px;width:' + G.tubeW + 'px;height:' + G.rowH + 'px';
+    t.firstChild.style.cssText = 'height:' + G.tubeH + 'px;border-radius:0 0 ' + (G.tubeW / 2) + 'px ' + (G.tubeW / 2) + 'px';
+    for (var k = 0; k < tubes[i].length; k++) {
+      var e = els[i][k];
+      e.style.width = e.style.height = (G.ball - 2) + 'px';
+      put(e, sel === i && k === tubes[i].length - 1 ? liftPos(i) : slotPos(i, k));
+    }
+  }
+  placeHand();
+  void stage.offsetWidth;   // flush so the next change animates
+  stage.className = '';
+}
+
+// ---- rendering ---------------------------------------------------------------
+function makeBall(c) {
+  var e = document.createElement('div'), col = COLORS[c];
+  e.className = 'ball';
+  e.style.background = col.bg;
+  e.innerHTML = '<svg viewBox="0 0 24 24" fill="' + col.fg + '" fill-rule="evenodd"><path d="' + col.d + '"/></svg>';
+  return e;
+}
+function build() {
+  stage.textContent = '';
+  tubeEls = []; els = [];
+  var i, k;
+  for (i = 0; i < tubes.length; i++) {
+    var t = document.createElement('button');
+    t.className = 'tube';
+    t.setAttribute('data-tube', i);
+    t.appendChild(document.createElement('i'));
+    stage.appendChild(t);
+    tubeEls.push(t);
+  }
+  for (i = 0; i < tubes.length; i++) {
+    els.push([]);
+    for (k = 0; k < tubes[i].length; k++) {
+      var e = makeBall(tubes[i][k]);
+      stage.appendChild(e);
+      els[i].push(e);
+    }
+  }
+  var h = document.createElement('div');
+  h.id = 'hand'; h.hidden = true;
+  h.innerHTML = '<svg viewBox="0 0 44 44"><path d="M17 5.500a3.500 3.500 0 0 1 7 0V19l8.300 1.700a4 4 0 0 1 3.200 4.500l-1.300 8.800a5 5 0 0 1-5 4.300H21a6 6 0 0 1-4.700-2.300l-7-9a3 3 0 0 1 4.300-4.100L17 26z" fill="#fff" stroke="#131A2E" stroke-width="2" stroke-linejoin="round"/></svg>';
+  stage.appendChild(h);
+  layout();
+}
+function placeHand() {
+  var h = $('hand');
+  if (!h || !G) return;
+  var show = level === 0 && !hist.length && !won && !save.stars[0];
+  var target = sel < 0 ? HINT[0] : sel === HINT[0] ? HINT[1] : -1;
+  if (!show || target < 0) { h.hidden = true; return; }
+  var b = tubeBox(target);
+  h.hidden = false;
+  put(h, { x: b.x + G.tubeW / 2 - 12, y: b.y + G.rowH - G.ball * 1.1 });
+}
+function starSvg(on) {
+  return '<svg viewBox="0 0 24 24"' + (on ? ' class="on"' : '') + '><use href="#star"/></svg>';
+}
+function refresh() {
+  $('lvl').textContent = 'Niveau ' + (level + 1);
+  $('mv').textContent = hist.length;
+  $('bUndo').disabled = !hist.length || won;
+  $('bReset').disabled = !hist.length && !won;
+  $('goal').innerHTML = starSvg(1) + starSvg(1) + starSvg(1) + '<span>en ' + limits(level)[0] + ' coups ou moins</span>';
+  for (var i = 0; i < tubes.length; i++) {
+    var t = tubes[i], top = t.length ? COLORS[t[t.length - 1]].n : '';
+    tubeEls[i].className = 'tube' + (sel === i ? ' sel' : '') + (tubeDone(t) ? ' done' : '');
+    tubeEls[i].setAttribute('aria-label', 'Tube ' + (i + 1) + ', ' +
+      (t.length ? t.length + ' bille' + (t.length > 1 ? 's' : '') + ', dessus : ' + top : 'vide'));
+  }
+  stuck = !won && !anyMove();
+  $('bUndo').classList.toggle('need', stuck);
+  $('bReset').classList.toggle('need', stuck);
+  if (stuck) say('Plus aucun coup possible : annule ou recommence.', 'stuck', true);
+  else if ($('msg').className === 'stuck') say('');
+  placeHand();
+}
+function say(text, cls, keep) {
+  var m = $('msg');
+  clearTimeout(msgTimer);
+  m.textContent = text;
+  m.className = cls || '';
+  if (text && !keep) msgTimer = setTimeout(function () { if (!stuck) { m.textContent = ''; m.className = ''; } }, 1800);
+}
+function shake(i) {
+  var t = tubeEls[i];
+  t.classList.remove('no');
+  void t.offsetWidth;
+  t.classList.add('no');
+}
+
+// ---- moves -------------------------------------------------------------------
+// The state changes at once; the animation (lift, travel, drop) is cosmetic only.
+function fly(el, from, to, wasLifted) {
+  var a = liftPos(from), b = liftPos(to), end = slotPos(to, tubes[to].length - 1);
+  put(el, end);
+  if (reduced || !el.animate) return;
+  var up = { x: end.x, y: end.y - 4 };
+  var frames = [
+    { transform: tr(a), easing: 'ease-in-out' },
+    { transform: tr(b), easing: 'ease-in' },
+    { transform: tr(end), easing: 'ease-out' },
+    { transform: tr(up), easing: 'ease-in' },
+    { transform: tr(end) }
+  ];
+  var offs = [0, 0.45, 0.78, 0.89, 1];
+  if (!wasLifted) {
+    frames.unshift({ transform: tr(slotPos(from, tubes[from].length)), easing: 'ease-out' });
+    offs = [0, 0.2, 0.55, 0.82, 0.91, 1];
+  }
+  for (var i = 0; i < frames.length; i++) frames[i].offset = offs[i];
+  el.animate(frames, { duration: wasLifted ? 260 : 320 });
+}
+function apply(from, to, wasLifted) {
+  var c = tubes[from].pop(), e = els[from].pop();
+  tubes[to].push(c); els[to].push(e);
+  fly(e, from, to, wasLifted);
+}
+function persistCur() {
+  save.cur = hist.length && !won ? { level: level + 1, hist: hist } : null;
+  store();
+}
+function move(from, to) {
+  apply(from, to, sel === from);
+  hist.push([from, to]);
+  sel = -1;
+  if (isWon()) return win();
+  persistCur();
+  refresh();
+}
+function tapTube(i) {
+  if (won || !tubes[i]) return;
+  if (sel < 0) {
+    if (!tubes[i].length) { shake(i); return; }
+    sel = i;
+    put(els[i][tubes[i].length - 1], liftPos(i));
+    if (!stuck) say('');
+  } else if (sel === i) {
+    sel = -1;
+    put(els[i][tubes[i].length - 1], slotPos(i, tubes[i].length - 1));
+  } else if (canMove(sel, i)) {
+    return move(sel, i);
+  } else {
+    shake(i);
+    say(tubes[i].length >= cap ? 'Ce tube est plein.' : 'Même couleur ou tube vide seulement.', 'warn');
+  }
+  refresh();
+}
+function dropSel() {
+  if (sel >= 0 && tubes[sel].length) put(els[sel][tubes[sel].length - 1], slotPos(sel, tubes[sel].length - 1));
+  sel = -1;
+}
+function undo() {
+  if (!hist.length || won) return;
+  dropSel();
+  var m = hist.pop();
+  apply(m[1], m[0], false);
+  say('');
+  persistCur();
+  refresh();
+}
+function start(n, replay) {
+  clearTimeout(winTimer);
+  level = n - 1;
+  cap = LEVELS[level].cap;
+  tubes = LEVELS[level].tubes.map(function (t) { return t.slice(); });
+  hist = []; sel = -1; won = false; stuck = false;
+  if (replay) {   // resume an unfinished level: replay the saved moves, drop them if invalid
+    for (var i = 0; i < replay.length; i++) {
+      var m = replay[i];
+      if (!m || !tubes[m[0]] || !tubes[m[1]] || !canMove(m[0], m[1])) { return start(n); }
+      tubes[m[1]].push(tubes[m[0]].pop());
+      hist.push([m[0], m[1]]);
+    }
+    if (isWon()) return start(n);
+  }
+  $('win').hidden = true;
+  $('map').hidden = true;
+  say('');
+  build();
+  save.level = n;
+  if (n > save.max) save.max = n;
+  persistCur();
+  refresh();
+}
+function restart() { start(level + 1); }
+
+// ---- win ---------------------------------------------------------------------
+function win() {
+  won = true;
+  var moves = hist.length, n = level + 1, s = starsFor(level, moves);
+  var prevBest = save.best[level] || 0;
+  if (s > (save.stars[level] || 0)) save.stars[level] = s;
+  if (!prevBest || moves < prevBest) save.best[level] = moves;
+  if (n < LEVELS.length) { save.max = Math.max(save.max, n + 1); save.level = n + 1; }
+  save.cur = null;
+  store();
+  refresh();
+  try {
+    window.parent.postMessage({ source: 'mini-jeu', game: GAME, event: 'level_complete', level: n, moves: moves }, '*');
+  } catch (e) { /* ignore */ }
+  winTimer = setTimeout(function () { showWin(n, moves, s, prevBest); }, reduced ? 80 : 480);
+}
+function showWin(n, moves, s, prevBest) {
+  var last = n === LEVELS.length;
+  $('wTitle').textContent = last ? 'Tout est rangé !' : s === 3 ? 'Pile poil !' : s === 2 ? 'Bien joué !' : 'Rangé !';
+  $('wSub').textContent = 'Niveau ' + n + ' terminé';
+  $('wStars').innerHTML = starSvg(s >= 1) + starSvg(s >= 2) + starSvg(s >= 3);
+  $('wStars').setAttribute('aria-label', s + ' étoile' + (s > 1 ? 's' : '') + ' sur 3');
+  $('wMoves').textContent = moves;
+  $('wRec').textContent = prevBest && moves < prevBest ? 'Nouveau record !' :
+    prevBest ? 'Record : ' + prevBest + ' coups' :
+    s < 3 ? '3 étoiles en ' + limits(level)[0] + ' coups ou moins' : '';
+  $('bNext').textContent = last ? 'Carte des niveaux' : 'Suivant';
+  $('bShare').textContent = 'Partager';
+  var w = $('win'), old = w.querySelectorAll('.bit'), i;
+  for (i = 0; i < old.length; i++) w.removeChild(old[i]);
+  w.hidden = false;
+  if (reduced) return;
+  for (i = 0; i < 22; i++) {
+    var c = COLORS[i % COLORS.length], b = document.createElement('div');
+    b.className = 'bit';
+    b.style.cssText = 'left:' + (4 + (i * 37) % 92) + '%;animation-delay:' + ((i * 53) % 400) + 'ms;--dx:' +
+      (((i * 29) % 80) - 40) + 'px;--rot:' + (((i * 97) % 540) - 270) + 'deg';
+    b.innerHTML = '<svg viewBox="0 0 24 24" fill="' + c.bg + '" fill-rule="evenodd"><path d="' + c.d + '"/></svg>';
+    w.appendChild(b);
+  }
+}
+function shareText() {
+  var s = starsFor(level, hist.length), st = '';
+  while (s--) st += '⭐';
+  return NAME + ' · Niveau ' + (level + 1) + ' en ' + hist.length + ' coups ' + st;
+}
+function share() {
+  var text = shareText(), btn = $('bShare');
+  var copied = function () { btn.textContent = 'Copié !'; };
+  var legacy = function () {   // last resort: hidden textarea + execCommand
+    var ok = false;
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;left:0;top:0;opacity:0';
+      document.body.appendChild(ta);
+      ta.select(); ta.setSelectionRange(0, text.length);
+      ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (e) { ok = false; }
+    btn.textContent = ok ? 'Copié !' : 'Copie impossible';
+  };
+  var clip = function () {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(copied, legacy);
+    } catch (e) { /* fall through */ }
+    legacy();
+  };
+  try {
+    if (navigator.share) {
+      return navigator.share({ text: text }).then(null, function (e) { if (!e || e.name !== 'AbortError') clip(); });
+    }
+  } catch (e) { /* fall through */ }
+  clip();
+}
+
+// ---- level map ---------------------------------------------------------------
+var LOCK = '<svg viewBox="0 0 24 24"><path d="M7 10V8a5 5 0 0 1 10 0v2h1.500v10h-13V10zm2.500 0h5V8a2.500 2.500 0 0 0-5 0z"/></svg>';
+function showMap() {
+  var g = $('grid'), total = 0, html = '';
+  for (var i = 0; i < LEVELS.length; i++) {
+    var n = i + 1, s = save.stars[i] || 0, open = n <= save.max, cur = n === level + 1;
+    total += s;
+    html += '<button class="cell' + (cur ? ' cur' : '') + (s ? ' ok' : '') + '" data-level="' + n + '"' + (open ? '' : ' disabled') +
+      ' aria-label="Niveau ' + n + (open ? ', ' + s + ' étoile' + (s > 1 ? 's' : '') : ', verrouillé') + '">' +
+      '<span class="n">' + (open ? n : LOCK) + '</span><span class="d"><span class="s">' +
+      starSvg(s >= 1) + starSvg(s >= 2) + starSvg(s >= 3) + '</span><span class="t">' +
+      (s ? 'Record : ' + save.best[i] + ' coups' : open ? (cur && hist.length && !won ? 'En cours' : 'À jouer') : 'Verrouillé') +
+      '</span></span></button>';
+  }
+  g.innerHTML = html;
+  $('mTotal').textContent = total + '/' + (LEVELS.length * 3);
+  $('win').hidden = true;
+  $('map').hidden = false;
+}
+function pickLevel(n) {
+  if (n === level + 1 && !won) { $('map').hidden = true; return; }   // keep the level in progress
+  start(n);
+}
+
+// ---- input: pointer events, with a click fallback for keyboards and assistive tech ----
+var lastTap = 0;
+function onTap(el, fn) {
+  var down = false;
+  el.addEventListener('pointerdown', function () { down = true; });
+  el.addEventListener('pointerleave', function () { down = false; });
+  el.addEventListener('pointercancel', function () { down = false; });
+  el.addEventListener('pointerup', function (e) {
+    if (!down) return;
+    down = false; lastTap = Date.now(); fn(e);
+  });
+  el.addEventListener('click', function (e) { if (Date.now() - lastTap > 600) fn(e); });
+}
+function closestAttr(node, attr) {
+  while (node && node !== document.body) {
+    if (node.getAttribute && node.getAttribute(attr) !== null) return node;
+    node = node.parentNode;
+  }
+  return null;
+}
+stage.addEventListener('pointerdown', function (e) {
+  var t = closestAttr(e.target, 'data-tube');
+  if (!t) return;
+  lastTap = Date.now();
+  tapTube(+t.getAttribute('data-tube'));
+});
+stage.addEventListener('click', function (e) {
+  var t = closestAttr(e.target, 'data-tube');
+  if (t && Date.now() - lastTap > 600) tapTube(+t.getAttribute('data-tube'));
+});
+onTap($('grid'), function (e) {
+  var c = closestAttr(e.target, 'data-level');
+  if (c && !c.disabled) pickLevel(+c.getAttribute('data-level'));
+});
+onTap($('bUndo'), undo);
+onTap($('bReset'), restart);
+onTap($('bMap'), showMap);
+onTap($('bBack'), function () { if (won) start(save.level); else $('map').hidden = true; });
+onTap($('bNext'), function () { if (level + 1 < LEVELS.length) start(level + 2); else showMap(); });
+onTap($('bAgain'), restart);
+onTap($('bShare'), share);
+document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+window.addEventListener('resize', function () { if (tubeEls.length) layout(); });
+
+// ---- boot --------------------------------------------------------------------
+loadSave();
+start(save.level, save.cur && save.cur.level === save.level ? save.cur.hist : null);
+
+// Test hooks.
+window.__game = {
+  state: function () {
+    return {
+      level: level + 1,
+      tubes: tubes.map(function (t) { return t.slice(); }),
+      moves: hist.length,
+      won: won,
+      selected: sel,
+      stuck: stuck,
+      cap: cap,
+      stars: won ? starsFor(level, hist.length) : 0
+    };
+  },
+  levels: LEVELS,
+  solutions: SOLUTIONS,
+  loadLevel: function (n) {
+    n = n | 0;
+    if (n < 1 || n > LEVELS.length) throw new Error('level must be 1..' + LEVELS.length);
+    start(n);
+    return this.state();
+  }
+};
+})();
+</script>
+</body>
+</html>
