@@ -83,3 +83,14 @@ Classement, identité, récompenses, son, notifications.
 - La partie en cours est reprise coup pour coup dans tous les modes (niveau, niveau du jour, défi).
 - Limite connue, acceptée : une victoire enregistrée avec une horloge avancée par erreur bloque la série jusqu'à cette date.
 - Les crochets de test exposent les couleurs cachées : accepté, ils ne sont pas accessibles à un joueur dans la webview.
+
+## Décisions après recette des niveaux (24 novembre) — voir `docs/qa/RECETTE-NIVEAUX.md`
+1. **Pas de premier coup piégé.** Un niveau n'est retenu que si au plus 25 % de ses premiers coups légaux mènent à une position perdue ; 0 % pour les 3 premiers niveaux de chaque monde. Pour les niveaux mystère : aucun premier coup fatal parmi ceux qu'un joueur ne peut pas distinguer.
+2. **Courbe mesurée, pas supposée.** La difficulté d'un niveau = longueur de solution + taux de victoire d'un joueur au hasard (simulation de `tools/qa/sim.js`). Dans un monde, cette difficulté monte par paliers avec respirations ; d'un monde au suivant, la médiane ne baisse pas et ne monte pas de plus de 30 %. L'ordre des mondes peut changer pour y arriver ; aucun pic de plus de 25 % par rapport au niveau précédent hors dernier niveau d'un monde.
+3. **Niveaux du jour homogènes** : taux de victoire au hasard entre 25 % et 60 %.
+4. **Repères d'étoiles** : toujours la meilleure solution connue (les 13 solutions plus courtes trouvées par la recette sont reprises).
+5. **Partie mal engagée** : quand le joueur dépasse 2 fois le repère, ou revient 3 fois sur une position déjà vue, un message discret propose Annuler ou Recommencer. Pas de solveur dans le jeu.
+6. **Mystère** : « Rejouer » et toute nouvelle partie d'un niveau déjà gagné recachent les billes ; elles restent révélées pendant une même partie (Annuler, Recommencer, rechargement).
+7. **Défi** : un seul objectif à l'écran (celui du défi remplace le repère d'étoiles). Résultat perdu : « À N coups près ». Sans `MJ_CONFIG.shareBaseUrl` et hors http(s), le partage n'inclut pas de lien.
+8. **Textes** : le rang « Maniaque » devient « Perfectionniste ».
+9. Les niveaux 1 à 10 peuvent changer : il n'y a pas encore de joueurs.

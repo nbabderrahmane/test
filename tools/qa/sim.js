@@ -47,24 +47,26 @@ function analyseLevel(job) {
   const GAMES = job.games, cap = Math.max(120, lvl.par * 4);
   for (const policy of ['uniform', 'naive']) {
     const rand = L.rng(0xC0FFEE + job.seed * 7919 + (policy === 'naive' ? 1 : 0));
-    let won = 0, stuck = 0, capped = 0; const depths = [], winMoves = [];
+    let won = 0, stuck = 0, capped = 0, w3 = 0, w2 = 0; const depths = [], winMoves = [];
+    const l3 = lvl.par + Math.max(2, Math.ceil(lvl.par * 0.15)), l2 = lvl.par + Math.max(4, Math.ceil(lvl.par * 0.5));
     for (let g = 0; g < GAMES; g++) {
       const r = playGame(lvl, rand, policy, cap);
-      if (r.end === 'won') { won++; winMoves.push(r.moves); } else if (r.end === 'stuck') { stuck++; depths.push(r.moves); } else capped++;
+      if (r.end === 'won') { won++; winMoves.push(r.moves); if (r.moves <= l3) w3++; if (r.moves <= l2) w2++; } else if (r.end === 'stuck') { stuck++; depths.push(r.moves); } else capped++;
     }
-    out[policy] = { won: won / GAMES, stuck: stuck / GAMES, capped: capped / GAMES, stuckMedianDepth: depths.length ? L.median(depths) : null,
+    out[policy] = { win3: w3 / GAMES, win2: w2 / GAMES, won: won / GAMES, stuck: stuck / GAMES, capped: capped / GAMES, stuckMedianDepth: depths.length ? L.median(depths) : null,
       stuckDepthMin: depths.length ? Math.min(...depths) : null, winMedian: winMoves.length ? L.median(winMoves) : null };
   }
   // winnability probes along naive trajectories: is the position still winnable after 8, 16, 24 ... moves?
   const rand = L.rng(0xBEEF + job.seed);
   const PROBES = job.probe, CH = [4, 8, 12, 16, 20, 24, 32, 40];
-  let doomedGames = 0, unknownGames = 0, firstDoomed = [], checked = 0, solveMs = 0;
+  let doomedGames = 0, stuckGames = 0, unknownGames = 0, firstDoomed = [], checked = 0, solveMs = 0;
   for (let g = 0; g < PROBES; g++) {
     const t = lvl.tubes.map(x => x.slice());
-    let prev = null, doomedAt = null, unk = false;
+    let prev = null, doomedAt = null, unk = false, stuckAt = null;
     for (let k = 1; k <= CH[CH.length - 1]; k++) {
       const mv = L.legalMoves(t, lvl.caps);
-      if (!mv.length || L.isWon(t, lvl.caps)) break;
+      if (L.isWon(t, lvl.caps)) break;
+      if (!mv.length) { stuckGames++; stuckAt = k - 1; break; }
       const wts = mv.map(([a, b]) => (prev && a === prev[1] && b === prev[0]) ? 0 : (t[b].length ? 3 : 1));
       const sum = wts.reduce((s, x) => s + x, 0) || 1; let r = rand() * sum, i = 0;
       while (i < wts.length - 1 && r >= wts[i]) { r -= wts[i]; i++; }
@@ -80,17 +82,18 @@ function analyseLevel(job) {
     if (doomedAt !== null) { doomedGames++; firstDoomed.push(doomedAt); }
     else if (unk) unknownGames++;
   }
-  out.probe = { games: PROBES, doomed: doomedGames / PROBES, unknown: unknownGames / PROBES, firstDoomedMedian: firstDoomed.length ? L.median(firstDoomed) : null, checks: checked, ms: solveMs };
+  out.probe = { games: PROBES, stuck: stuckGames / PROBES, doomed: doomedGames / PROBES, unknown: unknownGames / PROBES, firstDoomedMedian: firstDoomed.length ? L.median(firstDoomed) : null, checks: checked, ms: solveMs };
   // first-move analysis (what a player must decide at the start)
   const mv0 = L.legalMoves(lvl.tubes, lvl.caps);
   const onto = mv0.filter(([a, b]) => lvl.tubes[b].length).length;
-  let fatal = 0, unk0 = 0;
+  let fatal = 0, unk0 = 0, imm = 0;
   mv0.forEach(([a, b]) => {
     const t = lvl.tubes.map(x => x.slice()); t[b].push(t[a].pop());
+    if (!L.legalMoves(t, lvl.caps).length) imm++;
     const s = L.solve(t, lvl.caps, { maxNodes: job.nodes * 4, weight: 2 });
     if (s.status === 'unsolvable') fatal++; else if (s.status === 'unknown') unk0++;
   });
-  out.first = { legal: mv0.length, ontoSameColour: onto, intoEmpty: mv0.length - onto, fatal, unknown: unk0 };
+  out.first = { immediateStuck: imm, legal: mv0.length, ontoSameColour: onto, intoEmpty: mv0.length - onto, fatal, unknown: unk0 };
   // second-ply: fraction of (first,second) move pairs after which the position is lost
   let pairs = 0, fatalPairs = 0, unkPairs = 0;
   mv0.forEach(([a, b]) => {

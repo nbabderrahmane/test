@@ -159,3 +159,37 @@ function rng(seed) {
 const median = a => { const s = a.slice().sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 
 module.exports = { ROOT, HTML, SOLS, SCRATCH, loadAll, decode, canMove, isWon, legalMoves, replay, invariant, isomorphic, sameLabelOverlap, solve, keyOf, h, rng, median, pattern };
+
+// Same A* as solve(), but returns the move list (real tube indices) so a shorter solution can be replayed in the game.
+function solvePath(tubes, caps, maxNodes) {
+  const t0 = tubes.map(x => x.slice());
+  const seen = new Map();            // key -> {g, t, parent, move}
+  const k0 = keyOf(t0, caps);
+  seen.set(k0, { g: 0, t: t0, parent: null, move: null });
+  const buckets = new Map(); let minF = Infinity;
+  const push = (k, g, t) => { const f = g + h(t, caps); let b = buckets.get(f); if (!b) { b = []; buckets.set(f, b); } b.push(k); if (f < minF) minF = f; };
+  push(k0, 0, t0);
+  let nodes = 0;
+  while (buckets.size) {
+    while (!buckets.has(minF)) minF++;
+    const b = buckets.get(minF); const k = b.pop(); if (!b.length) buckets.delete(minF);
+    const rec = seen.get(k);
+    if (rec.g + h(rec.t, caps) !== minF) continue;
+    if (++nodes > maxNodes) return null;
+    for (const [a, c] of legalMoves(rec.t, caps)) {
+      const n = rec.t.map(x => x.slice()); n[c].push(n[a].pop());
+      const nk = keyOf(n, caps);
+      if (isWon(n, caps)) {
+        const path = [[a, c]]; let r = rec;
+        while (r.parent) { path.push(r.move); r = seen.get(r.parent); }
+        return path.reverse();
+      }
+      const o = seen.get(nk);
+      if (o && o.g <= rec.g + 1) continue;
+      seen.set(nk, { g: rec.g + 1, t: n, parent: k, move: [a, c] });
+      push(nk, rec.g + 1, n);
+    }
+  }
+  return null;
+}
+module.exports.solvePath = solvePath;
