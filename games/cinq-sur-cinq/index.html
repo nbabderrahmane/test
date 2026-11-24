@@ -701,6 +701,7 @@ window.__game = {
   advance: function (ms) {   // moves the game clock forward, as if that time had passed
     ms = Math.max(0, +ms || 0);
     if (frozenAt !== null) frozenAt += ms; else skew += ms;
+    if (G && !G.fin) persist();   // the saved deadline follows the moved clock
     checkExpiry();
     if (G && screen === 'game' && !G.fin && G.sel === null) renderTimer();
   }

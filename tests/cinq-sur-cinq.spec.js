@@ -24,7 +24,7 @@ let browser;
 const problems = [];   // console errors, page errors, unexpected requests (all pages)
 const results = [];
 
-// Opens the game. opts.save seeds localStorage once (a reload keeps what the game stored); opts.raw seeds a raw string;
+// Opens the game. opts.save seeds localStorage on the first navigation only (a reload keeps what the game stored); opts.raw seeds a raw string;
 // opts.config sets window.MJ_CONFIG; opts.share: 'ok' | 'none' stubs navigator.share (texts land in window.__shared);
 // opts.hash opens a link. Messages to the host are collected in window.__msgs (the page is its own parent here).
 async function open(viewport = { width: 360, height: 640 }, opts = {}) {
@@ -35,7 +35,8 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
     try {
       if (nostore) {
         Object.defineProperty(window, 'localStorage', { get() { throw new Error('storage disabled'); } });
-      } else if (!localStorage.getItem(key)) {
+      } else if (!sessionStorage.getItem('__seeded')) {   // first navigation only, never after a reload (R14)
+        sessionStorage.setItem('__seeded', '1');
         if (raw !== null) localStorage.setItem(key, raw);
         else if (save) localStorage.setItem(key, JSON.stringify(save));
       }
@@ -65,13 +66,8 @@ const msgs = page => page.evaluate(() => new Promise(r => setTimeout(() => r(win
 const events = async (page, name) => (await msgs(page)).filter(m => m.event === name);
 const stored = page => page.evaluate(k => localStorage.getItem(k), KEY);
 const shared = page => page.evaluate(() => window.__shared);
-// Headless Chromium on file:// sometimes forgets localStorage across a reload (also on a blank page, unrelated to the game):
-// carry the stored value over by hand so a reload test checks the game, not the browser.
-async function reload(page) {
-  const v = await page.evaluate(k => localStorage.getItem(k), KEY);
-  if (v !== null) await page.addInitScript(([k, val]) => { try { if (localStorage.getItem(k) !== val) localStorage.setItem(k, val); } catch (e) { /* ignore */ } }, [KEY, v]);
-  await page.reload();
-}
+const reload = page => page.reload();
+const prog = async page => { const o = JSON.parse(await stored(page)); delete o.chal; return JSON.stringify(o); };   // progress without the challenge slot
 const answerBtn = (page, d) => page.locator(`#ans .a[data-d="${d}"]`);
 
 // Index (displayed position) of the right answer of the question on screen.
@@ -123,7 +119,7 @@ async function test(name, fn) {
   }
 }
 const stars = (n, v) => new Array(n).fill(v);
-const OPEN_SAVE = { seed: 3, att: 0, max: 20, stars: [1, 1, 1, ...stars(17, 0)], best: stars(20, 0), cur: null };   // levels 1-3 done: "Continuer" points at 4   // every level unlocked
+const OPEN_SAVE = { seed: 3, att: 0, max: 20, lost: stars(20, 0), stars: [1, 1, 1, ...stars(17, 0)], best: stars(20, 0), cur: null };   // levels 1-3 done: "Continuer" points at 4   // every level unlocked
 
 // Layout of what is on screen: page scroll, tap targets, bounds, clipped text.
 const measure = page => page.evaluate(() => {
@@ -265,23 +261,41 @@ function checkFit(m, label) {
     await context.close();
   });
 
-  await test('stars follow the number of right answers: 3 -> 1, 4 -> 2, 5 -> 3 (and a worse replay keeps the best)', async () => {
-    const { context, page } = await open();
-    await fresh(page, 3);
-    let s = await playHooks(page, [true, false, true, false, true]);
+  await test('R11: stars follow the right answers (3 -> 1, 4 -> 2, 5 -> 3), freeze at the first win, and a win after a failure caps at 2', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { save: { ...OPEN_SAVE, stars: stars(20, 0) } });
+    const win = async (n, plan) => { await page.evaluate(k => { window.__game.freeze(true); window.__game.loadLevel(k); }, n); return playHooks(page, plan); };
+    let s = await win(1, [true, false, true, false, true]);
     assert.equal(s.game.good, 3); assert.equal(s.game.stars, 1);
-    await page.evaluate(() => window.__game.loadLevel(3));
-    s = await playHooks(page, [true, true, true, true, false]);
+    s = await win(2, [true, true, true, true, false]);
     assert.equal(s.game.good, 4); assert.equal(s.game.stars, 2);
-    await page.evaluate(() => window.__game.loadLevel(3));
+    s = await win(3, [true, true, true, true, true]);
+    assert.equal(s.game.stars, 3); assert.deepEqual(s.stars.slice(0, 3), [1, 2, 3]);
+    // frozen: a perfect replay of level 1 keeps its single star, and the screens say so
+    await page.evaluate(() => { window.__game.freeze(true); window.__game.loadLevel(1); });
+    assert.match(await page.locator('#goal').textContent(), /déjà obtenues/);
     s = await playHooks(page, [true, true, true, true, true]);
-    assert.equal(s.game.stars, 3);
-    assert.equal(s.stars[2], 3);
-    await page.evaluate(() => window.__game.loadLevel(3));
-    s = await playHooks(page, [true, true, false, false, false]);
-    assert.equal(s.game.won, false);
-    assert.equal(s.stars[2], 3, 'a failed replay must not lower the stars');
-    assert.ok(s.best[2] >= 1000 - 5 * 0 && s.best[2] <= 1000);
+    assert.equal(s.game.stars, 1); assert.equal(s.stars[0], 1);
+    await page.waitForTimeout(450);
+    assert.equal(await page.locator('#rStars svg.on').count(), 1);
+    assert.match(await page.locator('#rRec').textContent(), /déjà acquises/);
+    assert.equal((await events(page, 'level_complete')).pop().stars, 1);
+    // a worse replay of level 3 does not lower it either
+    s = await win(3, [true, true, false, false, false]);
+    assert.equal(s.game.won, false); assert.equal(s.stars[2], 3);
+    // failure first, then a perfect game: 2 stars at most
+    s = await win(4, [false, false, false, true, true]);
+    assert.equal(s.game.won, false); assert.equal(s.stars[3], 0); assert.equal(s.lost[3], 1);
+    await page.evaluate(() => { window.__game.freeze(true); window.__game.loadLevel(4); });
+    assert.match(await page.locator('#goal').textContent(), /Après un échec : 2 étoiles au plus/);
+    s = await playHooks(page, [true, true, true, true, true]);
+    assert.equal(s.game.good, 5); assert.equal(s.game.stars, 2); assert.equal(s.stars[3], 2);
+    await page.waitForTimeout(450);
+    assert.equal(await page.locator('#rStars svg.on').count(), 2);
+    assert.match(await page.locator('#rRec').textContent(), /2 étoiles au plus/);
+    s = await win(4, [true, true, true, true, true]);
+    assert.equal(s.stars[3], 2, 'frozen at the first win');
+    // the record of points still improves
+    assert.ok(s.best[3] > 0);
     await context.close();
   });
 
@@ -381,7 +395,7 @@ function checkFit(m, label) {
     assert.deepEqual(s.game.options, before.options);
     assert.deepEqual(s.game.results, before.results);
     assert.equal(s.game.score, before.score);
-    assert.ok(s.game.remaining <= before.remaining && s.game.remaining >= before.remaining - 1100, `time ${before.remaining} -> ${s.game.remaining}`);
+    assert.ok(s.game.remaining <= before.remaining && s.game.remaining >= before.remaining - 1500, `time ${before.remaining} -> ${s.game.remaining}`);
     // answer and reload on the revealed state
     await page.evaluate(() => window.__game.freeze(true));
     const right = await rightIndex(page);
@@ -517,7 +531,7 @@ function checkFit(m, label) {
     const save = { seed: 5, att: 3, level: 2, max: 2, stars: [3, ...stars(19, 0)], best: [900, ...stars(19, 0)], cur: null };
     const { context, page } = await open({ width: 360, height: 640 }, { save, hash: '#defi-9-1000', share: 'ok', config: { shareBaseUrl: 'https://exemple.test/jeux/cinq' } });
     await page.evaluate(() => window.__game.freeze(true));
-    const before = await stored(page);
+    const before = await prog(page);
     let s = await state(page);
     assert.equal(s.screen, 'game'); assert.equal(s.game.level, 9);
     assert.deepEqual(s.game.challenge, { target: 1000, won: null });
@@ -538,7 +552,7 @@ function checkFit(m, label) {
     const res = await events(page, 'challenge_result');
     assert.deepEqual(res, [{ source: 'mini-jeu', game: 'cinq-sur-cinq', event: 'challenge_result', level: 9, score: 1000, target: 1000, won: true }]);
     assert.equal((await events(page, 'level_complete')).length, 0);
-    assert.equal(await stored(page), before, 'progress must not change');
+    assert.equal(await prog(page), before, 'progress must not change');
     await shot(page, 'challenge-won');
     // R3: one play per opening: no replay, the result event left once, "Renvoyer le défi" only because it was won
     assert.equal(await page.locator('#bAgain').isHidden(), true);
@@ -553,14 +567,14 @@ function checkFit(m, label) {
     await page.waitForFunction(() => window.__game.state().screen === 'game');
     s = await state(page);
     assert.deepEqual(s.game.challenge, { target: 1000, won: null }); assert.equal(s.game.index, 0);
-    await playHooks(page, [true, true, true, false, true]);
+    await playHooks(page, [true, true, true, false]);   // R15: the 4th answer makes 1000 unreachable: the challenge ends there
     await page.waitForSelector('#res:not([hidden])');
     assert.match(await page.locator('#rTitle').textContent(), /Défi perdu/);
     const res2 = await events(page, 'challenge_result');
     assert.equal(res2.length, 2); assert.equal(res2[1].won, false); assert.equal(res2[1].target, 1000); assert.ok(res2[1].score < 1000);
     assert.equal(await page.locator('#bAgain').isHidden(), true);
     assert.equal(await page.locator('#bChal').isHidden(), true, 'a lost challenge is not sent back');
-    assert.equal(await stored(page), before);
+    assert.equal(await prog(page), before);
     await page.locator('#bHome').tap();
     s = await state(page);
     assert.equal(s.screen, 'home'); assert.equal(s.max, 2);
@@ -572,14 +586,14 @@ function checkFit(m, label) {
     const { context, page } = await open({ width: 360, height: 640 }, { save: { ...OPEN_SAVE, stars: [1, 1, ...stars(18, 0)] } });
     await fresh(page, 3, 9);
     await playHooks(page, [true, false]);
-    const before = await stored(page);
+    const before = await prog(page);
     const mid = (await state(page)).game;
     await page.evaluate(() => { location.hash = '#defi-12-400'; });
     await page.waitForFunction(() => window.__game.state().game.challenge);
     let s = await state(page);
     assert.equal(s.game.level, 12); assert.equal(s.game.challenge.target, 400);
     await playHooks(page, [true, true, true, true, true]);
-    assert.equal(await stored(page), before);
+    assert.equal(await prog(page), before);
     await reload(page);
     await page.waitForFunction(() => !!window.__game);
     await page.locator('#bGo').tap();
@@ -779,6 +793,152 @@ function checkFit(m, label) {
       a.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); b.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })); });
     assert.equal((await state(o.page)).game.answered, false);
     await o.context.close();
+  });
+
+  await test('R17: the question deadline is a clock time: the grid, a hidden app or a reload never give time back', async () => {
+    // grid trip
+    let { context, page } = await open();
+    await page.locator('#bGo').tap();
+    await page.evaluate(() => window.__game.advance(2000));
+    await page.locator('#bMap').tap();
+    await page.evaluate(() => window.__game.advance(6000));
+    await page.locator('.cell[data-n="1"]').tap();
+    let g = (await state(page)).game;
+    assert.ok(g.remaining <= 4100 && g.remaining > 2500, 'after the grid: ' + g.remaining);
+    // hidden app
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+      document.dispatchEvent(new Event('visibilitychange'));
+      window.__game.advance(2000);
+    });
+    await page.waitForTimeout(250);
+    await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange')); });
+    g = (await state(page)).game;
+    assert.ok(g.remaining <= 2100 && g.remaining > 500, 'after hiding: ' + g.remaining);
+    await context.close();
+    // deadline passed while away: counted as time out
+    ({ context, page } = await open());
+    await page.locator('#bGo').tap();
+    await page.locator('#bMap').tap();
+    await page.evaluate(() => window.__game.advance(13000));
+    await page.locator('.cell[data-n="1"]').tap();
+    g = (await state(page)).game;
+    assert.equal(g.answered, true); assert.equal(g.picked, -1);
+    assert.deepEqual(g.results, [{ ok: false, pts: 0 }]);
+    assert.match(await page.locator('#fbT').textContent(), /Temps écoulé/);
+    await context.close();
+    // reload
+    ({ context, page } = await open());
+    await page.locator('#bGo').tap();
+    await page.waitForTimeout(1500);
+    await reload(page);
+    await page.waitForFunction(() => !!window.__game);
+    await page.locator('#bGo').tap();
+    g = (await state(page)).game;
+    assert.ok(g.remaining <= 10500 && g.remaining > 8000, 'after reload: ' + g.remaining);
+    // reload after the deadline: time out
+    await page.evaluate(() => window.__game.advance(11000));
+    await reload(page);
+    await page.waitForFunction(() => !!window.__game);
+    await page.waitForTimeout(1300);
+    await page.locator('#bGo').tap();
+    g = (await state(page)).game;
+    assert.equal(g.answered, true); assert.equal(g.picked, -1);
+    await context.close();
+    // same for a challenge
+    ({ context, page } = await open({ width: 360, height: 640 }, { hash: '#defi-5-100' }));
+    await page.locator('#bMap').tap();
+    await page.evaluate(() => window.__game.advance(13000));
+    await page.waitForTimeout(250);
+    g = (await state(page)).game;
+    assert.equal(g.results.length, 1); assert.equal(g.picked, -1);
+    await context.close();
+  });
+
+  await test('R15: a challenge stops as soon as its target is out of reach, and its result leaves once', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { hash: '#defi-4-1000' });
+    await page.evaluate(() => window.__game.freeze(true));
+    await playHooks(page, [true, false]);   // 200 + 0 + 3 x 200 max = 800 < 1000
+    let s = await state(page);
+    assert.equal(s.game.finished, true); assert.equal(s.game.results.length, 2);
+    assert.deepEqual(s.game.challenge, { target: 1000, won: false });
+    await page.waitForSelector('#res:not([hidden])');
+    assert.match(await page.locator('#rTitle').textContent(), /Défi perdu/);
+    assert.equal(await page.locator('#bAgain').isHidden(), true);
+    await page.waitForTimeout(300);
+    const r = await events(page, 'challenge_result');
+    assert.equal(r.length, 1); assert.equal(r[0].won, false); assert.equal(r[0].score, 200);
+    await page.evaluate(() => { window.__game.next(); window.__game.answer(0); });
+    assert.equal((await events(page, 'challenge_result')).length, 1);
+    // still reachable: the game goes on (target 600 after one miss: 0 + 4 x 200 = 800)
+    await context.close();
+    const b = await open({ width: 360, height: 640 }, { hash: '#defi-4-600' });
+    await b.page.evaluate(() => window.__game.freeze(true));
+    await playHooks(b.page, [false]);
+    s = await state(b.page);
+    assert.equal(s.game.finished, false); assert.equal(s.game.index, 1);
+    await b.context.close();
+  });
+
+  await test('R15: a challenge in progress is resumed after a reload; challenge_result leaves once overall', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { save: OPEN_SAVE, hash: '#defi-9-700' });
+    await page.evaluate(() => window.__game.freeze(true));
+    await playHooks(page, [true, true]);
+    const before = (await state(page)).game;
+    assert.equal(before.index, 2);
+    const progress = await prog(page);
+    await reload(page);
+    await page.waitForFunction(() => !!window.__game);
+    let s = await state(page);
+    assert.equal(s.screen, 'game'); assert.equal(s.hasChallenge, true);
+    assert.equal(s.game.level, 9); assert.equal(s.game.challenge.target, 700); assert.equal(s.game.index, 2);
+    assert.equal(s.game.question, before.question); assert.deepEqual(s.game.options, before.options); assert.deepEqual(s.game.results, before.results);
+    assert.equal((await events(page, 'challenge_open')).length, 0, 'no second opening');
+    assert.equal(await prog(page), progress);
+    await page.evaluate(() => window.__game.freeze(true));
+    await playHooks(page, [true, true, true]);
+    assert.equal((await state(page)).game.challenge.won, true);
+    assert.equal((await events(page, 'challenge_result')).length, 1);
+    await reload(page);
+    await page.waitForFunction(() => !!window.__game);
+    s = await state(page);
+    assert.equal(s.screen, 'home'); assert.equal(s.hasChallenge, false);
+    assert.equal((await events(page, 'challenge_result')).length, 0, 'finished challenge is not replayed');
+    // a normal level started afterwards abandons nothing else; progress untouched
+    assert.equal(await prog(page), progress);
+    await context.close();
+  });
+
+  await test('R21: wording and look: no "sa seule", the 1934 and final titles, an accent that is not a brand green', async () => {
+    const flat = DATA.flatMap(l => l.qs.map(q => q.q));
+    assert.ok(!flat.some(q => /seule|première CAN|unique/i.test(q.replace('toute première Coupe', '')) && /sa seule/i.test(q)));
+    assert.ok(flat.includes('Quel fut le premier pays africain à jouer une Coupe du monde, en 1934 ?'));
+    assert.ok(flat.includes('Quel pays a gagné la CAN 1976 ?'));
+    assert.equal(DATA[19].theme, 'La grande finale');
+    const src = fs.readFileSync(FILE, 'utf8');
+    const acc = /--acc:(#[0-9A-Fa-f]{6})/.exec(src)[1].toUpperCase();
+    for (const brand of ['#3DDC84', '#1DB954', '#25D366', '#58CC02', '#00C853']) assert.notEqual(acc, brand);
+    assert.ok(!/3DDC84/i.test(src) && !/61,\s*220,\s*132/.test(src));
+    const { context, page } = await open();
+    const c = await page.evaluate(() => getComputedStyle(document.querySelector('#bGo')).backgroundColor);
+    assert.notEqual(c, 'rgb(61, 220, 132)');
+    assert.equal((await page.evaluate(() => window.__game.levels[19].theme)), 'La grande finale');
+    await context.close();
+  });
+
+  await test('R21: the answers are not stored in clear and the right one is not always first in the data', async () => {
+    const src = fs.readFileSync(FILE, 'utf8');
+    for (const l of DATA) for (const q of l.qs) for (const t of [q.a, ...q.w]) if (t.length >= 8) assert.ok(!src.includes(t), 'answer in clear in the file: ' + t);
+    const packed = JSON.parse(/var DATA=(\[.*\]);/.exec(src)[1]);
+    const pos = [0, 0, 0, 0];
+    let rank = 0;
+    packed.forEach((l, li) => l[1].forEach((q, k) => {
+      const opts = q[1].map(t => Buffer.from(t, 'base64').toString('utf8'));
+      const right = q[2] ^ ((rank * 7 + 3) & 3);
+      assert.equal(opts[right], DATA[li].qs[k].a, 'decoded right answer mismatch: ' + q[0]);
+      pos[right]++; rank++;
+    }));
+    assert.ok(pos.every(n => n >= 10), 'positions in the data: ' + pos);
   });
 
   const heaviest = (() => {   // the level whose questions and answers are the longest

@@ -76,6 +76,9 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
 // reload and wait for the NEW page (a marker set on the old one must be gone)
 async function reload(page) {
   await page.evaluate(() => { window.__old = true; });
+  // a write made just before the reload travels to the browser process on the old page's channel; the new page
+  // reads on another one, so under load it may read the value from before. A person never reloads within 300 ms.
+  await page.waitForTimeout(300);
   await page.reload();
   await page.waitForFunction(() => !!window.__game && !window.__old);
 }

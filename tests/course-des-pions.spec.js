@@ -37,7 +37,8 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
   await context.addInitScript(({ save, key, config, instant }) => {
     window.__msgs = [];
     window.addEventListener('message', e => { if (e.data && e.data.source === 'mini-jeu') window.__msgs.push(e.data); });
-    try { if (save && !localStorage.getItem(key)) localStorage.setItem(key, typeof save === 'string' ? save : JSON.stringify(save)); } catch (e) { /* ignore */ }
+    // R14: the starting save is written on the first navigation only (flag in sessionStorage), never after a reload
+    try { if (save && !sessionStorage.getItem('__seeded')) { sessionStorage.setItem('__seeded', '1'); localStorage.setItem(key, typeof save === 'string' ? save : JSON.stringify(save)); } } catch (e) { /* ignore */ }
     if (config) window.MJ_CONFIG = config;
   }, { save: opts.save || null, key: KEY, config: opts.config || null });
   const page = await context.newPage();
@@ -130,8 +131,12 @@ function checkFit(m, tag) {
 // Positions for the rule tests.
 const posAt = (seat, xy) => REF.PATHS[seat].findIndex(c => REF.key(c.xy) === REF.key(xy));
 function blank(np, k = 2) { return E.newGame({ k, seats: E.SEATS[np], tiers: [null].concat(new Array(np - 1).fill(1)), seed: 5 }); }
-function rngFor(v, S) {            // an rng state whose next throw is v
-  for (let r = 1; ; r++) { const t = { rng: r }; if (Math.floor(E.rnd(t, 'rng') * 6) + 1 === v) return r; }
+function rngFor(v, S, v2) {        // an rng state whose next throw is v (and the one after v2)
+  for (let r = 1; ; r++) {
+    const t = { rng: r };
+    if (Math.floor(E.rnd(t, 'rng') * 6) + 1 !== v) continue;
+    if (!v2 || Math.floor(E.rnd(t, 'rng') * 6) + 1 === v2) return r;
+  }
 }
 const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
 
@@ -154,7 +159,7 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     console.log(`        size: ${size} bytes (${(size / 1024).toFixed(1)} KB)`);
   });
 
-  await test('hooks and level table: 20 levels, 2 pions then 3, 1 then 2 then 3 opponents, no solutions in __game', async () => {
+  await test('hooks and level table: 20 levels, pions of each side and opponents as in the measured table of the doc, no solutions in __game', async () => {
     const { context, page } = await open();
     const info = await page.evaluate(() => ({ levels: window.__game.levels, fns: ['loadLevel', 'seed', 'state', 'setGame', 'instant', 'startHot'].map(k => typeof window.__game[k]),
       keys: Object.keys(window.__game), st: window.__game.state() }));
@@ -169,6 +174,12 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     assert.ok(info.levels.slice(0, 11).every(l => l.h < l.o), 'levels 1-11: fewer pions for the player');
     assert.ok(info.levels.slice(11).every(l => l.h === l.o), 'later: as many pions');
     assert.equal(info.levels[0].h, 1);
+    const md = fs.readFileSync(path.join(__dirname, '..', 'docs', 'contenu', 'course-des-pions.md'), 'utf8');
+    info.levels.forEach((l, i) => {
+      const m = new RegExp('^\\|\\s*' + (i + 1) + '\\s*\\|\\s*(\\d)\\s*\\|\\s*(\\d) × (\\d) pions \\(([\\d·]+)\\)', 'm').exec(md);
+      assert.ok(m, `level ${i + 1} is in the doc table`);
+      assert.deepEqual([+m[1], +m[2], +m[3], m[4]], [l.h, l.opp.length, l.o, l.opp.join('·')], `level ${i + 1}: doc table and game differ`);
+    });
     const counts = info.levels.map(l => l.opp.length);
     assert.ok(counts[0] === 1 && counts[18] === 3 && counts[19] === 3, 'one opponent first, three at the end');
     const strength = info.levels.map(l => l.opp.reduce((a, b) => a + b, 0) / l.opp.length);
@@ -510,7 +521,7 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     await context.close();
     // a challenge has neither "Annuler" nor "Recommencer"
     const b = await open({ width: 360, height: 640 }, { hash: '#defi-7-30' });
-    assert.equal(await b.page.locator('footer').isHidden(), true);
+    assert.equal(await b.page.locator('#bUndo').isHidden() && await b.page.locator('#bReset').isHidden(), true);
     assert.equal((await state(b.page)).canUndo, false);
     await b.context.close();
   });
@@ -545,7 +556,7 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     assert.equal(await page.locator('#act-share').count(), 0, 'no sharing a defeat');
     assert.equal(await page.locator('#act-again').textContent(), 'Réessayer');
     const sv = await stored(page);
-    assert.equal(sv.max, 6, 'a defeat unlocks nothing'); assert.equal(sv.stars[5] || 0, 0); assert.equal(sv.cur, null);
+    assert.equal(sv.max, 6, 'a defeat unlocks nothing'); assert.equal(sv.stars[5] || 0, 0); assert.equal(sv.cur[6], undefined);
     assert.equal((await events(page, 'level_complete')).length, 0);
     await shot(page, 'result-lost');
     await tap(page, '#act-again');
@@ -588,7 +599,7 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     await playSteps(page, 14);
     const a = await state(page);
     assert.ok(a.turns[0] >= 2);
-    assert.ok(a.seed !== 0 && a.seed === (await stored(page)).cur.seed, 'the seed of the game is in the save');
+    assert.ok(a.seed !== 0 && a.seed === (await stored(page)).cur[12].seed, 'the seed of the game is in the save');
     await page.reload();
     await page.waitForFunction(() => !!window.__game);
     await page.evaluate(() => window.__game.instant(true));
@@ -716,7 +727,7 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     await page.evaluate(seed => window.__game.seed(seed), 9);
     await playSteps(page, 6);
     const before = await stored(page), run = (await state(page)).game;
-    assert.ok(before.cur && before.cur.level === 3);
+    assert.ok(before.cur[3] && before.cur[3].level === 3);
     const exp = SEEDS.expect[6], target = exp.turns;
     await page.evaluate(h => { location.hash = h; }, `#defi-7-${target}`);
     let s = await state(page);
@@ -738,7 +749,7 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     assert.match(await page.locator('#wChal').textContent(), /égales ou bats/);
     assert.deepEqual(await page.locator('#acts .btn').allTextContents(), ['Renvoyer le défi', 'Accueil'], 'R3: a challenge is played once per opening');
     assert.equal(await page.locator('#act-again').count(), 0);
-    assert.equal(await page.locator('footer').isHidden(), true, 'no Recommencer / Annuler in a challenge');
+    assert.equal(await page.locator('#bUndo').isHidden() && await page.locator('#bReset').isHidden(), true, 'no Recommencer / Annuler in a challenge');
     assert.deepEqual(await events(page, 'challenge_result'), [{ source: 'mini-jeu', game: 'course-des-pions', event: 'challenge_result', level: 7, score: target, target, won: true }]);
     assert.equal((await events(page, 'level_complete')).length, 0, 'a challenge is not a level result');
     const after = await stored(page);
@@ -753,7 +764,9 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     await page.evaluate(seed => window.__game.seed(seed), SEEDS.win[6]);
     await playOut(page);
     await page.locator('#res').waitFor({ state: 'visible' });
-    assert.match(await page.locator('#wChal').textContent(), /de trop/);
+    assert.match(await page.locator('#wChal').textContent(), /Défi raté/);
+    assert.equal((await state(page)).turns[0], target, 'R15: the challenge stopped as soon as the objective was out of reach');
+    assert.notEqual((await state(page)).winner, 0);
     assert.deepEqual((await events(page, 'challenge_result')).map(e => [e.score, e.target, e.won]), [[target, target - 1, false]]);
     assert.deepEqual(await page.locator('#acts .btn').allTextContents(), ['Accueil'], 'lost challenge: nothing to retry');
     assert.equal(await page.locator('#act-again').count(), 0);
@@ -869,21 +882,29 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     };
     await page.evaluate(() => window.__game.loadLevel(7));
     const base = clone((await state(page)).game);
-    const craft = async (pos, v) => {
-      const S = clone(base); S.pos[0] = pos; S.pos[1] = [-1, -1, -1]; S.turn = 0; S.roll = 0; S.tries = 0; S.rng = rngFor(v, S);
+    const craft = async (pos, v, v2) => {
+      const S = clone(base); S.pos[0] = pos; S.pos[1] = [-1, -1, -1]; S.turn = 0; S.roll = 0; S.tries = 0; S.rng = rngFor(v, S, v2);
       await page.evaluate(g => window.__game.setGame(g), S);
-      const q = { rng: S.rng }; E.rnd(q, 'rng');
+      const q = { rng: S.rng }; E.rnd(q, 'rng'); if (v2) E.rnd(q, 'rng');
       return q.rng;
     };
-    // 1. a 6 that plays itself (the player throws again at once): a second tap 250 ms later is the same gesture
+    // 1. a stray second tap right after the first one: the die is not ready, one throw only
     let after = await craft([-1, -1], 6);
     await tap(page, '#die');
-    await page.waitForTimeout(250);
     await tap(page, '#die');
-    await page.waitForTimeout(700);
+    await page.waitForTimeout(500);
     let s = await state(page);
     assert.equal(s.game.rng, after, 'one throw only');
     assert.ok(s.game.pos[0].includes(0) && s.roll === 0 && s.turn === 0);
+    // 1b. two legitimate throws close together are both accepted (accelerated: the die is ready again after ~90 ms)
+    await tap(page, '#bFast');
+    const two = await craft([-1, -1], 6, 6);
+    await tap(page, '#die');
+    await page.waitForTimeout(160);
+    await tap(page, '#die');
+    await page.waitForTimeout(80);
+    assert.equal((await state(page)).game.rng, two, 'the second, legitimate, throw was taken');
+    await tap(page, '#bFast');
     // 2. long press on the die (800 ms): one throw, no pion played
     after = await craft([3, 10], 2);
     let c = await centre(page, '#die');
@@ -908,6 +929,114 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     await page.waitForTimeout(450);
     await page.touchscreen.tap(P[0], P[1]);
     assert.deepEqual((await state(page)).game.pos[0], [3, 12], 'a deliberate tap later does');
+    await context.close();
+  });
+
+  await test('help: a short rules screen reachable from the home and from the game, the game goes on behind it', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { instant: false });
+    await tap(page, '#bHHelp');
+    assert.equal((await state(page)).screen, 'help');
+    const txt = await page.locator('#rules').textContent();
+    for (const re of [/6/, /rejoue/, /trois essais/, /pion adverse/, /refuge/, /compte exact/, /étoiles/]) assert.match(txt, re);
+    assert.ok(txt.length < 520, 'short: ' + txt.length);
+    await tap(page, '#bKOk');
+    assert.equal((await state(page)).screen, 'home');
+    await tap(page, '#bGo');
+    await tap(page, '#bHelp');
+    assert.equal((await state(page)).screen, 'help');
+    await tap(page, '#bKBack');
+    assert.equal((await state(page)).screen, 'game');
+    assert.match(await page.locator('#msg').textContent(), /dé/i);
+    await context.close();
+  });
+
+  await test('one game in progress per level: another level never resets the first (grid, reload)', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { save: { max: 5, stars: [3, 3, 3, 3] } });
+    await tap(page, '#bGo');
+    assert.equal((await state(page)).level, 5);
+    await page.evaluate(() => window.__game.seed(41));
+    await playSteps(page, 6);
+    const g5 = (await state(page)).game;
+    await tap(page, '#bMap'); await tap(page, '.cell[data-level="3"]');
+    await page.evaluate(() => window.__game.seed(42));
+    await playSteps(page, 4);
+    const g3 = (await state(page)).game;
+    await tap(page, '#bMap'); await tap(page, '.cell[data-level="5"]');
+    assert.deepEqual((await state(page)).game, g5, 'level 5 is where it was left');
+    await tap(page, '#bMap'); await tap(page, '.cell[data-level="3"]');
+    assert.deepEqual((await state(page)).game, g3, 'level 3 too');
+    const sv = await stored(page);
+    assert.deepEqual(Object.keys(sv.cur).sort(), ['3', '5']);
+    await page.reload(); await page.waitForFunction(() => !!window.__game);
+    await page.evaluate(() => window.__game.instant(true));
+    assert.deepEqual((await state(page)).game, g3, 'after a reload: the game last played');
+    await tap(page, '#bGo');
+    assert.deepEqual((await state(page)).game, g5, '"Continuer" opens the first unfinished level, with its own game');
+    await context.close();
+  });
+
+  await test('result screen and content sheet say the same about the stars: the lead at arrival, 3 stars from the shown threshold', async () => {
+    const md = fs.readFileSync(path.join(__dirname, '..', 'docs', 'contenu', 'course-des-pions.md'), 'utf8');
+    assert.match(md, new RegExp(`${E.STAR2} cases d.avance par pion`)); assert.match(md, new RegExp(`${E.STAR3} cases d.avance par pion`));
+    assert.ok(!/selon le classement/i.test(md));
+    const { context, page } = await open();
+    await tap(page, '#bGo');
+    for (const [n, st] of [[1, 1], [6, 3]]) {
+      await page.evaluate(k => window.__game.loadLevel(k), n);
+      const L = E.LEVELS[n - 1], k = Math.max(L.h, L.o);
+      assert.match(await page.locator('#goal').textContent(), new RegExp(`${E.STAR3 * k} cases d’avance`), 'threshold on the game screen');
+      await page.evaluate(seed => window.__game.seed(seed), n === 1 ? SEEDS.win[0] : SEEDS.stars[3].seed);
+      await playOut(page);
+      const s = await state(page);
+      await page.locator('#res').waitFor({ state: 'visible' });
+      const lead = E.lead(s.game);
+      assert.equal((await page.locator('#wLead').textContent()).trim(), `Avance : ${lead} case${lead > 1 ? 's' : ''} · 3 étoiles dès ${E.STAR3 * k}`);
+      assert.equal(s.stars, lead >= E.STAR3 * k ? 3 : lead >= E.STAR2 * k ? 2 : 1, 'stars follow the lead shown');
+      assert.equal(await page.locator('#wStars .on').count(), s.stars);
+      if (n === 1) await tap(page, '#act-next');
+    }
+    await context.close();
+  });
+
+  await test('R19: a challenge that is left is dropped for good (not resumed, no result); R15: it resumes after a reload while played', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, {});
+    await page.evaluate(h => { location.hash = h; }, '#defi-9-30');
+    await playSteps(page, 4);
+    assert.equal((await state(page)).mode, 'chal');
+    await page.reload(); await page.waitForFunction(() => !!window.__game);
+    assert.equal((await state(page)).mode, 'chal', 'resumed after a reload');
+    await page.evaluate(() => window.__game.instant(true));
+    await tap(page, '#bMap');
+    assert.equal((await state(page)).screen, 'levels');
+    assert.equal((await stored(page)).chal, null);
+    await page.reload(); await page.waitForFunction(() => !!window.__game);
+    assert.equal((await state(page)).mode, 'level', 'abandoned for good');
+    assert.equal((await events(page, 'challenge_result')).length, 0);
+    await context.close();
+  });
+
+  await test('"à plusieurs" game in progress is resumed after a reload, and from the menu after leaving it', async () => {
+    const { context, page } = await open();
+    await tap(page, '#bHot'); await tap(page, '#hot [data-np="3"]');
+    await page.evaluate(() => window.__game.seed(61));
+    await playSteps(page, 12);
+    const a = await state(page);
+    assert.equal(a.mode, 'hot'); assert.ok(a.game.pos.flat().some(p => p >= 0));
+    await page.reload(); await page.waitForFunction(() => !!window.__game);
+    await page.evaluate(() => window.__game.instant(true));
+    let b = await state(page);
+    assert.equal(b.mode, 'hot', 'back on the game, not on the home screen'); assert.equal(b.screen, 'game');
+    assert.deepEqual(b.game, a.game); assert.equal(b.seed, a.seed);
+    await tap(page, '#bMap');                              // home
+    await tap(page, '#bHot');
+    assert.match(await page.locator('#hot [data-np="0"]').textContent(), /Reprendre.*3 joueurs/);
+    await tap(page, '#hot [data-np="0"]');
+    assert.deepEqual((await state(page)).game, a.game, 'resumed from the menu');
+    await playOut(page);
+    await page.locator('#res').waitFor({ state: 'visible' });
+    assert.equal((await stored(page)).hot, null, 'a finished game is not kept');
+    await page.reload(); await page.waitForFunction(() => !!window.__game);
+    assert.equal((await state(page)).screen, 'home');
     await context.close();
   });
 
@@ -1039,8 +1168,13 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
       checkFit(m, `hot ${tag}`);
       await shot(page, `hot-${tag}`);
       await tap(page, '#bHBack');
+      await tap(page, '#bHHelp');
+      m = await measure(page, '.btn, .icon');
+      checkFit(m, `help ${tag}`);
+      await shot(page, `help-${tag}`);
+      await tap(page, '#bKOk');
       await tap(page, '#bGo');
-      m = await measure(page, SEL_NOTOUR);
+      m = await measure(page, SEL_NOTOUR + ', #bHelp');
       checkFit(m, `game start ${tag}`);
       // the board is square, inside the screen, above the dock, cells at least 44 px wide
       assert.ok(Math.abs(m.board.w - m.board.h) < 1, 'square board');

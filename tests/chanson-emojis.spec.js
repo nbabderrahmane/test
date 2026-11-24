@@ -17,6 +17,12 @@ const SHOTS = process.env.SHOTS || '';
 const MOBILE = { hasTouch: true, isMobile: true, deviceScaleFactor: 2 };
 const SRC = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'tools', 'chanson-emojis', 'devinettes.json'), 'utf8'));
 const TITLE = new Map(SRC.map(x => [x.e, x]));
+const TITLE_SET = new Set(SRC.map(x => x.t));
+const MANUAL = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'tools', 'chanson-emojis', 'exclusions.json'), 'utf8'));
+// R20: titles that must never be a decoy of a riddle: the same emoji in both, or a listed pair (both ways)
+const EXCLUDED = new Map(SRC.map(x => [x.t, new Set()]));
+MANUAL.forEach(([a, b]) => { EXCLUDED.get(a).add(b); EXCLUDED.get(b).add(a); });
+SRC.forEach(x => SRC.forEach(y => { if (x !== y && x.e.split(' ').some(t => y.e.split(' ').includes(t))) EXCLUDED.get(x.t).add(y.t); }));
 const VIEWPORTS = [{ width: 320, height: 568 }, { width: 360, height: 640 }, { width: 430, height: 932 }];
 
 let browser;
@@ -152,6 +158,16 @@ function checkFit(m, tag) {
     assert.ok(A.length >= 36, 'only ' + A.length + ' African or francophone titles');
     for (let q = 0; q < 4; q++) assert.ok(A.filter(n => n >= q * 5 && n < q * 5 + 5).length >= 6, 'African/francophone titles missing in levels ' + (q * 5 + 1) + '-' + (q * 5 + 5));
     for (let n = 0; n < 19; n++) assert.ok(A.includes(n), 'no African/francophone title in level ' + (n + 1));
+    // R21 content corrections
+    ['Poker Face', 'Milord'].forEach(t => assert.ok(!TITLE_SET.has(t), t + ' must be removed'));
+    SRC.forEach(x => assert.ok(!/\u20e3/.test(x.e), x.t + ': keycap emoji (composed sequence)'));
+    assert.equal(TITLE.get(SRC.find(x => x.t === 'Dernière danse').e).y, 2013);
+    assert.ok(!/Rwanda/.test(SRC.find(x => x.t === "Parce qu'on vient de loin").r.split('enfance')[0]) && /né en Allemagne/.test(SRC.find(x => x.t === "Parce qu'on vient de loin").r), 'Corneille is born in Germany');
+    const doc = fs.readFileSync(path.join(__dirname, '..', 'docs', 'contenu', 'chanson-emojis.md'), 'utf8');
+    assert.match(doc.slice(0, 400), /à valider par un humain avant publication/i);
+    assert.match(doc.slice(0, 1400), /Afrique francophone[\s\S]*(équipe locale)/);
+    assert.match(doc.slice(0, 1400), /Seuls 4 titres sur 60/);
+    SRC.forEach(x => assert.ok(doc.includes('| ' + x.t + ' |'), 'doc lacks ' + x.t));
     SRC.filter(x => x.h).forEach(x => assert.ok(x.n, x.t + ': hidden decade needs a note'));
     const { context, page } = await open();
     const info = await page.evaluate(() => ({ levels: window.__game.levels, st: window.__game.state(), keys: Object.keys(window.__game) }));
@@ -256,7 +272,7 @@ function checkFit(m, tag) {
     await play(page, 'xhw');
     s = await state(page);
     assert.ok(!s.won);
-    await page.locator('#bAgain').tap();
+    await page.locator('#bNext').tap();   // Rejouer
     await play(page, 'rrr');
     s = await state(page);
     assert.ok(s.won); assert.equal(s.stars, 2, 'frozen stars');
@@ -684,6 +700,72 @@ function checkFit(m, tag) {
       assert.equal(s.level, 2); assert.equal(s.pos, 0);
       assert.deepEqual(s.answers, [-1, -1, -1], 'a second tap on the result picked an answer');
     }
+    await context.close();
+  });
+
+  await test('R20: decoys are honest: over 500 draws per riddle, no title that the same emojis also evoke is ever offered', async () => {
+    // the listed pairs of the review, in both directions
+    const must = [["Yellow Submarine", "My Heart Will Go On"], ["Stayin' Alive", 'Dancing Queen'], ["Stayin' Alive", 'Macarena'],
+      ['What a Wonderful World', 'Heal the World'], ['What a Wonderful World', 'Africa'], ["Il est cinq heures, Paris s'éveille", 'Les Champs-Élysées'],
+      ['La Mer', 'Sodade'], ['Je veux', 'Je te donne'], ['Paroles, paroles', 'Les Mots bleus'], ['Ça plane pour moi', 'Voyage, voyage'],
+      ["Comme d'habitude", "Pour que tu m'aimes encore"]];
+    must.forEach(([a, b]) => { assert.ok(EXCLUDED.get(a).has(b) && EXCLUDED.get(b).has(a), `${a} / ${b} not excluded`); });
+    const { context, page } = await open();
+    const seen = await page.evaluate(() => {
+      const g = window.__game, out = {};
+      for (let seed = 0; seed < 500; seed++) {
+        g.seed(seed * 7919 + 13);
+        for (let n = 1; n <= 20; n++) {
+          g.loadLevel(n);
+          for (let i = 0; i < 3; i++) {
+            const st = g.state();
+            (out[st.emojis] = out[st.emojis] || new Set());
+            st.choices.forEach(c => out[st.emojis].add(c));
+            g.answer(0); g.next();
+          }
+        }
+      }
+      return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, [...v]]));
+    });
+    assert.equal(Object.keys(seen).length, 60);
+    for (const x of SRC) {
+      const titles = seen[x.e];
+      assert.ok(titles.includes(x.t));
+      titles.filter(t => t !== x.t).forEach(t => assert.ok(!EXCLUDED.get(x.t).has(t), `${x.t}: decoy "${t}" is defensible`));
+      assert.ok(titles.length >= 8, `${x.t}: decoys hardly vary (${titles.length})`);
+    }
+    await context.close();
+  });
+
+  await test('resume: a game in progress is kept per level, also when an older level is replayed (reload, grid, other level and back)', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { save: { level: 6, max: 6, stars: [3, 3, 3, 3, 3, 0] } });
+    await page.locator('#bLevels').tap();
+    await page.locator('.cell').nth(1).tap();                      // replay level 2
+    let s = await state(page);
+    assert.equal(s.level, 2);
+    await tapOpt(page, rightIdx(s)); await tapNext(page);
+    s = await state(page);
+    await tapOpt(page, wrongIdx(s));
+    const mid = await state(page);
+    assert.equal(mid.pos, 1);
+    await reload(page);
+    assert.equal(await page.locator('#bGo').textContent(), 'Continuer · Niveau 6');
+    await page.locator('#bLevels').tap();
+    await page.locator('.cell').nth(1).tap();                      // back to level 2 by the grid
+    let t = await state(page);
+    for (const k of ['level', 'pos', 'answers', 'hints', 'choices', 'emojis', 'points']) assert.deepEqual(t[k], mid[k], 'after reload: ' + k);
+    // another level in progress does not erase it
+    await page.locator('#bMap').tap();
+    await page.locator('.cell').nth(3).tap();                      // level 4
+    s = await state(page);
+    await tapOpt(page, rightIdx(s));
+    await page.locator('#bMap').tap();
+    await page.locator('.cell').nth(1).tap();
+    t = await state(page);
+    for (const k of ['level', 'pos', 'answers', 'choices']) assert.deepEqual(t[k], mid[k], 'after another level: ' + k);
+    await page.locator('#bMap').tap();
+    await page.locator('.cell').nth(3).tap();
+    assert.deepEqual((await state(page)).answers.filter(a => a >= 0).length, 1, 'level 4 lost its answer');
     await context.close();
   });
 
