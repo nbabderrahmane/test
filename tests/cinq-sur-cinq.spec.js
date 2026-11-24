@@ -61,6 +61,13 @@ const msgs = page => page.evaluate(() => new Promise(r => setTimeout(() => r(win
 const events = async (page, name) => (await msgs(page)).filter(m => m.event === name);
 const stored = page => page.evaluate(k => localStorage.getItem(k), KEY);
 const shared = page => page.evaluate(() => window.__shared);
+// Headless Chromium on file:// sometimes forgets localStorage across a reload (also on a blank page, unrelated to the game):
+// carry the stored value over by hand so a reload test checks the game, not the browser.
+async function reload(page) {
+  const v = await page.evaluate(k => localStorage.getItem(k), KEY);
+  if (v !== null) await page.addInitScript(([k, val]) => { try { if (localStorage.getItem(k) !== val) localStorage.setItem(k, val); } catch (e) { /* ignore */ } }, [KEY, v]);
+  await page.reload();
+}
 const answerBtn = (page, d) => page.locator(`#ans .a[data-d="${d}"]`);
 
 // Index (displayed position) of the right answer of the question on screen.
@@ -358,7 +365,7 @@ function checkFit(m, label) {
     await page.evaluate(() => window.__game.advance(4000));
     const before = (await state(page)).game;
     assert.equal(before.index, 2); assert.equal(before.answered, false);
-    await page.reload();
+    await reload(page);
     await page.waitForFunction(() => !!window.__game);
     let s = await state(page);
     assert.equal(s.screen, 'home'); assert.equal(s.hasSaved, true);
@@ -376,7 +383,7 @@ function checkFit(m, label) {
     const right = await rightIndex(page);
     await answerBtn(page, (right + 1) % 4).tap();
     const rev = (await state(page)).game;
-    await page.reload();
+    await reload(page);
     await page.waitForFunction(() => !!window.__game);
     await page.locator('#bGo').tap();
     s = await state(page);
@@ -400,7 +407,7 @@ function checkFit(m, label) {
     await fresh(page, 1);
     await playHooks(page, [true, true, true, true, false]);
     const g = (await state(page)).game;
-    await page.reload();
+    await reload(page);
     await page.waitForFunction(() => !!window.__game);
     const s = await state(page);
     assert.equal(s.stars[0], 2); assert.equal(s.max, 2); assert.equal(s.best[0], g.score);
@@ -431,7 +438,9 @@ function checkFit(m, label) {
       await page.locator('#bGo').tap();
       const g = (await state(page)).game;
       assert.ok(g.index >= 0 && g.index < 5 && g.options.length === 4 && g.remaining > 0 && g.remaining <= 12000, raw);
-      await playByTaps(page).catch(() => {});
+      await page.evaluate(() => window.__game.freeze(true));
+      const done = await page.evaluate(() => { const g = window.__game; for (let i = 0; i < 5 && !g.state().game.finished; i++) { g.answer(0); g.next(); } return g.state().game.finished; });
+      assert.equal(done, true, raw);
       await context.close();
     }
     // a locked level saved as the running game is not honoured
@@ -556,7 +565,7 @@ function checkFit(m, label) {
     assert.equal(s.game.level, 12); assert.equal(s.game.challenge.target, 400);
     await playHooks(page, [true, true, true, true, true]);
     assert.equal(await stored(page), before);
-    await page.reload();
+    await reload(page);
     await page.waitForFunction(() => !!window.__game);
     await page.locator('#bGo').tap();
     s = await state(page);
