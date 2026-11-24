@@ -563,7 +563,7 @@ function say(text, cls, ms) {
 var sugList = [];
 function maxSugg() {
   var h = $('app').clientHeight;
-  return h < 380 ? 3 : h < 470 ? 4 : 5;
+  return h < 330 ? 2 : h < 400 ? 3 : h < 470 ? 4 : 5;
 }
 function matches(q) {
   var k = norm(q), k2 = k.replace(/ /g, ''), out = [], tried = {};
@@ -586,8 +586,9 @@ function renderSugg() {
     html += '<button class="sg" role="option" data-pick="' + i + '"><b>' + CITIES[i].n + '</b><span>' + CITIES[i].c + '</span></button>';
   });
   if (!show.length && picked < 0 && norm(q)) {
-    var k = cityByKey(norm(q));
-    html = '<div class="sn">' + (k >= 0 ? 'Déjà essayé.' : 'Aucune ville de ce nom dans la liste.') + '</div>';
+    var nq = norm(q), nq2 = nq.replace(/ /g, '');
+    var again = guesses.some(function (g) { return CITIES[g.i].k.indexOf(nq) >= 0 || CITIES[g.i].k2.indexOf(nq2) >= 0; });
+    html = '<div class="sn">' + (again ? 'Déjà essayé.' : 'Aucune ville de ce nom dans la liste.') + '</div>';
   }
   box.innerHTML = html;
   box.style.maxHeight = (maxSugg() * 45) + 'px';

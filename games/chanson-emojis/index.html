@@ -106,7 +106,9 @@ footer{flex:none;display:flex;gap:10px;padding:8px 12px 12px}
 .card p.cres.lost{color:#FFB4BC}
 .acts{display:flex;flex-direction:column;gap:8px;margin-top:12px}
 .acts .row{display:flex;gap:8px}
+.acts .row .btn{flex:1}
 .acts .btn{min-height:48px}
+.acts>.btn,.acts .row{flex:none}
 .bit{position:absolute;top:-24px;font-size:20px;animation:fall 1.5s cubic-bezier(.3,.2,.6,1) forwards}
 @keyframes fall{to{transform:translate(var(--dx),105vh) rotate(var(--rot));opacity:.9}}
 
@@ -299,7 +301,7 @@ var DATA=[["💃 💃 🎶","Alors on danse","Stromae",2000,"A"],
 ["🎈 ☁️ ⬆️","Levitating","Dua Lipa",2020,"M"],
 ["💐 🌷 🌸","Flowers","Miley Cyrus",2020,"M"],
 ["💪 🔥","I Will Survive","Gloria Gaynor",1970,"M"],
-["👫 🤝","Stand by Me","Ben E. King",1960,"M"],
+["👫 💕","Stand by Me","Ben E. King",1960,"M"],
 ["🐶 🎸","Hound Dog","Elvis Presley",1950,"M"]];
 /*DATA:END*/
 // DATA[i] = [emoji tokens, title, artist, decade, group]; level n holds DATA[3(n-1)..3(n-1)+2].
@@ -364,7 +366,7 @@ function cleanGame(g, chal) {
     salt: int(g.salt, 0, 99999, 0), seed: int(g.seed, -2147483648, 2147483647, SEED), target: 0 };
   if (!o.level) return null;
   for (var i = 0; i < PER; i++) { o.ans.push(int(g.ans[i], -1, 3, -1)); o.hint.push(g.hint[i] ? 1 : 0); }
-  if (chal) { o.target = int(g.target, 1, MAXPTS, 0); if (!o.target) return null; }
+  if (chal) { o.target = Number(g.target); if (!(o.target >= 1 && o.target <= MAXPTS && o.target % 1 === 0)) return null; }
   return o;
 }
 function loadSave() {
@@ -397,6 +399,7 @@ var screen = 'home';
 var nextAct = null, againAct = null;
 
 function newGame(mode, n, from, target) {
+  $('win').hidden = true;
   if (from) {
     G = { mode: mode, level: from.level, pos: from.pos, ans: from.ans.slice(), hint: from.hint.slice(), salt: from.salt, seed: from.seed, target: from.target || 0, over: false };
   } else {
@@ -766,6 +769,7 @@ window.__game = {
   restart: function () { restart(); return this.state(); },
   seed: function (n) {
     SEED = n | 0;
+    save.plays = 0;   // the same seed replays the same sequence of choices
     if (G && G.ans.every(function (a) { return a < 0; })) { G.seed = SEED; persist(); render(); }
     return SEED;
   }

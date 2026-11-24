@@ -80,7 +80,9 @@ async function test(name, fn) {
   }
 }
 
-const measure = page => page.evaluate(() => {
+const measure = async page => {
+  await page.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => 0))));   // let the pop-in end
+  return page.evaluate(() => {
   const de = document.documentElement, b = document.body;
   window.scrollTo(50, 50);
   const vis = el => { const q = el.getBoundingClientRect(); return q.width > 0 && q.height > 0 && getComputedStyle(el).visibility !== 'hidden'; };
@@ -93,7 +95,8 @@ const measure = page => page.evaluate(() => {
     clipped: [...document.querySelectorAll('.opt .t,.btn,#hint,#msg,#goal,.cell')].filter(vis)
       .filter(e => e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1).map(e => e.className + ':' + e.textContent.slice(0, 30)),
   };
-});
+  });
+};
 function checkFit(m, tag) {
   assert.ok(m.sw <= m.iw, `${tag}: horizontal scroll (${m.sw} > ${m.iw})`);
   assert.ok(m.sh <= m.ih, `${tag}: vertical scroll (${m.sh} > ${m.ih})`);
@@ -130,7 +133,7 @@ function checkFit(m, tag) {
       assert.ok(x.e.split(' ').length >= 2 && x.e.split(' ').length <= 4, x.t + ': 2 to 4 emojis');
       assert.ok(!/‍|[\u{1F3FB}-\u{1F3FF}]|[\u{1F1E6}-\u{1F1FF}]/u.test(x.e), x.t + ': composed emoji, skin tone or flag');
       assert.ok(!/[\u{1F900}-\u{1FAFF}\u{1F6D0}-\u{1F6FF}\u{1F300}-\u{1F321}]/u.test(x.e.replace(/[\u{1F300}-\u{1F6CF}]/gu, c => c)) || true);
-      assert.ok(!/[\u{1F900}-\u{1FAFF}]/u.test(x.e), x.t + ': recent emoji');
+      assert.ok(!/[\u{1F900}-\u{1FAFF}\u{1F321}-\u{1F32F}\u{1F336}\u{1F37D}\u{1F394}-\u{1F39F}\u{1F3CB}-\u{1F3CE}\u{1F3D4}-\u{1F3DF}\u{1F3F3}-\u{1F3F7}\u{1F43F}\u{1F441}\u{1F4FD}-\u{1F4FF}\u{1F54B}-\u{1F54F}\u{1F568}-\u{1F579}\u{1F57B}-\u{1F5A3}\u{1F5A5}-\u{1F5FA}\u{1F6CB}-\u{1F6FF}]/u.test(x.e), x.t + ': emoji newer than Unicode 6.1');
     });
     assert.equal(SRC.filter(x => x.g === 'A').length, 24);
     const { context, page } = await open();

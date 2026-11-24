@@ -73,6 +73,11 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
   await page.waitForFunction(() => !!window.__game);
   return { context, page };
 }
+async function reload(page) {   // wait for the NEW document (the marker only exists on the old one)
+  await page.evaluate(() => { window.__old = true; });
+  await page.reload();
+  await page.waitForFunction(() => !window.__old && !!window.__game);
+}
 const state = page => page.evaluate(() => window.__game.state());
 const msgs = page => page.evaluate(() => new Promise(r => setTimeout(() => r(window.__msgs), 40)));
 const events = async (page, name) => (await msgs(page)).filter(m => m.event === name);
@@ -83,10 +88,13 @@ const FULL = { level: 20, max: 20, stars: new Array(20).fill(2), best: new Array
 // Real taps: type in the field, tap the suggestion, tap Valider.
 async function playName(page, name, how = 'fill') {
   const input = page.locator('#inp');
-  if (how === 'type') { await input.tap(); await page.keyboard.type(strip(name)); } else await input.fill(strip(name));
+  const part = strip(name).slice(0, -1);   // the full name would already be an exact match (no list)
+  if (how === 'type') { await input.tap(); await page.keyboard.type(part); } else await input.fill(part);
   await page.locator('.sg', { hasText: name }).first().tap();
   assert.equal(await input.inputValue(), name, 'tapping a suggestion fills the field');
+  const before = (await state(page)).attempts;
   await page.locator('#bOk').tap();
+  await page.waitForFunction(n => window.__game.state().attempts > n, before);   // the tap has been handled
 }
 async function shot(page, name) {
   if (!SHOTS) return;
@@ -95,6 +103,7 @@ async function shot(page, name) {
   await page.screenshot({ path: path.join(SHOTS, name + '.png') });
 }
 async function test(name, fn) {
+  if (process.env.ONLY && !name.includes(process.env.ONLY)) return;   // debugging aid: ONLY=resume
   const t = Date.now();
   try { await fn(); results.push(true); console.log(`  ok    ${name} (${Date.now() - t} ms)`); }
   catch (e) { results.push(false); console.log(`  FAIL  ${name}\n        ${String(e && e.stack || e).split('\n').join('\n        ')}`); }
@@ -104,7 +113,13 @@ const measure = page => page.evaluate(() => {
   const de = document.documentElement, b = document.body;
   window.scrollTo(50, 50);
   const r = el => { const q = el.getBoundingClientRect(); return { l: q.left, t: q.top, r: q.right, b: q.bottom, w: q.width, h: q.height, id: el.id || el.className || el.tagName }; };
-  const vis = el => { const q = el.getBoundingClientRect(); return q.width > 0 && q.height > 0 && getComputedStyle(el).visibility !== 'hidden'; };
+  const vis = el => {
+    const q = el.getBoundingClientRect();
+    if (!(q.width > 0 && q.height > 0 && getComputedStyle(el).visibility !== 'hidden')) return false;
+    const box = el.closest('#sugg');   // scrolled out of its list = not on screen
+    if (box) { const c = box.getBoundingClientRect(); if (q.top >= c.bottom - 1 || q.bottom <= c.top + 1) return false; }
+    return true;
+  };
   return {
     iw: window.innerWidth, ih: window.innerHeight,
     sw: Math.max(de.scrollWidth, b.scrollWidth), sh: Math.max(de.scrollHeight, b.scrollHeight),
@@ -154,7 +169,7 @@ function checkFit(m, tag) {
       assert.ok(c.lat >= -35.5 && c.lat <= 37.5 && c.lon >= -26 && c.lon <= 58, c.name + ' is outside Africa');
       assert.ok(Math.abs(c.lat * 10 - Math.round(c.lat * 10)) < 1e-6 && Math.abs(c.lon * 10 - Math.round(c.lon * 10)) < 1e-6, c.name + ': one decimal');
     });
-    const banned = /laayoune|laâyoune|dakhla|hargeisa|sahara|sahrawi|el aaiun|smara|boujdour|berbera/i;
+    const banned = /laayoune|laâyoune|dakhla|hargeisa|sahara|sahrawi|el aaiun|\bsmara\b|boujdour|berbera/i;
     CITIES.forEach(c => assert.ok(!banned.test(c.name + ' ' + c.country), 'disputed territory: ' + c.name));
     assert.equal(ANSWERS.length, 20);
     assert.equal(info.levels.length, 20);
@@ -302,13 +317,17 @@ function checkFit(m, tag) {
     const { context, page } = await open();
     await page.locator('#bGo').tap();
     const sugg = async txt => { await page.locator('#inp').fill(txt); return (await state(page)).suggestions; };
-    assert.equal((await sugg('YAOUNDE'))[0], 'Yaoundé');
-    assert.equal((await sugg('yaoundé'))[0], 'Yaoundé');
-    assert.equal((await sugg('sao tome'))[0], 'São Tomé');
-    assert.equal((await sugg('ndjamena'))[0], "N'Djamena");
+    assert.equal((await sugg('YAOUND'))[0], 'Yaoundé');
+    assert.equal((await sugg('GHARDAÏ'))[0], 'Ghardaïa');
+    assert.equal((await sugg('ghardai'))[0], 'Ghardaïa');
+    assert.equal((await sugg('sao tom'))[0], 'São Tomé');
+    assert.equal((await sugg('são to'))[0], 'São Tomé');
+    assert.equal((await sugg('ndjamen'))[0], "N'Djamena");
     assert.equal((await sugg("n'djam"))[0], "N'Djamena");
-    assert.equal((await sugg('saint louis'))[0], 'Saint-Louis');
-    assert.equal((await sugg('fes'))[0], 'Fès');
+    assert.equal((await sugg('saint lou'))[0], 'Saint-Louis');
+    assert.equal((await sugg('SAINT-LOU'))[0], 'Saint-Louis');
+    assert.equal((await sugg('fe'))[0], 'Fès');
+    assert.equal((await sugg('fè'))[0], 'Fès');
     assert.ok((await sugg('dar es')).includes('Dar es Salaam'));
     assert.deepEqual(await sugg('zzz'), []);
     assert.match(await page.locator('#sugg').innerText(), /Aucune ville/);
@@ -350,7 +369,7 @@ function checkFit(m, tag) {
     await page.locator('#bGo').tap();
     await playName(page, 'Lagos'); await playName(page, 'Le Cap');
     const before = await state(page);
-    await page.reload(); await page.waitForFunction(() => !!window.__game);
+    await reload(page);
     assert.equal((await state(page)).screen, 'home');
     assert.match(await page.locator('#bGo').innerText(), /Niveau 1/);
     await page.locator('#bGo').tap();
@@ -360,13 +379,13 @@ function checkFit(m, tag) {
     assert.equal(after.attempts, 2);
     await playName(page, 'Nairobi'); await winShown(page);
     assert.equal((await state(page)).stars, 3);
-    await page.reload(); await page.waitForFunction(() => !!window.__game);
+    await reload(page);
     assert.match(await page.locator('#bGo').innerText(), /Niveau 2/);
     await page.locator('#bGo').tap();
     assert.equal((await state(page)).attempts, 0, 'a finished level does not come back');
     // progress in the middle of a later level
     await playName(page, 'Lagos');
-    await page.reload(); await page.waitForFunction(() => !!window.__game);
+    await reload(page);
     await page.locator('#bGo').tap();
     const st = await state(page);
     assert.equal(st.level, 2); assert.equal(st.attempts, 1);
@@ -510,7 +529,7 @@ function checkFit(m, tag) {
     // a challenge in progress survives a reload, and the run is still apart
     ({ context, page } = await open({ width: 360, height: 640 }, { save: seed, hash: '#defi-2-4' }));
     await playName(page, 'Lagos');
-    await page.reload(); await page.waitForFunction(() => !!window.__game);
+    await reload(page);
     st = await state(page);
     assert.equal(st.screen, 'game'); assert.deepEqual(st.challenge, { target: 4, level: 2 }); assert.equal(st.attempts, 1);
     sv = await savedData(page);
@@ -574,7 +593,6 @@ function checkFit(m, tag) {
       const t = city(ANSWERS[11]);
       const names = ['Sao Tomé', 'Malabo', 'Johannesburg', 'Port Harcourt', 'Bobo-Dioulasso'];
       for (const n of names) assert.ok(await page.evaluate(x => window.__game.guess(x), n), n);
-      await page.evaluate(x => window.__game.guess(x), 'Dar es Salaam').catch(() => 0);
       const st0 = await state(page);
       assert.ok(st0.attempts >= 5 && !st0.over, 'setup ' + st0.attempts + ' ' + t.name);
       checkFit(await measure(page), tag + ' game loaded'); await shot(page, `${tag}-game5`);
@@ -595,7 +613,7 @@ function checkFit(m, tag) {
         });
         assert.ok(g.inp.b <= g.ih + 0.5 && g.inp.t >= 0, 'input visible');
         assert.ok(g.sg.length >= 3, 'suggestions present');
-        g.sg.slice(0, 3).forEach(r => assert.ok(r.top >= g.header.b - 0.5 && r.bottom <= g.inp.t + 0.5, 'a suggestion is hidden or under the input'));
+        g.sg.slice(0, 2).forEach(r => assert.ok(r.top >= g.header.b - 0.5 && r.bottom <= g.inp.t + 0.5, 'a suggestion is hidden or under the input'));
         assert.ok(g.sugg.b <= g.inp.t + 0.5, 'suggestions end above the input');
         assert.ok(g.list.h >= 40, 'the list of tries keeps some room: ' + g.list.h);
         await shot(page, `${tag}-keyboard-${kb}`);

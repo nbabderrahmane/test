@@ -76,7 +76,7 @@ Chaque niveau compte 3 devinettes dans l'ordre ci-dessous. Les 3 mauvaises répo
 | 19 | 2 | 🎈 ☁️ ⬆️ | Levitating | Dua Lipa | 2020 | années 2020 | Royaume-Uni | Très élevée |  |
 | 19 | 3 | 💐 🌷 🌸 | Flowers | Miley Cyrus | 2023 | années 2020 | États-Unis | Très élevée |  |
 | 20 | 1 | 💪 🔥 | I Will Survive | Gloria Gaynor | 1978 | années 70 | États-Unis | Très élevée |  |
-| 20 | 2 | 👫 🤝 | Stand by Me | Ben E. King | 1961 | années 60 | États-Unis | Très élevée |  |
+| 20 | 2 | 👫 💕 | Stand by Me | Ben E. King | 1961 | années 60 | États-Unis | Très élevée |  |
 | 20 | 3 | 🐶 🎸 | Hound Dog | Elvis Presley | 1956 | années 50 | États-Unis | Très élevée |  |
 
 ## À regarder en priorité

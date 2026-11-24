@@ -2,7 +2,7 @@
 # Free format: words separated by spaces/newlines, accents allowed (stripped by build.js).
 # Only 4 to 7 letters are kept. Lines starting with # are ignored.
 # --- 4 letters
-abri acte aide aile aire ange anse arme aube auto avis agir axes
+abri acte aide aile aire ange anse arme aube auto avis agir 
 bain banc bave bile bise bleu bois bond bord bouc bout bras brin buse boue bête
 cafe cage cale cane cape cave cerf chat chef chou cire cité clef clou coco coin cour coup cube cure cuve cuir code côte
 dame dent dire dose dune dôme daim dard

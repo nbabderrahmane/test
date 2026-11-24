@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#17121F">
+<title>Qui va où</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#17121F;--panel:#261D36;--line:#5B4B7A;--ink:#F6F0E6;--dim:#B9AECF;--off:#3B2F52;
+  --acc:#FF7A59;--acc-ink:#2A0E05;--gold:#FFC53D;--bad:#FFB4BC;
+  --c0:#F7C948;--c1:#4FCB8D;--c2:#5BA4F5;--c3:#B28CF2;--cink:#1E1630;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);overscroll-behavior:none}
+body{
+  position:fixed;top:0;right:0;bottom:0;left:0;color:var(--ink);
+  font:16px/1.25 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif;
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-text-size-adjust:100%;
+}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;touch-action:manipulation}
+button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+svg{display:block}
+
+#app{
+  position:absolute;top:0;right:0;bottom:0;left:0;display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+header{display:flex;align-items:center;gap:8px;padding:8px 12px 4px;flex:none}
+.icon{width:48px;height:48px;border-radius:14px;background:var(--panel);display:flex;align-items:center;justify-content:center;flex:none}
+.icon svg{width:24px;height:24px;fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.ttl{flex:1;min-width:0;text-align:center}
+.brand{display:block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#lvl{display:block;font-size:20px;font-weight:800;white-space:nowrap}
+
+#info{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:30px;margin:0 12px;font-size:12px;color:var(--dim)}
+#goal{display:flex;align-items:center;gap:8px;min-width:0;white-space:nowrap}
+#goal span{display:inline-flex;align-items:center;gap:3px}
+#goal svg{width:12px;height:12px;fill:var(--gold)}
+#goal.chal{background:rgba(255,122,89,.16);color:var(--acc);border-radius:13px;padding:5px 10px;font-weight:700;font-size:13px;white-space:normal;line-height:1.1}
+#pips{display:flex;align-items:center;gap:5px;flex:none}
+#pips svg{width:20px;height:20px}
+#pips .p{fill:none;stroke:var(--line);stroke-width:2.4}
+#pips .x{display:none;stroke:var(--bad);stroke-width:2.8;stroke-linecap:round}
+#pips svg.used .p{fill:#4A2530;stroke:var(--bad)}
+#pips svg.used .x{display:block}
+
+#board{flex:1;min-height:0;display:flex;align-items:center;margin:0 12px}
+#grid{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(4,minmax(52px,92px));gap:8px}
+.tile{
+  position:relative;min-width:0;border-radius:14px;background:var(--panel);box-shadow:inset 0 0 0 2px var(--line);
+  display:flex;align-items:center;justify-content:center;padding:0 4px;font-weight:800;line-height:1;
+  transition:background-color .12s,box-shadow .12s;
+}
+.tile span{display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:clip;line-height:1.35}
+#grid.l1 .tile{font-size:20px}#grid.l2 .tile{font-size:18px}#grid.l3 .tile{font-size:17px}#grid.l4 .tile{font-size:15px}
+.tile:active{transform:scale(.97)}
+.tile.sel{background:#4A3466;box-shadow:inset 0 0 0 3px var(--ink)}
+.tile .ck{display:none;position:absolute;top:4px;right:4px;width:14px;height:14px;fill:none;stroke:var(--ink);stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round}
+.tile.sel .ck{display:block}
+.tile.no{animation:no .3s}
+@keyframes no{25%{transform:translateX(-5px)}50%{transform:translateX(5px)}75%{transform:translateX(-3px)}}
+
+.band{
+  grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:0 12px;border-radius:14px;color:var(--cink);min-width:0;overflow:hidden;
+}
+.band.new{animation:pop .3s cubic-bezier(.2,1.3,.5,1)}
+@keyframes pop{from{transform:scale(.9);opacity:0}}
+.band svg{width:28px;height:28px;flex:none;fill:var(--cink)}
+.band .tx{min-width:0;flex:1}
+.band b{display:block;font-size:16px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.band span{display:block;font-size:13px;margin-top:3px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.band.c0{background:var(--c0)}.band.c1{background:var(--c1)}.band.c2{background:var(--c2)}.band.c3{background:var(--c3)}
+.band.rev{background:none;box-shadow:inset 0 0 0 2px currentColor;color:var(--dim)}
+.band.rev svg{fill:currentColor}.band.rev b,.band.rev span{color:var(--ink)}
+
+#msg{
+  flex:none;height:42px;margin:0 12px;display:flex;align-items:center;justify-content:center;text-align:center;
+  font-size:14px;line-height:1.15;font-weight:700;color:var(--dim);border-radius:12px;padding:3px 10px;overflow:hidden;
+}
+#msg.good{color:var(--ink)}
+#msg.warn{color:#FFD9A0}
+#msg.bad{background:#4A2530;color:#FFE1E4}
+footer{flex:none;display:flex;gap:10px;padding:4px 12px 12px}
+.btn{
+  flex:1;min-height:50px;border-radius:14px;background:var(--panel);font-weight:700;font-size:15px;
+  display:flex;align-items:center;justify-content:center;gap:8px;padding:0 10px;
+}
+.btn:active{transform:scale(.97)}
+.btn[disabled]{color:#7B6C99;cursor:default;transform:none}
+.btn.acc{background:var(--acc);color:var(--acc-ink)}
+.btn.acc[disabled]{background:#4A3250;color:#8E7BA8}
+.btn.line{background:none;box-shadow:inset 0 0 0 2px var(--line)}
+
+.over{position:absolute;top:0;right:0;bottom:0;left:0;z-index:5;display:flex;align-items:center;justify-content:center;
+  background:rgba(14,10,22,.92);padding:12px 16px;overflow:hidden;animation:fade .2s}
+@keyframes fade{from{opacity:0}}
+.card{width:100%;max-width:330px;background:var(--panel);border-radius:22px;padding:18px 18px 14px;text-align:center;animation:up .28s cubic-bezier(.2,1.3,.5,1)}
+@keyframes up{from{transform:translateY(24px) scale(.94);opacity:0}}
+.card h2{font-size:26px;font-weight:800}
+.card p{color:var(--dim);margin-top:4px;font-size:15px}
+.stars{display:flex;justify-content:center;align-items:flex-end;gap:6px;margin:10px 0 4px}
+.stars svg{width:50px;height:50px;fill:var(--off)}
+.stars svg:nth-child(2){width:62px;height:62px}
+.stars svg.on{fill:var(--gold);animation:star .4s cubic-bezier(.2,1.6,.4,1) backwards}
+.stars svg.on:nth-child(2){animation-delay:.14s}
+.stars svg.on:nth-child(3){animation-delay:.28s}
+@keyframes star{from{transform:scale(.2) rotate(-40deg);opacity:0}}
+.card p.res{font-weight:800;font-size:16px;color:var(--acc);min-height:20px}
+.card p.res.lost{color:var(--bad)}
+.acts{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.acts .row{display:flex;gap:8px}
+.acts .btn{min-height:48px}
+
+.scr{position:absolute;top:0;right:0;bottom:0;left:0;z-index:4;background:var(--bg);display:flex;flex-direction:column;
+  padding:calc(env(safe-area-inset-top) + 10px) calc(env(safe-area-inset-right) + 14px) calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 14px)}
+.top{flex:none;display:flex;align-items:center;gap:10px}
+.top .tt{flex:1;min-width:0}
+.top h1{font-size:24px;font-weight:800;color:var(--acc);white-space:nowrap}
+.top .sub{font-size:12px;color:var(--dim);margin-top:2px}
+.total{display:flex;align-items:center;gap:6px;background:var(--panel);border-radius:14px;height:44px;padding:0 12px;font-weight:800;font-variant-numeric:tabular-nums;flex:none}
+.total svg{width:18px;height:18px;fill:var(--gold)}
+
+#home{justify-content:center;gap:14px}
+.logo{display:flex;justify-content:center;gap:10px;margin-bottom:2px}
+.logo svg{width:34px;height:34px}
+.logo .a{fill:var(--c0)}.logo .b{fill:var(--c1)}.logo .c{fill:var(--c2)}.logo .d{fill:var(--c3)}
+.hbrand{text-align:center}
+.hbrand h1{font-size:40px;font-weight:800;color:var(--acc);line-height:1.1}
+.hbrand .sub{color:var(--dim);font-size:14px;margin-top:6px}
+.stat{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--panel);border-radius:16px;padding:10px 12px;min-height:56px}
+.stat svg{width:26px;height:26px;fill:var(--gold)}
+.stat b{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}
+.stat small{font-size:13px;color:var(--dim)}
+#home .btn{flex:none}
+#bGo{min-height:58px;font-size:17px}
+
+#cells{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,92px));align-content:start;gap:8px;margin:12px 0}
+.cell{min-height:48px;border-radius:14px;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;overflow:hidden}
+.cell .n{font-weight:800;font-size:20px;line-height:1;font-variant-numeric:tabular-nums}
+.cell .n svg{width:18px;height:18px;fill:#7B6C99}
+.cell .s{display:flex;gap:1px}
+.cell .s svg{width:14px;height:14px;fill:var(--off)}
+.cell .s svg.on{fill:var(--gold)}
+.cell.cur{box-shadow:inset 0 0 0 2px var(--acc)}
+.cell.ok{background:#3A2A55}
+.cell[disabled]{background:#1D1629;cursor:default}
+.cell:not([disabled]):active{transform:scale(.96)}
+
+@media (max-height:600px){
+  header{padding-top:4px}
+  #msg{height:40px;padding:2px 10px}
+  footer{padding-bottom:8px}
+  .btn{min-height:46px}
+  .stars svg{width:40px;height:40px}.stars svg:nth-child(2){width:50px;height:50px}
+  .card{padding:14px 16px 12px}.card h2{font-size:22px}
+  .acts{gap:6px;margin-top:8px}.acts .btn{min-height:46px}
+  .hbrand h1{font-size:34px}
+  #home{gap:10px}
+  #grid{gap:6px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*:before,*:after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button class="icon" id="bMap" aria-label="Niveaux">
+      <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
+    </button>
+    <div class="ttl"><span class="brand">Qui va où</span><span id="lvl">Niveau 1</span></div>
+    <button class="icon" id="bRestart" aria-label="Recommencer">
+      <svg viewBox="0 0 24 24"><path d="M4 5v6h6M5 11a8 8 0 1 1 2 7"/></svg>
+    </button>
+  </header>
+  <div id="info"><div id="goal"></div><div id="pips" role="img"></div></div>
+  <main id="board"><div id="grid"></div></main>
+  <div id="msg" role="status" aria-live="polite"></div>
+  <footer>
+    <button class="btn" id="bClear">Effacer</button>
+    <button class="btn acc" id="bOk">Valider</button>
+  </footer>
+
+  <section class="over" id="win" hidden aria-live="polite">
+    <div class="card">
+      <h2 id="wTitle">Bravo !</h2>
+      <p id="wSub"></p>
+      <div class="stars" id="wStars"></div>
+      <p class="res" id="wRes"></p>
+      <div class="acts">
+        <button class="btn acc" id="bNext">Suivant</button>
+        <div class="row" id="rowS">
+          <button class="btn line" id="bShare">Partager</button>
+          <button class="btn line" id="bChal">Défier un ami</button>
+        </div>
+        <div class="row" id="rowA">
+          <button class="btn line" id="bAgain">Rejouer</button>
+          <button class="btn line" id="bBack">Niveaux</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="scr" id="home" hidden>
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><circle class="a" cx="12" cy="12" r="10"/></svg>
+      <svg viewBox="0 0 24 24"><rect class="b" x="2" y="2" width="20" height="20" rx="3"/></svg>
+      <svg viewBox="0 0 24 24"><path class="c" d="M12 2 23 21H1z"/></svg>
+      <svg viewBox="0 0 24 24"><path class="d" d="M12 1 23 12 12 23 1 12z"/></svg>
+    </div>
+    <div class="hbrand"><h1>Qui va où</h1><div class="sub">Trois par trois, chacun sa famille.</div></div>
+    <div class="stat"><svg viewBox="0 0 24 24"><use href="#star"/></svg><b id="hStars">0</b><small>/ 60 étoiles</small></div>
+    <button class="btn acc" id="bGo">Continuer · Niveau 1</button>
+    <button class="btn" id="bLevels">Niveaux</button>
+  </section>
+
+  <section class="scr" id="levels" hidden>
+    <div class="top">
+      <button class="icon" id="bLBack" aria-label="Accueil"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="tt"><h1>Niveaux</h1><div class="sub">20 grilles</div></div>
+      <div class="total" aria-label="Étoiles gagnées"><svg viewBox="0 0 24 24"><use href="#star"/></svg><span id="lTotal">0/60</span></div>
+    </div>
+    <div id="cells"></div>
+  </section>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <path id="star" d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/>
+</defs></svg>
+
+<script>
+(function () {
+'use strict';
+
+var GAME = 'les-familles';
+var NAME = 'Qui va où';
+var KEY = 'mj:' + GAME + ':v1';
+var N = 20;
+var MAX_ERR = 3;   // errors allowed: the 4th one ends the game
+
+/*GRIDS:BEGIN (generated by tools/les-familles/build.js, do not edit by hand)*/
+var GRIDS=[
+  [["Fruits",["mangue","banane","papaye"]],["Couleurs",["rouge","bleu","vert"]],["Le corps",["main","pied","tête"]],["À la ferme",["poule","vache","chèvre"]]],
+  [["Transports",["taxi","bus","train"]],["Légumes",["carotte","oignon","chou"]],["Dans le cartable",["cahier","stylo","gomme"]],["Meubles",["lit","chaise","armoire"]]],
+  [["Boissons",["eau","lait","jus"]],["Sports",["foot","judo","boxe"]],["Instruments de musique",["kora","flûte","guitare"]],["Le temps qu'il fait",["pluie","vent","orage"]]],
+  [["Métiers",["médecin","boulanger","chauffeur"]],["Animaux sauvages",["lion","girafe","zèbre"]],["Habits",["pagne","robe","chemise"]],["Parties d'une maison",["toit","mur","porte"]]],
+  [["La famille",["père","oncle","cousin"]],["Arbres",["baobab","palmier","manguier"]],["Ustensiles de cuisine",["marmite","cuillère","assiette"]],["Insectes",["fourmi","abeille","moustique"]]],
+  [["Fruits",["ananas","goyave","orange"]],["Couleurs",["jaune","noir","blanc"]],["Sports",["natation","course","lutte"]],["Poissons",["thon","sardine","carpe"]]],
+  [["L'argent",["billet","monnaie","pièce"]],["Pièces de la maison",["salon","chambre","cuisine"]],["Percussions",["djembé","tambour","balafon"]],["Matières à l'école",["maths","dessin","histoire"]]],
+  [["À la ferme",["vache","âne","mouton"]],["Oiseaux",["aigle","perroquet","coq"]],["Boissons",["thé","café","soda"]],["Saveurs",["sucré","salé","amer"]]],
+  [["Dans la classe",["tableau","craie","banc"]],["Meubles",["lit","armoire","tabouret"]],["Transports",["moto","pirogue","avion"]],["Métiers",["tailleur","maçon","pêcheur"]]],
+  [["Pour assaisonner",["sel","poivre","gingembre"]],["Légumes",["gombo","aubergine","piment"]],["Céréales",["riz","mil","maïs"]],["Façons de cuire",["frire","griller","bouillir"]]],
+  [["Couleurs",["noir","gris","violet"]],["Fleurs",["hibiscus","jasmin","rose"]],["Moments de la journée",["matin","midi","soir"]],["Animaux sauvages",["éléphant","crocodile","gazelle"]]],
+  [["Dans le ciel",["lune","étoile","soleil"]],["Le temps qu'il fait",["pluie","orage","brume"]],["Reliefs",["vallée","falaise","colline"]],["Étendues d'eau",["fleuve","lac","mare"]]],
+  [["On souffle dedans",["trompette","flûte","sifflet"]],["Au football",["penalty","tir","corner"]],["Arbres",["baobab","manguier","cocotier"]],["Insectes",["termite","criquet","mouche"]]],
+  [["Pour mesurer",["kilo","litre","mètre"]],["Au marché",["étal","panier","balance"]],["Outils du champ",["houe","machette","râteau"]],["Outils de bricolage",["marteau","scie","pelle"]]],
+  [["Pour la tête",["chapeau","casquette","foulard"]],["Habits",["boubou","jupe","pantalon"]],["Chaussures",["sandale","botte","basket"]],["Sports",["judo","boxe","natation"]]],
+  [["Dans le cartable",["crayon","gomme","feuille"]],["Parties d'une plante",["racine","tige","graine"]],["Oiseaux",["aigle","hibou","poule"]],["À la ferme",["vache","chèvre","âne"]]],
+  [["Fruits",["mangue","goyave","plantain"]],["Couleurs",["noir","gris","orange"]],["Féculents",["manioc","igname","riz"]],["Animaux sauvages",["singe","léopard","buffle"]]],
+  [["Percussions",["djembé","cymbale","batterie"]],["Pièces d'un véhicule",["moteur","volant","frein"]],["Matériel de sport",["raquette","haltère","ballon"]],["Au football",["but","arbitre","corner"]]],
+  [["Matériel de sport",["raquette","corde","ballon"]],["Au football",["penalty","corner","gardien"]],["Métiers",["boulanger","maçon","pêcheur"]],["Jours de la semaine",["lundi","mardi","samedi"]]],
+  [["Fruits",["mangue","goyave","orange"]],["Couleurs",["noir","gris","violet"]],["Fleurs",["hibiscus","jasmin","rose"]],["Métiers",["tailleur","maçon","avocat"]]]
+];
+/*GRIDS:END*/
+
+// colour index -> symbol (colours never stand alone) and emoji for the shared text
+var SYMBOLS = [
+  '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>',
+  '<svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="3"/></svg>',
+  '<svg viewBox="0 0 24 24"><path d="M12 2 23 21H1z"/></svg>',
+  '<svg viewBox="0 0 24 24"><path d="M12 1 23 12 12 23 1 12z"/></svg>'
+];
+var EMOJI = ['🟨', '🟩', '🟦', '🟪'];
+var STAR = '<svg viewBox="0 0 24 24"><use href="#star"/></svg>';
+var LOCK = '<svg viewBox="0 0 24 24"><path d="M7 10V8a5 5 0 0 1 10 0v2h1.5v10h-13V10zm2.5 0h5V8a2.5 2.5 0 0 0-5 0z"/></svg>';
+var CHECK = '<svg class="ck" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>';
+
+var $ = function (id) { return document.getElementById(id); };
+
+// ---- host page (only the events listed in the game sheet, no personal data) ----
+function emit(msg) {
+  msg.source = 'mini-jeu'; msg.game = GAME;
+  try { window.parent.postMessage(msg, '*'); } catch (e) { /* ignore */ }
+}
+
+// ---- seeded random (all the randomness of the game) -------------------------------
+var seedBase = 1;
+function mulberry(a) {
+  return function () {
+    a = (a + 0x6D2B79F5) | 0;
+    var t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+// Order of the 12 tiles of level n for a given roll. No row of three may already be a family.
+function shuffled(n, roll) {
+  var rnd = mulberry((seedBase * 7919 + n * 104729 + roll * 1299709) >>> 0), o, tries = 0, i;
+  do {
+    o = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+    for (i = 11; i > 0; i--) {
+      var j = Math.floor(rnd() * (i + 1)), t = o[i]; o[i] = o[j]; o[j] = t;
+    }
+    var bad = false;
+    for (i = 0; i < 12; i += 3) if (famOf(o[i]) === famOf(o[i + 1]) && famOf(o[i]) === famOf(o[i + 2])) bad = true;
+    tries++;
+  } while (bad && tries < 60);
+  return o;
+}
+function famOf(id) { return Math.floor(id / 3); }
+
+// ---- persistence (always guarded: the game works without storage) -----------------
+var save = { max: 1, stars: [], cur: null };
+function totalStars() { var t = 0; for (var i = 0; i < save.stars.length; i++) t += save.stars[i]; return t; }
+function intIn(v, lo, hi) { return typeof v === 'number' && v === Math.floor(v) && v >= lo && v <= hi; }
+function validCur(c) {
+  if (!c || typeof c !== 'object' || !intIn(c.n, 1, N) || !intIn(c.roll, 0, 99999) || !intIn(c.err, 0, MAX_ERR)) return null;
+  if (!Array.isArray(c.order) || c.order.length !== 12 || !Array.isArray(c.found) || !Array.isArray(c.tried) || !Array.isArray(c.sel)) return null;
+  var seen = {}, i;
+  for (i = 0; i < 12; i++) { if (!intIn(c.order[i], 0, 11) || seen[c.order[i]]) return null; seen[c.order[i]] = 1; }
+  var f = {};
+  if (c.found.length > 2) return null;
+  for (i = 0; i < c.found.length; i++) { if (!intIn(c.found[i], 0, 3) || f[c.found[i]]) return null; f[c.found[i]] = 1; }
+  if (c.sel.length > 3) return null;
+  var s = {};
+  for (i = 0; i < c.sel.length; i++) { if (!intIn(c.sel[i], 0, 11) || s[c.sel[i]] || f[famOf(c.sel[i])]) return null; s[c.sel[i]] = 1; }
+  for (i = 0; i < c.tried.length; i++) if (typeof c.tried[i] !== 'string' || !/^\d{1,2}-\d{1,2}-\d{1,2}$/.test(c.tried[i])) return null;
+  if (c.tried.length > 40) return null;
+  return { n: c.n, roll: c.roll, err: c.err, order: c.order.slice(), found: c.found.slice(), tried: c.tried.slice(), sel: c.sel.slice() };
+}
+function loadSave() {
+  var i;
+  save.max = 1; save.stars = []; save.cur = null;
+  for (i = 0; i < N; i++) save.stars.push(0);
+  try {
+    var s = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (s && typeof s === 'object') {
+      if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = intIn(s.stars[i], 0, 3) ? s.stars[i] : 0;
+      save.max = intIn(s.max, 1, N) ? s.max : 1;
+      for (i = 0; i < N; i++) if (save.stars[i] > 0 && save.max < Math.min(N, i + 2)) save.max = Math.min(N, i + 2);
+      save.cur = validCur(s.cur);
+    }
+  } catch (e) { /* no storage: play without it */ }
+}
+function store() {
+  try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) { /* ignore */ }
+}
+
+// ---- game state ----------------------------------------------------------------
+var g = null;        // {n, mode:'level'|'chal', target, roll, order, found, err, tried, sel, status, stars}
+var screen = 'home';
+var msgText = '', msgKind = '';
+var winTimer = 0;
+var newBand = -1, shake = false;
+
+function grid() { return GRIDS[g.n - 1]; }
+function wordOf(id) { return grid()[famOf(id)][1][id % 3]; }
+function idOfWord(w) {
+  for (var f = 0; f < 4; f++) for (var k = 0; k < 3; k++) if (grid()[f][1][k] === w) return f * 3 + k;
+  return -1;
+}
+function remaining() {
+  return g.order.filter(function (id) { return g.found.indexOf(famOf(id)) < 0; });
+}
+function starsFor(err) { return err === 0 ? 3 : err <= 2 ? 2 : 1; }
+
+function newGame(n, roll, mode, target) {
+  g = { n: n, mode: mode, target: target, roll: roll, order: shuffled(n, roll), found: [], err: 0, tried: [], sel: [], status: 'play', stars: 0, emitted: false };
+  newBand = -1; shake = false;
+}
+function startLevel(n, roll, mode, target) {
+  clearTimeout(winTimer);
+  newGame(n, roll, mode || 'level', target);
+  msgText = ''; msgKind = '';
+  persist();
+  show('game');
+}
+function resume(c) {
+  clearTimeout(winTimer);
+  g = { n: c.n, mode: 'level', target: 0, roll: c.roll, order: c.order, found: c.found, err: c.err, tried: c.tried, sel: c.sel, status: 'play', stars: 0, emitted: false };
+  newBand = -1; shake = false; msgText = ''; msgKind = '';
+  show('game');
+}
+function persist() {
+  if (g && g.mode === 'level') {
+    save.cur = g.status === 'play' ? { n: g.n, roll: g.roll, err: g.err, order: g.order, found: g.found, tried: g.tried, sel: g.sel } : null;
+    store();
+  }
+}
+
+function say(text, kind) { msgText = text; msgKind = kind || ''; }
+
+function tapWord(id) {
+  if (!g || g.status !== 'play') return;
+  var i = g.sel.indexOf(id);
+  if (i >= 0) g.sel.splice(i, 1);
+  else if (g.sel.length < 3) g.sel.push(id);
+  else { say('Trois mots au plus : décoche-en un.', 'warn'); render(); return; }
+  say('', '');
+  persist(); render();
+}
+function clearSel() {
+  if (!g || g.status !== 'play') return;
+  g.sel = []; say('', ''); persist(); render();
+}
+
+// Checks the three selected words. Returns 'ok' | 'close' | 'wrong' | 'dup' | 'none'.
+function submit() {
+  if (!g || g.status !== 'play' || g.sel.length !== 3) return 'none';
+  var key = g.sel.slice().sort(function (a, b) { return a - b; }).join('-');
+  if (g.tried.indexOf(key) >= 0) { say('Déjà essayé.', 'warn'); render(); return 'dup'; }
+  var count = [0, 0, 0, 0], best = 0, bestF = 0;
+  g.sel.forEach(function (id) { count[famOf(id)]++; });
+  for (var f = 0; f < 4; f++) if (count[f] > best) { best = count[f]; bestF = f; }
+  var out;
+  if (best === 3) {
+    g.found.push(bestF); newBand = g.found.length - 1; g.sel = [];
+    if (g.found.length === 3) {   // the last three words can only make the last family
+      for (var r = 0; r < 4; r++) if (g.found.indexOf(r) < 0) { g.found.push(r); }
+      g.status = 'won';
+      say('', '');
+    } else say('Trouvé : ' + grid()[bestF][0], 'good');
+    out = 'ok';
+  } else {
+    g.tried.push(key); g.err++; shake = true;
+    if (g.err > MAX_ERR) {
+      g.status = 'lost'; g.sel = []; say('Plus d’essais. Voici les familles.', 'bad');
+    } else if (best === 2) say('Presque ! Deux vont ensemble.' + (g.err === MAX_ERR ? ' Dernière chance.' : ''), 'warn');
+    else say('Pas ensemble.' + (g.err === MAX_ERR ? ' Dernière chance.' : ''), 'warn');
+    out = best === 2 ? 'close' : 'wrong';
+  }
+  if (g.status === 'won') finishWin();
+  else if (g.status === 'lost') finishLost();
+  persist(); render();
+  return out;
+}
+
+function finishWin() {
+  g.stars = starsFor(g.err);
+  if (g.mode === 'level') {
+    save.stars[g.n - 1] = Math.max(save.stars[g.n - 1], g.stars);
+    save.max = Math.max(save.max, Math.min(N, g.n + 1));
+    emit({ event: 'level_complete', level: g.n, score: g.err, stars: g.stars });
+  } else {
+    emit({ event: 'challenge_result', level: g.n, score: g.err, target: g.target, won: g.err <= g.target });
+  }
+  g.emitted = true;
+  clearTimeout(winTimer);
+  winTimer = setTimeout(showResult, 550);
+}
+function finishLost() {
+  if (g.mode === 'chal') emit({ event: 'challenge_result', level: g.n, score: g.err, target: g.target, won: false });
+  g.emitted = true;
+  clearTimeout(winTimer);
+  winTimer = setTimeout(showResult, 1100);
+}
+
+// ---- rendering -----------------------------------------------------------------
+function errText(n) { return n === 0 ? 'aucune erreur' : n + (n > 1 ? ' erreurs' : ' erreur'); }
+function bandHtml(f, cls) {
+  var words = grid()[f][1].join(' · ');
+  return '<div class="band c' + f + (cls || '') + '">' + SYMBOLS[f] + '<div class="tx"><b>' + grid()[f][0] + '</b><span>' + words + '</span></div></div>';
+}
+function render() {
+  if (!g) return;
+  $('lvl').textContent = 'Niveau ' + g.n;
+  var goal = $('goal');
+  if (g.mode === 'chal') {
+    goal.className = 'chal';
+    goal.textContent = 'Défi : ' + (g.target === 0 ? 'aucune erreur' : g.target === 1 ? '1 erreur au plus' : g.target + ' erreurs au plus');
+  } else {
+    goal.className = '';
+    goal.innerHTML = '<span>' + STAR + STAR + STAR + ' 0</span><span>' + STAR + STAR + ' 1-2</span><span>' + STAR + ' 3 erreurs</span>';
+  }
+  var pips = '', i;
+  for (i = 0; i < MAX_ERR; i++) {
+    pips += '<svg class="' + (i < g.err ? 'used' : '') + '" viewBox="0 0 24 24"><circle class="p" cx="12" cy="12" r="9"/><path class="x" d="M8 8l8 8M16 8l-8 8"/></svg>';
+  }
+  $('pips').innerHTML = pips;
+  $('pips').setAttribute('aria-label', 'Erreurs : ' + Math.min(g.err, MAX_ERR) + ' sur ' + MAX_ERR);
+
+  var h = '';
+  g.found.forEach(function (f, k) { h += bandHtml(f, k === newBand ? ' new' : ''); });
+  if (g.status === 'lost') {
+    for (var f = 0; f < 4; f++) if (g.found.indexOf(f) < 0) h += bandHtml(f, ' rev');
+  } else if (g.status === 'play') {
+    remaining().forEach(function (id) {
+      var w = wordOf(id), on = g.sel.indexOf(id) >= 0;
+      h += '<button class="tile' + (on ? ' sel' : '') + '" data-id="' + id + '" data-w="' + w + '" aria-pressed="' + on + '"><span>' + w + '</span>' + CHECK + '</button>';
+    });
+  }
+  var longest = 0;
+  for (i = 0; i < 12; i++) longest = Math.max(longest, wordOf(i).length);   // one font size for the whole grid
+  $('grid').className = longest <= 6 ? 'l1' : longest === 7 ? 'l2' : longest === 8 ? 'l3' : 'l4';
+  $('grid').innerHTML = h;
+  if (shake) {
+    var sel = $('grid').querySelectorAll('.tile.sel');
+    for (i = 0; i < sel.length; i++) sel[i].classList.add('no');
+  }
+  newBand = -1; shake = false;
+  var m = $('msg');
+  m.textContent = msgText; m.className = msgKind;
+  $('bOk').disabled = !(g.status === 'play' && g.sel.length === 3);
+  $('bClear').disabled = !(g.status === 'play' && g.sel.length > 0);
+}
+
+var SCREENS = ['home', 'levels'];
+function show(name) {
+  clearTimeout(winTimer);   // a result must never open over another screen
+  screen = name;
+  SCREENS.forEach(function (s) { $(s).hidden = s !== name; });
+  $('win').hidden = true;
+  if (name === 'home') renderHome();
+  else if (name === 'levels') renderLevels();
+  else render();
+}
+function nextLevel() { return save.cur ? save.cur.n : Math.min(N, save.max); }
+function renderHome() {
+  $('hStars').textContent = totalStars();
+  $('bGo').textContent = 'Continuer · Niveau ' + nextLevel();
+}
+function renderLevels() {
+  $('lTotal').textContent = totalStars() + '/60';
+  var h = '', cur = nextLevel();
+  for (var n = 1; n <= N; n++) {
+    var s = save.stars[n - 1], open = n <= save.max;
+    h += '<button class="cell' + (s ? ' ok' : '') + (n === cur ? ' cur' : '') + '" data-level="' + n + '"' + (open ? '' : ' disabled') +
+      ' aria-label="Niveau ' + n + (open ? ', ' + s + ' étoile' + (s > 1 ? 's' : '') : ', verrouillé') + '">' +
+      '<span class="n">' + (open ? n : LOCK) + '</span>' +
+      '<span class="s">' + [1, 2, 3].map(function (k) { return '<svg class="' + (s >= k ? 'on' : '') + '" viewBox="0 0 24 24"><use href="#star"/></svg>'; }).join('') + '</span></button>';
+  }
+  $('cells').innerHTML = h;
+}
+
+// ---- result screen, sharing, challenges -----------------------------------------------
+var shareLabel = 'Partager', chalLabel = 'Défier un ami';
+function showResult() {
+  if (!g || screen !== 'game') return;
+  var won = g.status === 'won', chal = g.mode === 'chal', i;
+  var good = won && (!chal || g.err <= g.target);
+  $('wTitle').textContent = chal ? (good ? 'Défi relevé !' : 'Défi manqué') : won ? (g.err === 0 ? 'Sans faute !' : 'Bravo !') : 'Dommage';
+  $('wSub').textContent = chal ? 'Niveau ' + g.n + ' · objectif : ' + (g.target === 0 ? 'aucune erreur' : g.target + (g.target > 1 ? ' erreurs' : ' erreur') + ' au plus')
+    : 'Niveau ' + g.n;
+  var st = won ? g.stars : 0, s = '';
+  for (i = 1; i <= 3; i++) s += '<svg class="' + (st >= i ? 'on' : '') + '" viewBox="0 0 24 24"><use href="#star"/></svg>';
+  $('wStars').innerHTML = s; $('wStars').hidden = chal;
+  $('wRes').className = 'res' + (good ? '' : ' lost');
+  $('wRes').textContent = won ? (g.err === 0 ? 'Aucune erreur !' : errText(g.err)) : '4 erreurs : réessaie !';
+  $('bNext').hidden = !(won && !chal);
+  $('bNext').textContent = g.n < N ? 'Suivant' : 'Niveaux';
+  $('rowS').hidden = !(won && !chal);
+  $('bAgain').className = 'btn ' + (won && !chal ? 'line' : 'acc');
+  $('bBack').textContent = chal ? 'Accueil' : 'Niveaux';
+  $('bShare').textContent = shareLabel = 'Partager';
+  $('bChal').textContent = chalLabel = 'Défier un ami';
+  $('win').hidden = false;
+}
+function shareText() {
+  var st = ''; for (var i = 0; i < g.stars; i++) st += '⭐';
+  return NAME + ' · Niveau ' + g.n + ' · ' + st + ' ' + g.found.map(function (f) { return EMOJI[f]; }).join('');
+}
+// The link base: MJ_CONFIG.shareBaseUrl, else the current address if it is http(s); otherwise no link.
+function shareBase() {
+  var b = window.MJ_CONFIG && window.MJ_CONFIG.shareBaseUrl;
+  if (typeof b !== 'string' || !b) b = /^https?:/i.test(String(location.href)) ? String(location.href) : '';
+  return b.split('#')[0];
+}
+function challengeText() {
+  var base = shareBase(), link = base ? base + '#defi-' + g.n + '-' + g.err : '';
+  return NAME + ' · Niveau ' + g.n + ' en ' + errText(g.err) + '. À toi de faire mieux !' + (link ? ' ' + link : '');
+}
+function sendText(text, kind, btn) {
+  var done = function () { emit({ event: 'share', kind: kind }); };
+  var copied = function () { btn.textContent = 'Copié !'; done(); };
+  var legacy = function () {   // last resort: hidden textarea + execCommand
+    var ok = false;
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;left:0;top:0;opacity:0';
+      document.body.appendChild(ta);
+      ta.select(); ta.setSelectionRange(0, text.length);
+      ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (e) { ok = false; }
+    btn.textContent = ok ? 'Copié !' : 'Copie impossible';
+    if (ok) done();
+  };
+  var clip = function () {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(copied, legacy);
+    } catch (e) { /* fall through */ }
+    legacy();
+  };
+  try {
+    if (navigator.share) {
+      return navigator.share({ text: text }).then(done, function (e) { if (!e || e.name !== 'AbortError') clip(); });
+    }
+  } catch (e) { /* fall through */ }
+  clip();
+}
+
+// A friend's challenge: #defi-<level>-<errors>. Never touches the saved run.
+function openChallenge() {
+  var h = String(location.hash || ''), m;
+  try { if (h) history.replaceState(null, '', String(location.href).split('#')[0]); } catch (e) { /* ignore */ }
+  m = /^#defi-(\d{1,2})-(\d)$/.exec(h);
+  if (!m) return false;
+  var n = +m[1], target = +m[2];
+  if (n < 1 || n > N || target > MAX_ERR) return false;
+  startLevel(n, 0, 'chal', target);
+  emit({ event: 'challenge_open', level: n, target: target });
+  return true;
+}
+
+// ---- input (pointer events; Enter/Space on a focused button still work through click) --
+var lastUp = 0;   // time of the last pointerup anywhere: the click that follows it (and a ghost click that
+                  // lands on whatever appeared under the finger) must not act a second time
+function onTap(el, fn) {
+  el.addEventListener('pointerup', function (e) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    lastUp = Date.now(); fn(e);
+  });
+  el.addEventListener('click', function (e) {
+    if (e.detail === 0 || Date.now() - lastUp > 800) fn(e);
+  });
+}
+function tapTarget(e, sel) {
+  var t = e.target;
+  while (t && t.nodeType === 1 && !(t.matches && t.matches(sel))) t = t.parentNode;
+  return t && t.matches && t.matches(sel) ? t : null;
+}
+onTap($('grid'), function (e) {
+  var t = tapTarget(e, '.tile');
+  if (t) tapWord(+t.getAttribute('data-id'));
+});
+onTap($('cells'), function (e) {
+  var t = tapTarget(e, '.cell');
+  if (t && !t.disabled) {
+    var n = +t.getAttribute('data-level');
+    if (save.cur && save.cur.n === n) resume(save.cur); else startLevel(n, 0);
+  }
+});
+onTap($('bOk'), function () { if (!$('bOk').disabled) submit(); });
+onTap($('bClear'), function () { if (!$('bClear').disabled) clearSel(); });
+onTap($('bMap'), function () { show('levels'); });
+onTap($('bRestart'), function () { if (g) startLevel(g.n, g.roll + 1, g.mode, g.target); });
+onTap($('bGo'), function () { if (save.cur) resume(save.cur); else startLevel(nextLevel(), 0); });
+onTap($('bLevels'), function () { show('levels'); });
+onTap($('bLBack'), function () { show('home'); });
+onTap($('bNext'), function () { if (g.n < N) startLevel(g.n + 1, 0); else show('levels'); });
+onTap($('bAgain'), function () { startLevel(g.n, g.roll + 1, g.mode, g.target); });
+onTap($('bBack'), function () { show(g && g.mode === 'chal' ? 'home' : 'levels'); });
+onTap($('bShare'), function () { sendText(shareText(), 'result', $('bShare')); });
+onTap($('bChal'), function () { sendText(challengeText(), 'challenge', $('bChal')); });
+document.addEventListener('animationend', function (e) { if (e.target.classList) e.target.classList.remove('no'); });
+window.addEventListener('hashchange', function () { if (/^#defi-/.test(location.hash)) openChallenge(); });
+
+// ---- test hooks (no solution leaves the game) --------------------------------------
+function publicState() {
+  var rem = g ? remaining().map(wordOf) : [];
+  return {
+    screen: screen, level: g ? g.n : 0, mode: g ? g.mode : '', status: g ? g.status : '',
+    tiles: g && g.status === 'play' ? rem : [],
+    order: g ? g.order.map(wordOf) : [],
+    selected: g ? g.sel.map(wordOf) : [],
+    found: g ? g.found.map(function (f) { return { name: grid()[f][0], color: f, words: grid()[f][1].slice() }; }) : [],
+    errors: g ? g.err : 0, stars: g ? g.stars : 0, roll: g ? g.roll : 0,
+    challenge: g && g.mode === 'chal' ? { target: g.target } : null,
+    max: save.max, total: totalStars(), seed: seedBase, msg: msgText
+  };
+}
+var LEVELS = GRIDS.map(function (gr, i) {
+  var words = [];
+  gr.forEach(function (f) { f[1].forEach(function (w) { words.push(w); }); });
+  return { n: i + 1, words: words.sort() };
+});
+window.__game = {
+  levels: LEVELS,
+  state: publicState,
+  loadLevel: function (n) { startLevel(n | 0, 0); return publicState(); },
+  seed: function (n) { seedBase = n | 0; return seedBase; },
+  // select the given words (no animation) and validate them; returns 'ok' | 'close' | 'wrong' | 'dup' | 'none'
+  play: function (words) {
+    if (!g) return 'none';
+    g.sel = [];
+    for (var i = 0; i < words.length; i++) { var id = idOfWord(words[i]); if (id >= 0 && g.found.indexOf(famOf(id)) < 0 && g.sel.length < 3) g.sel.push(id); }
+    return submit();
+  }
+};
+
+// ---- start --------------------------------------------------------------------
+loadSave();
+show('home');
+if (/^#defi-/.test(location.hash)) openChallenge();
+})();
+</script>
+</body>
+</html>

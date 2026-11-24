@@ -82,54 +82,54 @@
   {
    "numbers": [
     1,
+    2,
     3,
-    8,
-    9,
-    10,
-    25
-   ],
-   "target": 41,
-   "par": 3,
-   "solutions": 37
-  },
-  {
-   "numbers": [
-    3,
-    5,
-    7,
     9,
     10,
     12
    ],
-   "target": 54,
+   "target": 71,
    "par": 3,
-   "solutions": 50
+   "solutions": 7
   },
   {
    "numbers": [
+    1,
+    3,
+    4,
+    8,
+    9,
+    12
+   ],
+   "target": 78,
+   "par": 3,
+   "solutions": 2
+  },
+  {
+   "numbers": [
+    1,
     2,
     3,
-    5,
-    9,
+    6,
     10,
-    20
+    25
    ],
-   "target": 104,
+   "target": 113,
    "par": 4,
-   "solutions": 110
+   "solutions": 27
   },
   {
    "numbers": [
-    3,
+    1,
+    2,
     5,
     7,
-    9,
     10,
-    75
+    100
    ],
-   "target": 99,
+   "target": 132,
    "par": 3,
-   "solutions": 19
+   "solutions": 1
   },
   {
    "numbers": [

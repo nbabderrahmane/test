@@ -10,7 +10,7 @@ const opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? +args[
 const key = t => t.map(x => x.join(',')).join('|');
 function run(job) {
   const lvl = L.decode(job.raw), caps = lvl.caps, par = lvl.par;
-  const out = { id: job.id, par, ref: null, games: job.games, nudged: 0, nudgedBeforeWin: 0, won: 0, lost: 0, lostNudged: 0, lostNever: 0, gaps: [], nudgeAt: [], stuckNoNudge: 0, stuck: 0, lostStuck: 0 };
+  const out = { id: job.id, par, ref: null, games: job.games, nudged: 0, nudgedBeforeWin: 0, won: 0, lost: 0, lostNudged: 0, lostNever: 0, gaps: [], nudgeAt: [], stuckNoNudge: 0, stuck: 0, lostStuck: 0, lostNeverSilent: 0, tooEarly: 0 };
   // reference solution must never trigger
   { const t = lvl.tubes.map(x => x.slice()), seen = { [key(t)]: 1 }; let rev = 0, hit = false;
     job.sol.forEach(([a, b], i) => { t[b].push(t[a].pop()); const k = key(t); seen[k] = (seen[k] || 0) + 1; if (seen[k] > 1) rev++; if (i + 1 > 2 * par || rev >= 3) hit = true; });
@@ -29,14 +29,14 @@ function run(job) {
       if (!sum) pick = mv[Math.floor(rand() * mv.length)]; else { let r = rand() * sum, i = 0; while (r >= w[i]) { r -= w[i]; i++; } pick = mv[i]; }
       t[pick[1]].push(t[pick[0]].pop()); prev = pick; k++;
       const kk = key(t); seen[kk] = (seen[kk] || 0) + 1; if (seen[kk] > 1) rev++;
-      if (nud === null && !L.isWon(t, caps) && (k > 2 * par || rev >= 3)) nud = k;
+      if (nud === null && !L.isWon(t, caps) && (k > 2 * par || rev >= 3)) { nud = k; const sv = L.solve(t, caps, { maxNodes: 4000, weight: 2 }).status; out.atNudge = out.atNudge || { lost: 0, winnable: 0, unknown: 0, byRevisit: 0 }; out.atNudge[sv === 'unsolvable' ? 'lost' : sv === 'solved' ? 'winnable' : 'unknown']++; if (rev >= 3 && k <= 2 * par) out.atNudge.byRevisit++; }
       if (doomAt === null && k % 4 === 0 && !L.isWon(t, caps)) { if (L.solve(t, caps, { maxNodes: 4000, weight: 2 }).status === 'unsolvable') doomAt = k; }
     }
     if (end === 'stuck') { out.stuck++; if (nud === null) out.stuckNoNudge++; }
     if (end === 'won') { out.won++; if (nud !== null) out.nudgedBeforeWin++; }
     if (nud !== null) { out.nudged++; out.nudgeAt.push(nud); }
     const lost = doomAt !== null || end === 'stuck';
-    if (lost) { out.lost++; if (end === 'stuck' && doomAt === null) { out.lostStuck++; } else { if (nud !== null) { out.lostNudged++; out.gaps.push(nud - doomAt); } else out.lostNever++; } }
+    if (lost) { out.lost++; if (end === 'stuck' && doomAt === null) { out.lostStuck++; } else { if (nud !== null) { out.lostNudged++; out.gaps.push(nud - doomAt); } else { out.lostNever++; if (end !== 'stuck') out.lostNeverSilent = (out.lostNeverSilent || 0) + 1; } } }
   }
   return out;
 }

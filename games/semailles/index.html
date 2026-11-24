@@ -1,4 +1,281 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#131A2E">
+<title>Petit Mil</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#131A2E;--panel:#1D2742;--line:#4A5880;--ink:#F4F1E8;--dim:#A9B4D0;--gold:#FFC53D;--off:#3A4567;
+  --acc:#9AD86A;--acc-ink:#12260A;--wood:#6A4429;--wood2:#7C5233;--pit:#2B1B11;--seed:#F1DBA2;--seed2:#B98B43;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);overscroll-behavior:none}
+body{
+  position:fixed;top:0;right:0;bottom:0;left:0;color:var(--ink);
+  font:16px/1.25 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif;
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-text-size-adjust:100%;
+}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;touch-action:manipulation}
+button:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+svg{display:block}
+
+#app{
+  position:absolute;top:0;right:0;bottom:0;left:0;display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+header{display:flex;align-items:center;gap:8px;padding:8px 10px 4px;flex:none}
+.icon{width:48px;height:48px;border-radius:14px;background:var(--panel);display:flex;align-items:center;justify-content:center;flex:none}
+.icon svg{width:24px;height:24px;fill:var(--ink)}
+.icon svg.st{fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.icon b{font-size:22px;font-weight:800}
+.ttl{flex:1;min-width:0;text-align:center}
+.brand{display:block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#lvl{display:block;font-size:20px;font-weight:800;white-space:nowrap}
+
+#chal{flex:none;display:flex;align-items:center;justify-content:center;gap:6px;height:26px;margin:0 10px;border-radius:13px;background:rgba(255,197,61,.14);color:var(--gold);font-size:13px;font-weight:700}
+#chal svg{width:14px;height:14px;fill:var(--gold)}
+#goal{flex:none;display:flex;align-items:center;justify-content:center;gap:10px;height:24px;font-size:12px;color:var(--dim);white-space:nowrap}
+#goal span{display:flex;align-items:center;gap:1px}
+#goal svg{width:12px;height:12px;fill:var(--gold)}
+#goal em{font-style:normal;margin-left:3px}
+
+.store{flex:none;position:relative;display:flex;align-items:center;gap:8px;height:40px;margin:2px 10px;padding:0 12px;border-radius:12px;background:var(--panel);overflow:hidden}
+.store .who{flex:1;min-width:0;display:flex;align-items:center;gap:8px;font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.store .who svg{width:16px;height:16px;flex:none}
+.store .cnt{font-variant-numeric:tabular-nums;font-size:22px;font-weight:800;line-height:1}
+.store .cnt small{font-size:12px;font-weight:600;color:var(--dim);margin-left:2px}
+.store .bar{position:absolute;left:0;bottom:0;height:4px;width:0;background:var(--acc);transition:width .25s}
+.store.foe .bar{background:var(--dim)}
+.store.bump .cnt{animation:bump .35s}
+@keyframes bump{40%{transform:scale(1.35)}}
+
+#bw{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:4px 6px}
+#board{
+  width:100%;max-width:420px;height:100%;max-height:250px;padding:5px;border-radius:20px;background:var(--wood);
+  box-shadow:inset 0 0 0 2px var(--wood2);
+  display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:5px;
+}
+.pit{
+  position:relative;min-width:0;min-height:44px;border-radius:16px;background:var(--pit);box-shadow:inset 0 3px 0 rgba(0,0,0,.45);
+  overflow:hidden;
+}
+.pit.top{background:#2A1B22}
+.pit .sd{position:absolute;left:4px;right:4px;top:5px;bottom:27px}
+.pit .sd i{position:absolute;width:10px;height:7px;margin:-3.500px 0 0 -5px;border-radius:50%;background:var(--seed);box-shadow:inset 0 -2px 0 var(--seed2)}
+.pit .nb{
+  position:absolute;left:50%;bottom:4px;transform:translateX(-50%);min-width:26px;height:22px;padding:0 5px;border-radius:11px;
+  background:rgba(0,0,0,.38);color:var(--ink);font-size:15px;font-weight:800;line-height:22px;text-align:center;font-variant-numeric:tabular-nums;
+}
+.pit.empty .nb{color:var(--dim);font-weight:600}
+.pit.go{box-shadow:inset 0 0 0 3px var(--acc);animation:glow 1.4s ease-in-out infinite}
+.pit.go .nb{background:var(--acc);color:var(--acc-ink)}
+.pit.go:active{transform:scale(.95)}
+.pit.last{outline:3px dashed var(--gold);outline-offset:-3px}
+.pit.cap{background:#6B2A33;box-shadow:inset 0 0 0 3px #FF8A8A}
+.pit.pop .sd{animation:pop .16s}
+.pit.no{animation:no .28s}
+@keyframes glow{50%{box-shadow:inset 0 0 0 3px rgba(154,216,106,.45)}}
+@keyframes pop{40%{transform:scale(1.18)}}
+@keyframes no{25%{transform:translateX(-5px)}50%{transform:translateX(5px)}75%{transform:translateX(-3px)}}
+
+#msg{
+  flex:none;height:44px;margin:0 12px;display:flex;align-items:center;justify-content:center;text-align:center;
+  font-size:14px;line-height:1.15;font-weight:600;color:var(--dim);border-radius:12px;padding:3px 10px;overflow:hidden;
+}
+#msg.hi{color:var(--ink)}
+#msg.warn{color:#FFD9A0}
+footer{flex:none;display:flex;gap:10px;padding:4px 10px 12px}
+.btn{
+  flex:1;min-height:50px;border-radius:14px;background:var(--panel);font-weight:700;font-size:15px;
+  display:flex;align-items:center;justify-content:center;gap:8px;padding:0 10px;
+}
+.btn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.btn:active{transform:scale(.97)}
+.btn[disabled]{color:#66739A;cursor:default}
+.btn.acc{background:var(--acc);color:var(--acc-ink)}
+.btn.line{background:none;box-shadow:inset 0 0 0 2px var(--line)}
+
+.over{position:absolute;top:0;right:0;bottom:0;left:0;z-index:5;display:flex;align-items:center;justify-content:center;
+  background:rgba(12,17,32,.92);padding:12px 16px;overflow:hidden;animation:fade .2s}
+@keyframes fade{from{opacity:0}}
+.card{position:relative;z-index:1;width:100%;max-width:330px;background:var(--panel);border-radius:22px;padding:18px 18px 14px;text-align:center;animation:rise .28s cubic-bezier(.2,1.3,.5,1)}
+@keyframes rise{from{transform:translateY(24px) scale(.94);opacity:0}}
+.card h2{font-size:26px;font-weight:800}
+.card p{color:var(--dim);margin-top:4px;font-size:15px}
+.stars{display:flex;justify-content:center;align-items:flex-end;gap:6px;margin:10px 0 4px}
+.stars svg{width:50px;height:50px;fill:var(--off)}
+.stars svg:nth-child(2){width:62px;height:62px}
+.stars svg.on{fill:var(--gold);animation:star .4s cubic-bezier(.2,1.6,.4,1) backwards}
+.stars svg.on:nth-child(2){animation-delay:.14s}
+.stars svg.on:nth-child(3){animation-delay:.28s}
+@keyframes star{from{transform:scale(.2) rotate(-40deg);opacity:0}}
+.big{font-size:40px;font-weight:800;line-height:1;margin-top:8px;font-variant-numeric:tabular-nums}
+.big small{font-size:16px;font-weight:600;color:var(--dim);margin-left:6px}
+.card p.cres{margin-top:6px;font-weight:800;font-size:16px;color:var(--gold)}
+.card p.cres.lost{color:#FFB4BC}
+.acts{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.acts .row{display:flex;gap:8px}
+.acts .btn{min-height:48px}
+
+.scr{position:absolute;top:0;right:0;bottom:0;left:0;z-index:4;background:var(--bg);display:flex;flex-direction:column;
+  padding:calc(env(safe-area-inset-top) + 10px) calc(env(safe-area-inset-right) + 14px) calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 14px)}
+.top{flex:none;display:flex;align-items:center;gap:10px}
+.top .tt{flex:1;min-width:0}
+.top h1{font-size:24px;font-weight:800;color:var(--acc);white-space:nowrap}
+.top .sub{font-size:12px;color:var(--dim);margin-top:2px;line-height:1.2}
+.total{display:flex;align-items:center;gap:6px;background:var(--panel);border-radius:14px;height:44px;padding:0 12px;font-weight:800;font-variant-numeric:tabular-nums;flex:none}
+.total svg{width:18px;height:18px;fill:var(--gold)}
+
+#home{justify-content:center;gap:14px}
+.hdeco{align-self:center;width:208px;height:84px;border-radius:22px;background:var(--wood);box-shadow:inset 0 0 0 2px var(--wood2);padding:8px;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(2,1fr);gap:6px}
+.hdeco u{border-radius:50%;background:var(--pit);box-shadow:inset 0 3px 0 rgba(0,0,0,.45);position:relative;text-decoration:none}
+.hdeco u i{position:absolute;width:9px;height:6px;border-radius:50%;background:var(--seed);box-shadow:inset 0 -2px 0 var(--seed2)}
+.hbrand{text-align:center}
+.hbrand h1{font-size:40px;font-weight:800;color:var(--acc);letter-spacing:.01em;line-height:1.1}
+.hbrand .sub{color:var(--dim);font-size:14px;margin-top:4px}
+.stats{display:flex;gap:10px}
+.stat{flex:1;min-width:0;background:var(--panel);border-radius:16px;padding:10px 12px;display:flex;align-items:center;gap:10px;min-height:62px}
+.stat svg{width:28px;height:28px;fill:var(--gold);flex:none}
+.stat b{display:block;font-size:24px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.stat small{display:block;font-size:12px;color:var(--dim);margin-top:3px;white-space:nowrap}
+#home .btn{flex:none}
+#home .hrow .btn{flex:1}
+#bGo{min-height:58px;font-size:17px}
+.hrow{display:flex;gap:10px}
+
+#grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,1fr));gap:8px;margin:12px 0}
+.cell{position:relative;min-height:48px;border-radius:14px;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;overflow:hidden}
+.cell .n{font-weight:800;font-size:19px;line-height:1;font-variant-numeric:tabular-nums}
+.cell .n svg{width:18px;height:18px;fill:#66739A}
+.cell .s{display:flex;gap:1px}
+.cell .s svg{width:14px;height:14px;fill:var(--off)}
+.cell .s svg.on{fill:var(--gold)}
+.cell.cur{box-shadow:inset 0 0 0 2px var(--acc)}
+.cell.ok{background:#25402F}
+.cell[disabled]{background:#182036;cursor:default}
+.cell:not([disabled]):active{transform:scale(.96)}
+
+#help .card{max-width:360px;text-align:left}
+#help h2{text-align:center}
+#help ul{list-style:none;margin:10px 0 4px;display:flex;flex-direction:column;gap:8px}
+#help li{font-size:14px;line-height:1.3;color:var(--ink);padding-left:16px;position:relative}
+#help li:before{content:"";position:absolute;left:2px;top:6px;width:7px;height:5px;border-radius:50%;background:var(--seed)}
+#help .acts{margin-top:10px}
+
+@media (max-height:600px){
+  header{padding-top:4px}
+  #msg{height:38px}
+  footer{padding-bottom:8px}
+  .btn{min-height:46px}
+  .stars svg{width:40px;height:40px}.stars svg:nth-child(2){width:50px;height:50px}
+  .card{padding:14px 16px 12px}.card h2{font-size:22px}
+  .big{font-size:34px}
+  .acts{gap:6px;margin-top:8px}.acts .btn{min-height:46px}
+  .hbrand h1{font-size:32px}
+  #home{gap:10px}
+  .hdeco{height:70px}
+  #help li{font-size:13px}#help ul{gap:6px}
+}
+@media (min-width:400px){.pit .sd i{width:12px;height:8px;margin:-4px 0 0 -6px}}
+@media (prefers-reduced-motion:reduce){
+  *,*:before,*:after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button class="icon" id="bMap" aria-label="Niveaux">
+      <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
+    </button>
+    <div class="ttl"><span class="brand">Petit Mil</span><span id="lvl">Niveau 1</span></div>
+    <button class="icon" id="bHelp" aria-label="Règles"><b>?</b></button>
+  </header>
+  <div id="chal" hidden><svg viewBox="0 0 24 24"><path d="M5 3h2v18H5zM8 4h11l-3 4.500 3 4.500H8z"/></svg><span id="chalT"></span></div>
+  <div id="goal"></div>
+  <div class="store foe" id="stFoe"><span class="who"><svg viewBox="0 0 24 24"><use href="#seed"/></svg><span id="foeName">Adversaire</span></span><span class="cnt"><b id="foeN">0</b><small>/25</small></span><u class="bar" id="foeBar"></u></div>
+  <div id="bw"><main id="board" aria-label="Plateau"></main></div>
+  <div class="store" id="stMe"><span class="who"><svg viewBox="0 0 24 24"><use href="#seed"/></svg>Toi</span><span class="cnt"><b id="meN">0</b><small>/25</small></span><u class="bar" id="meBar"></u></div>
+  <div id="msg" role="status" aria-live="polite"></div>
+  <footer>
+    <button class="btn" id="bUndo"><svg viewBox="0 0 24 24"><path d="M9 7 4 12l5 5M4 12h10a6 6 0 0 1 0 12" transform="translate(0 -3)"/></svg>Annuler</button>
+    <button class="btn" id="bReset"><svg viewBox="0 0 24 24"><path d="M4 5v6h6M5 11a8 8 0 1 1 2 7"/></svg>Recommencer</button>
+  </footer>
+
+  <section class="over" id="win" hidden aria-live="polite">
+    <div class="card">
+      <h2 id="wTitle">Gagné !</h2>
+      <p id="wSub">Niveau 1</p>
+      <div class="stars" id="wStars"></div>
+      <div class="big"><span id="wScore">0 – 0</span><small>graines</small></div>
+      <p id="wWhy"></p>
+      <p class="cres" id="wChal" hidden></p>
+      <div class="acts">
+        <button class="btn acc" id="bNext">Suivant</button>
+        <div class="row">
+          <button class="btn line" id="bAgain">Rejouer</button>
+          <button class="btn line" id="bShare">Partager</button>
+        </div>
+        <button class="btn line" id="bChal">Défier un ami</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="over" id="help" hidden>
+    <div class="card">
+      <h2>Les règles</h2>
+      <ul>
+        <li>Tu joues en bas, l’adversaire en haut. On sème dans le sens inverse des aiguilles d’une montre : tu vides une case et tu poses une graine dans chaque case suivante.</li>
+        <li>Si ta dernière graine tombe chez l’adversaire et porte une case à 2 ou 3, tu prends ces graines, et celles des cases d’avant tant qu’elles font 2 ou 3.</li>
+        <li>Une case de 12 graines ou plus saute sa case de départ.</li>
+        <li>Si l’adversaire n’a plus de graines, tu dois lui en donner. Prendre toutes ses graines d’un coup ne rapporte rien.</li>
+        <li>Le premier à 25 graines gagne. Si quelqu’un ne peut plus jouer, ou après 200 coups, chacun garde les graines de son côté.</li>
+      </ul>
+      <div class="acts"><button class="btn acc" id="bHelpOk">Compris</button></div>
+    </div>
+  </section>
+
+  <section class="scr" id="home" hidden>
+    <div class="hdeco" id="deco" aria-hidden="true"></div>
+    <div class="hbrand"><h1>Petit Mil</h1><div class="sub">Sème, capture, gagne : l’awalé de poche.</div></div>
+    <div class="stats">
+      <div class="stat" aria-label="Étoiles"><svg viewBox="0 0 24 24"><use href="#star"/></svg><div><b id="hStars">0</b><small>étoiles sur 60</small></div></div>
+      <div class="stat" aria-label="Niveaux gagnés"><div><b id="hDone">0</b><small>niveaux sur 20</small></div></div>
+    </div>
+    <button class="btn acc" id="bGo">Continuer · Niveau 1</button>
+    <div class="hrow">
+      <button class="btn" id="bLevels">Niveaux</button>
+      <button class="btn" id="bRules">Règles</button>
+    </div>
+  </section>
+
+  <section class="scr" id="levels" hidden>
+    <div class="top">
+      <button class="icon" id="bLBack" aria-label="Accueil"><svg class="st" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="tt"><h1>Niveaux</h1><div class="sub">20 adversaires</div></div>
+      <div class="total" aria-label="Étoiles gagnées"><svg viewBox="0 0 24 24"><use href="#star"/></svg><span id="lTotal">0/60</span></div>
+    </div>
+    <div id="grid"></div>
+    <button class="btn acc" id="bBack" style="flex:none">Reprendre</button>
+  </section>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <path id="star" d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.200 6.500L12 17.400l-5.900 3.100 1.200-6.500L2.500 9.400l6.600-.9z"/>
+  <ellipse id="seed" cx="12" cy="12" rx="9" ry="6" fill="#F1DBA2"/>
+</defs></svg>
+
 <script>
+(function () {
+'use strict';
+
+var GAME = 'semailles';
+var NAME = 'Petit Mil';
+var KEY = 'mj:' + GAME + ':v1';
+
 /*ENGINE:BEGIN (pure rules + adversaries, no DOM; tools/semailles loads this block)*/
 var WIN = 25, PLY_CAP = 200, INF = 100000;
 // Board: Int8Array(14). Pits 0..5 = the player's row (left to right), 6..11 = the adversary's row
@@ -167,4 +444,539 @@ var LEVELS = [
 ];
 /*ENGINE:END*/
 
+var N = LEVELS.length;
+
+var $ = function (id) { return document.getElementById(id); };
+var reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+var still = false;   // test hook: no animation, no thinking delay
+
+// ---- host page (only the events listed in the game sheet, no personal data) ----
+function emit(msg) {
+  msg.source = 'mini-jeu'; msg.game = GAME;
+  try { window.parent.postMessage(msg, '*'); } catch (e) { /* ignore */ }
+}
+
+// ---- random generator (seeded; __game.seed(n) sets it) ----------------------------------
+var rng = mkRng((Date.now() ^ Math.floor(Math.random() * 1e9)) | 0);
+
+// ---- persistence (always guarded: the game works without storage) -------------------------
+var save = { level: 1, max: 1, stars: [], best: [], cur: null, chalGame: null };
+function totalStars() { var t = 0; for (var i = 0; i < N; i++) t += save.stars[i] || 0; return t; }
+function cleanGame(g, lvOk) {
+  if (!g || typeof g !== 'object' || !Array.isArray(g.hist) || !Array.isArray(g.rss)) return null;
+  if (g.hist.length > PLY_CAP || g.rss.length > PLY_CAP) return null;
+  var ok = g.hist.every(function (v) { return typeof v === 'number' && v >= 0 && v < 12 && v === (v | 0); }) &&
+    g.rss.every(function (v) { return typeof v === 'number' && isFinite(v); }) && typeof g.rs === 'number' && isFinite(g.rs);
+  if (!ok || !lvOk(g)) return null;
+  return g;
+}
+function loadSave() {
+  var i;
+  save.stars = []; save.best = [];
+  for (i = 0; i < N; i++) { save.stars.push(0); save.best.push(0); }
+  try {
+    var s = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (s && typeof s === 'object') {
+      var nat = function (v, hi) { v = v | 0; return v < 0 ? 0 : v > hi ? hi : v; };
+      save.max = Math.max(1, nat(s.max, N));
+      save.level = Math.min(Math.max(1, nat(s.level, N)), save.max);
+      if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = nat(s.stars[i], 3);
+      if (Array.isArray(s.best)) for (i = 0; i < N && i < s.best.length; i++) save.best[i] = nat(s.best[i], 48);
+      var lvOk = function (g) { return g.level === (g.level | 0) && g.level >= 1 && g.level <= save.max; };
+      save.cur = cleanGame(s.cur, lvOk);
+      var cg = cleanGame(s.chalGame, function (g) { return g.level === (g.level | 0) && g.level >= 1 && g.level <= N && g.target >= 1 && g.target <= 48; });
+      save.chalGame = cg;
+    }
+  } catch (e) { /* no storage: play without it */ }
+}
+function store() {
+  try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) { /* ignore */ }
+}
+
+// ---- game state --------------------------------------------------------------------------
+var S = null;          // {lv, b, t, n, hist, rss, rs0, snaps, over, res, last}
+var view = null;       // board as drawn (differs from S.b during an animation)
+var chal = null;       // {target, level} while a friend's challenge is on
+var free = false;      // challenge on a locked level
+var busy = false;      // a move is being animated or the adversary is thinking
+var gen = 0;           // bumps when a game is replaced: pending timers of the old one stop
+var screen = 'home', winTimer = 0;
+var lastBump = [0, 0];
+var last = { score: 0, stars: 0 };   // result of the game just finished
+
+function later(fn, ms) {
+  var g = gen;
+  setTimeout(function () { if (g === gen) fn(); }, ms);
+}
+function levelDef() { return LEVELS[S.lv - 1]; }
+function startBoard(lv) { var L = LEVELS[lv - 1]; return mkBoard(L.p, L.s); }
+
+function persist() {
+  if (!S || S.over) return;
+  var g = { level: S.lv, hist: S.hist.slice(), rss: S.rss.slice(), rs: rng.s };
+  if (chal) { g.target = chal.target; save.chalGame = g; } else { save.cur = g; }
+  store();
+}
+// Builds a game; `from` is a saved game to resume (replayed move by move, never trusted).
+function newGame(lv, opts) {
+  opts = opts || {};
+  gen++; busy = false;
+  clearTimeout(winTimer);
+  chal = opts.chal || null; free = !!opts.free;
+  S = { lv: lv, b: startBoard(lv), t: 0, n: 0, hist: [], rss: [], snaps: [], over: false, res: null, last: -1 };
+  var from = opts.from;
+  if (from) {
+    var ok = true, i, rsv, r;
+    for (i = 0; i < from.hist.length; i++) {
+      if (moves(S.b, S.t).indexOf(from.hist[i]) < 0) { ok = false; break; }
+      if (S.t === 0) {
+        rsv = from.rss[S.rss.length];
+        if (rsv === undefined) { ok = false; break; }
+        S.snaps.push({ b: S.b, n: S.n, hl: S.hist.length, rs: rsv }); S.rss.push(rsv);
+      }
+      r = play(S.b, S.t, from.hist[i]);
+      S.b = r.b; S.t = 1 - S.t; S.n++; S.hist.push(from.hist[i]); S.last = r.last;
+    }
+    if (ok && (status(S.b, S.t, S.n) || S.rss.length !== from.rss.length)) ok = false;
+    if (ok) rng.s = from.rs | 0;
+    else S = { lv: lv, b: startBoard(lv), t: 0, n: 0, hist: [], rss: [], snaps: [], over: false, res: null, last: -1 };   // corrupted: start clean
+  }
+  view = S.b.slice(); lastBump = [view[12], view[13]];
+  $('win').hidden = true; $('help').hidden = true;
+  if (!from || !S.hist.length) { if (chal) save.chalGame = null; else if (!opts.keep) save.cur = null; }
+  paintAll();
+  next();
+}
+function startLevel(lv, resume) {
+  var from = null;
+  if (resume && save.cur && save.cur.level === lv) from = save.cur;
+  newGame(lv, { from: from });
+  if (!chal) { save.level = lv; store(); }
+}
+
+// ---- one move ----------------------------------------------------------------------------
+function commit(pit, animate, done) {
+  var who = S.t, prev = S.b, r = play(S.b, who, pit);
+  if (who === 0) { S.snaps.push({ b: prev, n: S.n, hl: S.hist.length, rs: rng.s }); S.rss.push(rng.s); }
+  S.hist.push(pit); S.b = r.b; S.n++; S.t = 1 - who; S.last = r.last;
+  var st = status(S.b, S.t, S.n);
+  if (st) { S.over = true; S.res = st; }
+  persist();
+  var fin = function () {
+    view = (st ? st.b : S.b).slice();
+    paintAll();
+    if (r.caps.length) say((who === 0 ? 'Tu prends ' : levelDef().nm + ' prend ') + r.gain + (r.gain > 1 ? ' graines' : ' graine') + ' !', who === 0 ? 'hi' : 'warn');
+    else if (r.grand) say('Prise de toutes les graines : rien n’est pris.', 'warn');
+    if (done) done();
+  };
+  if (animate) animateMove(prev, r, who, pit, fin); else fin();
+}
+function next() {
+  if (!S) return;
+  if (S.over) { onOver(); return; }
+  if (S.t === 1) {
+    busy = true; paintAll();
+    say(levelDef().nm + ' réfléchit…', '');
+    var g = gen;
+    later(function () {
+      if (g !== gen || !S || S.over || S.t !== 1) return;
+      var pit = aiMove(S.b, 1, S.n, levelDef().ai, rng);
+      commit(pit, !(still || reduced), function () { busy = false; next(); });
+    }, still ? 0 : reduced ? 150 : 420);
+  } else {
+    busy = false; paintAll();
+    var mv = moves(S.b, 0);
+    if (sideSum(S.b, 1) === 0 && S.hist.length) say('L’adversaire n’a plus de graines : donne-lui en.', 'warn');
+    else if (!S.hist.length) say(S.lv <= 2 ? 'Touche une case entourée pour semer.' : 'À toi de jouer.', 'hi');
+    else if (mv.length === 1) say('Un seul coup possible.', '');
+  }
+}
+function tapPit(i) {
+  if (busy || !S || S.over || screen !== 'game' || !$('win').hidden || !$('help').hidden) return;
+  var el = pitEls[i];
+  var refuse = function (m) {
+    say(m, 'warn');
+    el.classList.remove('no'); void el.offsetWidth; el.classList.add('no');
+  };
+  if (i > 5) return refuse('Ce sont les graines de ' + levelDef().nm + '.');
+  if (S.b[i] === 0) return refuse('Cette case est vide.');
+  if (moves(S.b, 0).indexOf(i) < 0) return refuse('Il faut nourrir l’adversaire : choisis une case entourée.');
+  busy = true;
+  commit(i, !(still || reduced), function () { busy = false; next(); });
+}
+// Test hook: plays the pit of the player and the adversary's replies at once, without animation.
+function applyMove(pit) {
+  if (busy || !S || S.over || S.t !== 0 || moves(S.b, 0).indexOf(pit | 0) < 0) return false;
+  commit(pit | 0, false);
+  while (!S.over && S.t === 1) commit(aiMove(S.b, 1, S.n, levelDef().ai, rng), false);
+  paintAll();
+  if (S.over) onOver(); else next();
+  return true;
+}
+
+// ---- end of a game -----------------------------------------------------------------------
+function starsFor(mine, theirs) { var m = mine - theirs; return m < 1 ? 0 : 1 + (m >= 8 ? 1 : 0) + (m >= 16 ? 1 : 0); }
+var WHY = { stuck: 'Plus de coup possible : chacun garde ses graines.', cap: 'Partie très longue : on compte les graines restantes.', win: '' };
+function onOver() {
+  var res = S.res, mine = res.b[12], theirs = res.b[13], won = res.winner === 0, stars = won ? starsFor(mine, theirs) : 0;
+  busy = false; view = res.b.slice(); paintAll();
+  last = { score: mine, stars: stars };
+  var lv = S.lv;
+  if (chal) {
+    save.chalGame = null; store();
+    emit({ event: 'challenge_result', level: lv, score: mine, target: chal.target, won: mine >= chal.target });
+  } else {
+    save.cur = null;
+    if (won) {
+      if (stars > save.stars[lv - 1]) save.stars[lv - 1] = stars;
+      if (mine > save.best[lv - 1]) save.best[lv - 1] = mine;
+      if (lv < N) { save.max = Math.max(save.max, lv + 1); save.level = lv + 1; }
+      emit({ event: 'level_complete', level: lv, score: mine, stars: stars });
+    }
+    store();
+  }
+  say(won ? 'Bien joué !' : res.winner === -1 ? 'Égalité.' : 'Perdu cette fois.', 'hi');
+  clearTimeout(winTimer);
+  winTimer = setTimeout(function () { if (screen === 'game' && S && S.over) openResult(); }, still ? 0 : 700);
+}
+function openResult() {
+  var res = S.res, mine = res.b[12], theirs = res.b[13], won = res.winner === 0, L = levelDef();
+  $('wScore').textContent = mine + ' – ' + theirs;
+  $('wWhy').textContent = WHY[res.why] || '';
+  var h = $('wStars'); h.innerHTML = '';
+  var cr = $('wChal');
+  if (chal) {
+    var ok = mine >= chal.target;
+    $('wTitle').textContent = ok ? 'Défi relevé !' : 'Défi manqué';
+    $('wSub').textContent = 'Niveau ' + S.lv + ' · contre ' + L.nm;
+    cr.hidden = false; cr.className = 'cres' + (ok ? '' : ' lost');
+    cr.textContent = 'Objectif ' + chal.target + ' · toi ' + mine;
+    $('bNext').hidden = false; $('bNext').textContent = 'Accueil';
+  } else {
+    cr.hidden = true;
+    $('wTitle').textContent = won ? 'Gagné !' : res.winner === -1 ? 'Égalité' : 'Perdu';
+    $('wSub').textContent = 'Niveau ' + S.lv + ' · contre ' + L.nm;
+    for (var i = 1; i <= 3; i++) h.insertAdjacentHTML('beforeend', '<svg viewBox="0 0 24 24" class="' + (i <= last.stars ? 'on' : '') + '"><use href="#star"/></svg>');
+    $('bNext').hidden = !won; $('bNext').textContent = S.lv < N ? 'Suivant' : 'Niveaux';
+  }
+  h.hidden = !!chal || !won;
+  $('bAgain').className = 'btn line';
+  if (!chal && !won) $('bAgain').className = 'btn acc';
+  $('win').hidden = false;
+}
+
+// ---- sharing -----------------------------------------------------------------------------
+function starsText(s) { var st = ''; while (s-- > 0) st += '⭐'; return st; }
+function shareText() {
+  return NAME + ' · Niveau ' + S.lv + ' · ' + (last.stars ? starsText(last.stars) + ' · ' : '') + last.score + ' graines';
+}
+// The link base: MJ_CONFIG.shareBaseUrl, else the current address if it is http(s); otherwise no link.
+function shareBase() {
+  var b = window.MJ_CONFIG && window.MJ_CONFIG.shareBaseUrl;
+  if (typeof b !== 'string' || !b) b = /^https?:/i.test(String(location.href)) ? String(location.href) : '';
+  return b.split('#')[0];
+}
+// Fragment: letters, digits and hyphens only.
+function challengeLink() {
+  var base = shareBase();
+  return base ? base + '#defi-' + S.lv + '-' + Math.max(1, last.score) : '';
+}
+function challengeText() {
+  var link = challengeLink();
+  return NAME + ' · Niveau ' + S.lv + ' : j’ai pris ' + last.score + ' graines. À toi de faire mieux !' + (link ? ' ' + link : '');
+}
+function sendText(text, kind, btn) {
+  var done = function () { emit({ event: 'share', kind: kind }); };
+  var copied = function () { btn.textContent = 'Copié !'; done(); };
+  var legacy = function () {
+    var ok = false;
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;left:0;top:0;opacity:0';
+      document.body.appendChild(ta);
+      ta.select(); ta.setSelectionRange(0, text.length);
+      ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (e) { ok = false; }
+    btn.textContent = ok ? 'Copié !' : 'Copie impossible';
+    if (ok) done();
+  };
+  var clip = function () {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(copied, legacy);
+    } catch (e) { /* fall through */ }
+    legacy();
+  };
+  try {
+    if (navigator.share) {
+      return navigator.share({ text: text }).then(done, function (e) { if (!e || e.name !== 'AbortError') clip(); });
+    }
+  } catch (e) { /* fall through */ }
+  clip();
+}
+
+// ---- challenges (#defi-<level>-<seeds>) --------------------------------------------------
+function openChallenge() {
+  var h = String(location.hash || ''), m;
+  try { if (h) history.replaceState(null, '', String(location.href).split('#')[0]); } catch (e) { /* ignore */ }
+  m = /^#defi-(\d{1,2})-(\d{1,2})$/.exec(h);
+  if (!m) return false;
+  var n = +m[1], target = +m[2];
+  if (n < 1 || n > N || target < 1 || target > 48) return false;
+  newGame(n, { chal: { target: target, level: n }, free: n > save.max, keep: true });
+  emit({ event: 'challenge_open', level: n, target: target });
+  show('game');
+  return true;
+}
+
+// ---- drawing -----------------------------------------------------------------------------
+var POS = [[50,50],[32,36],[68,64],[68,34],[32,66],[50,20],[50,80],[22,52],[78,50],[26,20],[74,80],[74,18]];
+var board = $('board'), pitEls = [];
+(function buildBoard() {
+  var order = [11, 10, 9, 8, 7, 6, 0, 1, 2, 3, 4, 5], i;
+  for (i = 0; i < 12; i++) {
+    var p = order[i], b = document.createElement('button');
+    b.className = 'pit' + (p > 5 ? ' top' : '');
+    b.setAttribute('data-pit', p);
+    b.innerHTML = '<span class="sd"></span><b class="nb">0</b>';
+    b._sd = b.firstChild; b._nb = b.lastChild; b._n = -1;
+    board.appendChild(b);
+    pitEls[p] = b;
+  }
+})();
+function paintPit(i, pop) {
+  var el = pitEls[i], n = view[i];
+  if (el._n === n) return;
+  el._n = n;
+  el._nb.textContent = n;
+  var html = '', k, c = Math.min(n, 12);
+  for (k = 0; k < c; k++) html += '<i style="left:' + POS[k][0] + '%;top:' + POS[k][1] + '%;transform:rotate(' + (k * 47 % 180) + 'deg)"></i>';
+  el._sd.innerHTML = html;
+  el.classList.toggle('empty', n === 0);
+  el.setAttribute('aria-label', (i > 5 ? 'Case adverse, ' : 'Ta case ' + (i + 1) + ', ') + n + (n > 1 ? ' graines' : ' graine'));
+  if (pop && !reduced) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
+}
+function paintStores() {
+  var set = function (k, id, bar, st) {
+    var v = view[12 + k];
+    $(id).textContent = v;
+    $(bar).style.width = Math.min(100, v * 100 / WIN) + '%';
+    if (v > lastBump[k] && !reduced) { $(st).classList.remove('bump'); void $(st).offsetWidth; $(st).classList.add('bump'); }
+    lastBump[k] = v;
+  };
+  set(0, 'meN', 'meBar', 'stMe'); set(1, 'foeN', 'foeBar', 'stFoe');
+}
+function paintAll() {
+  if (!S) return;
+  var legal = (!busy && !S.over && S.t === 0) ? moves(S.b, 0) : [];
+  for (var i = 0; i < 12; i++) {
+    paintPit(i);
+    var el = pitEls[i];
+    el.classList.toggle('go', legal.indexOf(i) >= 0);
+    el.classList.toggle('last', i === S.last && S.hist.length > 0);
+    el.classList.remove('cap');
+  }
+  paintStores();
+  $('lvl').textContent = chal ? 'Défi · Niveau ' + S.lv : 'Niveau ' + S.lv;
+  $('foeName').textContent = levelDef().nm;
+  $('chal').hidden = !chal;
+  if (chal) { $('chalT').textContent = 'Défi : prends au moins ' + chal.target + (chal.target > 1 ? ' graines' : ' graine'); }
+  var goal = $('goal');
+  if (chal) goal.innerHTML = '<span>Un seul objectif : ' + chal.target + ' graines</span>';
+  else {
+    var star = '<svg viewBox="0 0 24 24"><use href="#star"/></svg>';
+    goal.innerHTML = '<span aria-label="1 étoile : gagner">' + star + '<em>gagner</em></span><span aria-label="2 étoiles : 8 graines d’avance">' + star + star + '<em>+8</em></span><span aria-label="3 étoiles : 16 graines d’avance">' + star + star + star + '<em>+16</em></span>';
+  }
+  $('bUndo').disabled = busy || S.over || !S.snaps.length;
+}
+function say(text, cls) { var m = $('msg'); m.textContent = text; m.className = cls || ''; }
+
+// Sowing animation: seed by seed, then the captured pits go to the store.
+var STEP = 60;
+function animateMove(prev, r, who, from, cb) {
+  view = prev.slice();
+  var steps = [[0, function () { view[from] = 0; paintPit(from); for (var i = 0; i < 12; i++) pitEls[i].classList.remove('last', 'go'); }]];
+  r.path.forEach(function (p) { steps.push([STEP, function () { view[p]++; paintPit(p, true); }]); });
+  steps.push([STEP, function () { pitEls[r.last].classList.add('last'); }]);
+  if (r.caps.length) {
+    steps.push([120, function () { r.caps.forEach(function (c) { pitEls[c[0]].classList.add('cap'); }); }]);
+    steps.push([380, function () {
+      r.caps.forEach(function (c) { pitEls[c[0]].classList.remove('cap'); view[c[0]] = 0; paintPit(c[0]); });
+      view[12 + who] += r.gain; paintStores();
+    }]);
+  }
+  var k = 0;
+  (function run() {
+    if (k >= steps.length) { cb(); return; }
+    var s = steps[k++];
+    later(function () { s[1](); run(); }, s[0]);
+  })();
+}
+
+// ---- screens -----------------------------------------------------------------------------
+var SCREENS = ['home', 'levels'];
+function show(name) {
+  clearTimeout(winTimer);
+  screen = name;
+  SCREENS.forEach(function (s) { $(s).hidden = s !== name; });
+  if (name !== 'game') { $('win').hidden = true; $('help').hidden = true; }
+  if (name === 'home') renderHome();
+  else if (name === 'levels') renderLevels();
+}
+var LOCK = '<svg viewBox="0 0 24 24"><path d="M7 10V8a5 5 0 0 1 10 0v2h1.500v10h-13V10zm2.500 0h5V8a2.500 2.500 0 0 0-5 0z"/></svg>';
+function renderHome() {
+  var done = 0;
+  for (var i = 0; i < N; i++) if (save.stars[i] > 0) done++;
+  $('hStars').textContent = totalStars();
+  $('hDone').textContent = done;
+  $('bGo').textContent = 'Continuer · Niveau ' + save.level;
+}
+function renderLevels() {
+  var html = '';
+  for (var i = 0; i < N; i++) {
+    var open = i + 1 <= save.max, s = save.stars[i];
+    html += '<button class="cell' + (i + 1 === save.level ? ' cur' : '') + (s ? ' ok' : '') + '" data-lv="' + (i + 1) + '"' + (open ? '' : ' disabled') +
+      ' aria-label="Niveau ' + (i + 1) + (open ? ', ' + s + (s > 1 ? ' étoiles' : ' étoile') : ', verrouillé') + '">' +
+      '<span class="n">' + (open ? i + 1 : LOCK) + '</span><span class="s">';
+    for (var k = 1; k <= 3; k++) html += '<svg viewBox="0 0 24 24" class="' + (k <= s ? 'on' : '') + '"><use href="#star"/></svg>';
+    html += '</span></button>';
+  }
+  $('grid').innerHTML = html;
+  $('lTotal').textContent = totalStars() + '/60';
+}
+(function deco() {
+  var h = '', pat = [4, 3, 5, 4, 2, 5, 3, 4], i, k;
+  for (i = 0; i < 8; i++) {
+    h += '<u>';
+    for (k = 0; k < pat[i]; k++) h += '<i style="left:' + (POS[k][0] * 0.62 + 12) + '%;top:' + (POS[k][1] * 0.62 + 12) + '%"></i>';
+    h += '</u>';
+  }
+  $('deco').innerHTML = h;
+})();
+
+// ---- input -------------------------------------------------------------------------------
+// A click that belongs to a touch/mouse gesture is never replayed; only clicks without pointer
+// events (keyboard, assistive tech) go through the fallback.
+var pressing = false, lastUp = 0;
+function stray() { return pressing || Date.now() - lastUp < 700; }
+document.addEventListener('pointerdown', function () { pressing = true; }, true);
+['pointerup', 'pointercancel'].forEach(function (ev) {
+  document.addEventListener(ev, function () { pressing = false; lastUp = Date.now(); }, true);
+});
+function onTap(el, fn) {
+  var down = false;
+  el.addEventListener('pointerdown', function () { down = true; });
+  el.addEventListener('pointerleave', function () { down = false; });
+  el.addEventListener('pointercancel', function () { down = false; });
+  el.addEventListener('pointerup', function (e) {
+    if (!down) return;
+    down = false; fn(e);
+  });
+  el.addEventListener('click', function (e) { if (!stray()) fn(e); });
+}
+function goContinue() {
+  startLevel(save.level, true);
+  show('game');
+}
+pitEls.forEach(function (el, i) { onTap(el, function () { tapPit(i); }); });
+onTap($('grid'), function (e) {
+  var c = e.target.closest ? e.target.closest('[data-lv]') : null;
+  if (!c || c.disabled) return;
+  startLevel(+c.getAttribute('data-lv'), true);
+  show('game');
+});
+onTap($('bMap'), function () { show('levels'); });
+onTap($('bLBack'), function () { show('home'); });
+onTap($('bBack'), goContinue);
+onTap($('bGo'), goContinue);
+onTap($('bLevels'), function () { show('levels'); });
+onTap($('bRules'), function () { $('help').hidden = false; });
+onTap($('bHelp'), function () { $('help').hidden = false; });
+onTap($('bHelpOk'), function () { $('help').hidden = true; });
+onTap($('bUndo'), function () {
+  if (busy || !S || S.over || !S.snaps.length) return;
+  var sn = S.snaps.pop();
+  gen++;
+  S.b = sn.b; S.t = 0; S.n = sn.n; S.hist.length = sn.hl; S.rss.length = S.rss.length - 1; S.last = -1;
+  rng.s = sn.rs; view = S.b.slice(); lastBump = [view[12], view[13]];
+  persist(); paintAll(); next();
+});
+onTap($('bReset'), function () { if (S) restart(); });
+function restart() {
+  var lv = S.lv;
+  if (chal) newGame(lv, { chal: chal, free: free, keep: true }); else { newGame(lv); save.level = lv; store(); }
+  $('win').hidden = true;
+}
+onTap($('bNext'), function () {
+  $('win').hidden = true;
+  if (chal) show('home');
+  else if (S.lv < N) startLevel(S.lv + 1);
+  else show('levels');
+});
+onTap($('bAgain'), function () { $('win').hidden = true; restart(); });
+onTap($('bShare'), function () { sendText(shareText(), 'result', $('bShare')); });
+onTap($('bChal'), function () { sendText(challengeText(), 'challenge', $('bChal')); });
+document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+window.addEventListener('hashchange', function () { if (/^#defi-/.test(location.hash)) openChallenge(); });
+
+// ---- boot --------------------------------------------------------------------------------
+loadSave();
+var cg0 = save.chalGame;   // a challenge in progress is resumed where it was
+if (cg0) {
+  newGame(cg0.level, { from: cg0, chal: { target: cg0.target, level: cg0.level }, free: cg0.level > save.max, keep: true });
+  show('game');
+} else {
+  startLevel(save.level, true);
+  show('home');
+}
+if (/^#defi-/.test(location.hash)) openChallenge();
+
+// Test hooks. Solutions are never embedded.
+function plain(b) { return { pits: Array.prototype.slice.call(b, 0, 12), store: [b[12], b[13]] }; }
+window.__game = {
+  state: function () {
+    var s = S ? plain(S.over && S.res ? S.res.b : S.b) : { pits: [], store: [0, 0] };
+    return {
+      mode: chal ? 'challenge' : 'level', level: S ? S.lv : 0, board: s.pits, store: s.store,
+      turn: S ? S.t : 0, plies: S ? S.n : 0, busy: busy, over: !!(S && S.over), winner: S && S.res ? S.res.winner : null,
+      why: S && S.res ? S.res.why : '', won: !!(S && S.res && S.res.winner === 0),
+      stars: S && S.over && S.res && S.res.winner === 0 && !chal ? starsFor(S.res.b[12], S.res.b[13]) : 0,
+      legal: S && !S.over && S.t === 0 ? moves(S.b, 0) : [], hist: S ? S.hist.slice() : [],
+      screen: screen, total: totalStars(), max: save.max, current: save.level, free: free,
+      challenge: chal ? { target: chal.target, level: chal.level } : null, seed: rng.s
+    };
+  },
+  levels: LEVELS.map(function (l) { return { nm: l.nm, p: l.p.slice(), s: l.s.slice(), ai: { r: l.ai.r, d: l.ai.d, n: l.ai.n }, note: l.note || '' }; }),
+  loadLevel: function (n) {
+    n = n | 0;
+    if (n < 1 || n > N) throw new Error('level must be 1..' + N);
+    newGame(n); save.level = Math.min(n, save.max); show('game');
+    return this.state();
+  },
+  applyMove: applyMove,
+  seed: function (n) { rng = mkRng(n | 0); return rng.s; },
+  still: function (v) { still = v !== false; },
+  // pure rules on plain data (pits[12], store[2], turn): the tests compare them with tools/semailles/engine.js
+  rules: {
+    legal: function (pits, st, t) { return moves(mkBoard(pits, st), t); },
+    play: function (pits, st, t, pit) {
+      var r = play(mkBoard(pits, st), t, pit), p = plain(r.b);
+      return { pits: p.pits, store: p.store, taken: r.caps.map(function (c) { return c[0]; }), gain: r.gain, grand: r.grand, last: r.last };
+    },
+    end: function (pits, st, t, plies) {
+      var r = status(mkBoard(pits, st), t, plies);
+      return r ? { winner: r.winner, why: r.why, store: [r.b[12], r.b[13]] } : null;
+    }
+  },
+  // one adversary search from a position (default: the start of level n); never reads the clock for its decisions
+  think: function (n, pits, st) {
+    var L = LEVELS[n - 1], b = pits ? mkBoard(pits, st) : startBoard(n), t0 = performance.now(), r = bestMoves(b, 0, 0, L.ai.d, L.ai.n);
+    return { moves: r.moves, nodes: r.nodes, depth: r.depth, budget: L.ai.n, ms: performance.now() - t0 };
+  }
+};
+})();
 </script>
+</body>
+</html>
