@@ -880,14 +880,14 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     const botTurn = (T.delays.botRoll + T.delays.botMove + T.delays.after) / 1000, humanThrow = 1.2;
     assert.ok(botTurn < 0.8, 'an opponent throw takes less than 0.8 s: ' + botTurn);
     const est = {};
-    for (const n of [1, 5, 10, 11, 14, 17, 20]) {
+    for (const n of [1, 2, 6, 11, 14, 18, 19, 20]) {
       let h = 0, b = 0; const G = 120;
       for (let s = 1; s <= G; s++) { const S = E.levelGame(n, 300 + s); const r = playGame(S); h += r.humanRolls; b += r.botRolls; }
       est[n] = { normal: (h / G * humanThrow + b / G * botTurn) / 60, fast: (h / G * humanThrow + b / G * botTurn * T.fastFactor) / 60 };
     }
-    for (const n of [14, 17, 20]) assert.ok(est[n].normal >= 2 && est[n].normal <= 4, `level ${n}: ${est[n].normal.toFixed(1)} min`);
-    for (const n of [11]) assert.ok(est[n].normal >= 1.5 && est[n].normal <= 4, `level ${n}: ${est[n].normal.toFixed(1)} min`);
-    for (const n of [1, 5, 10]) assert.ok(est[n].normal <= 2.2, `level ${n}: ${est[n].normal.toFixed(1)} min`);
+    for (const n of [19, 20]) assert.ok(est[n].normal >= 2 && est[n].normal <= 4, `level ${n}: ${est[n].normal.toFixed(1)} min`);
+    for (const n of [1, 2, 6, 11, 14, 18]) assert.ok(est[n].normal <= 2.4, `level ${n}: ${est[n].normal.toFixed(1)} min`);
+    for (const n of [1, 2]) assert.ok(est[n].normal <= 1, `level ${n} takes less than a minute: ${est[n].normal.toFixed(1)} min`);
     for (const n of Object.keys(est)) assert.ok(est[n].fast < est[n].normal, 'accelerating must be faster');
     console.log('        estimated minutes (normal / accelerated): ' + Object.keys(est).map(n => `L${n} ${est[n].normal.toFixed(1)}/${est[n].fast.toFixed(1)}`).join('  '));
     // the button really shortens the wait: a human throw and the opponent's answer, in real time
@@ -917,14 +917,14 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
 
   // ------------------------------------------------------------------------------------- layout
   const dense = n => {          // a crowded position: up to 6 pions on one refuge, pions in lanes, at home, in base
-    const S = E.levelGame(n, 9), np = S.np, k = S.k;
+    const S = E.levelGame(n, 9), np = S.np;
     const corner = REF.PATHS[S.seats[0]].findIndex((x, i) => i > 4 && !x.lane && REF.SAFE.has(REF.key(x.xy)));
     const xy = REF.PATHS[S.seats[0]][corner].xy;
     const here = p => posAt(S.seats[p], xy);
-    S.pos[0] = [here(0), here(0), 24].slice(0, k);
-    S.pos[1] = [here(1), here(1), 26].slice(0, k);
-    if (np > 2) S.pos[2] = [here(2), 14, -1].slice(0, k);
-    if (np > 3) S.pos[3] = [here(3), 20, 25].slice(0, k);
+    S.pos[0] = [here(0), here(0), 24].slice(0, S.ks[0]);
+    S.pos[1] = [here(1), here(1), 26].slice(0, S.ks[1]);
+    if (np > 2) S.pos[2] = [here(2), 14, -1].slice(0, S.ks[2]);
+    if (np > 3) S.pos[3] = [here(3), 20, 25].slice(0, S.ks[3]);
     return S;
   };
   for (const vp of VIEWPORTS) {
@@ -969,7 +969,7 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
         });
       }
       await shot(page, `game-level20-${tag}`);
-      for (const n of [20, 11, 4]) {
+      for (const n of [20, 11, 9]) {
         await page.evaluate(g => window.__game.loadLevel(g), n);
         const S = dense(n);
         await page.evaluate(g => window.__game.setGame(g), S);

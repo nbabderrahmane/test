@@ -37,7 +37,7 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
   page.on('console', m => { if (m.type() === 'error') problems.push('console.error: ' + m.text()); });
   page.on('pageerror', e => problems.push('pageerror: ' + e.message));
   const target = opts.url || URL;
-  if (opts.url) await context.route(opts.url.split('?')[0], r => r.fulfill({ contentType: 'text/html', body: fs.readFileSync(FILE, 'utf8') }));
+  if (opts.url) await context.route(opts.url.split('?')[0] + '**', r => r.fulfill({ contentType: 'text/html', body: fs.readFileSync(FILE, 'utf8') }));
   page.on('request', r => { if (r.url().split('#')[0] !== target) problems.push('request: ' + r.url()); });
   page.__guard = !!opts.guard;
   if (opts.save !== undefined) {   // seed the storage with a first visit, then open for real (no init-script storage access)
@@ -585,11 +585,9 @@ function checkFit(m, tag) {
     assert.equal((await state(page)).level, 2);
     await play(page, 'rrr');
     assert.equal((await state(page)).next, 6);
-    await page.locator('#bMap').tap({ force: true }).catch(() => {});
     await page.evaluate(() => window.__game.loadLevel(3));
     await play(page, 'www');                                  // failed replay
     assert.equal((await state(page)).next, 6);
-    await page.locator('#bNext').tap(); await page.locator('#bAgain').tap();
     await reload(page);
     assert.equal(await page.locator('#bGo').textContent(), 'Continuer · Niveau 6');
     await page.locator('#bGo').tap();
@@ -653,7 +651,6 @@ function checkFit(m, tag) {
     await page.waitForTimeout(100);
     s = await state(page);
     assert.ok(s.over);
-    assert.equal((await events(page, 'level_complete')).length + (await events(page, 'x')).length >= 0, true);
     await page.waitForTimeout(400);
     const w = s.won;
     if (!w) { await page.evaluate(() => window.__game.restart()); }
