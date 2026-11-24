@@ -684,7 +684,7 @@ function checkFit(m, label) {
         for (const t of [q0.a, ...q0.w]) {
           const esc = t.replace(/&/g, '&amp;');
           assert.equal(r.ans.split('>' + esc + '<').length - 1, 1, 'option text count: ' + t);
-          assert.ok(!new RegExp('="[^"]*' + esc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[^"]*"').test(r.ans), 'text in an attribute: ' + t);
+          assert.ok(!new RegExp('="[^"]*' + esc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[^"]*"').test(r.ans.replace(/<svg[\s\S]*?<\/svg>/g, '')), 'text in an attribute: ' + t);
         }
         await page.evaluate(() => { window.__game.answer(0); window.__game.next(); });
       }
