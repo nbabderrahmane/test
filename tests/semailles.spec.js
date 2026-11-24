@@ -59,7 +59,17 @@ const msgs = page => page.evaluate(() => new Promise(r => setTimeout(() => r(win
 const events = async (page, name) => (await msgs(page)).filter(m => m.event === name);
 const saved = page => page.evaluate(k => JSON.parse(localStorage.getItem(k) || 'null'), KEY);
 const pit = (page, i) => page.locator(`[data-pit="${i}"]`);
-const myTurn = page => page.waitForFunction(() => { const s = window.__game.state(); return !s.busy && (s.turn === 0 || s.over); });
+// Resolves with the state once it is my turn again (or the game is over), polling inside the page.
+const myTurn = page => page.evaluate(() => new Promise((resolve, reject) => {
+  let n = 0;
+  const f = () => {
+    const s = window.__game.state();
+    if (!s.busy && (s.turn === 0 || s.over)) resolve(s);
+    else if (++n > 6000) reject(new Error('no turn after 12 s'));
+    else setTimeout(f, 2);
+  };
+  f();
+}));
 const refOf = s => R.initial(s.board, s.store, 0);
 
 // One real tap on a pit, then waits until the adversary has answered (or the game is over).
@@ -67,12 +77,15 @@ async function tapPit(page, i) { await pit(page, i).tap(); await myTurn(page); }
 
 // Plays the current game to its end with real taps; `player` chooses from a reference state.
 async function playByTaps(page, player) {
+  // the layout does not move during a level: the centres of the pits are measured once
+  const c = await page.evaluate(() => { const o = {}; document.querySelectorAll('[data-pit]').forEach(e => { const r = e.getBoundingClientRect(); o[e.dataset.pit] = [r.left + r.width / 2, r.top + r.height / 2]; }); return o; });
+  let s = await myTurn(page);
   for (let guard = 0; guard < 260; guard++) {
-    const s = await state(page);
     if (s.over) return s;
     const p = player(refOf(s), null, s.plies);
     assert.ok(s.legal.includes(p), `player chose an illegal pit ${p} (legal ${s.legal})`);
-    await tapPit(page, p);
+    await page.touchscreen.tap(c[p][0], c[p][1]);
+    s = await myTurn(page);
   }
   throw new Error('game does not end');
 }
@@ -581,6 +594,7 @@ const ENDS = [
     const a = await open({ width: 360, height: 640 }, { save: { level: 1, max: 20, stars: stars(20, 0), best: stars(20, 0), cur: null } });
     await a.page.evaluate(() => { window.__game.seed(5); window.__game.loadLevel(12); });
     await a.page.locator('[data-pit="3"]').tap();
+    await a.page.waitForFunction(() => window.__game.state().hist.length >= 1);
     await a.page.reload(); await a.page.waitForFunction(() => !!window.__game);
     await a.page.locator('#bGo').tap();
     await a.page.waitForFunction(() => !window.__game.state().busy && window.__game.state().turn === 0, null, { timeout: 6000 });
@@ -836,6 +850,7 @@ const ENDS = [
       }
       // rules
       await page.locator('#bHelp').tap();
+      await page.waitForTimeout(400);
       checkFit(await measure(page, '#help .btn'), 'help ' + tag);
       const card = await page.evaluate(() => { const q = document.querySelector('#help .card').getBoundingClientRect(); return { t: q.top, b: q.bottom, l: q.left, r: q.right, ih: innerHeight, iw: innerWidth }; });
       assert.ok(card.t >= 0 && card.b <= card.ih && card.l >= 0 && card.r <= card.iw, 'help card out of screen ' + JSON.stringify(card));

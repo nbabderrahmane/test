@@ -56,3 +56,29 @@ Atteindre un nombre cible avec 6 nombres et les 4 opérations ; chaque nombre se
 
 **`course-des-pions` — jeu de parcours à dés traditionnel (petits chevaux / ludo).**
 Chaque joueur fait le tour du plateau et rentre ses pions ; un 6 fait sortir un pion et rejouer ; arriver sur un pion adverse le renvoie à sa base ; cases refuges. Version courte : 2 pions par joueur (niveaux 1-10), 3 pions ensuite ; 1 adversaire puis 2, puis 3. Adversaires de plus en plus avisés. Le dé est tiré par le générateur à graine, visible et identique pour tous les joueurs ; aucune mise, aucun gain. Mode « à plusieurs sur ce téléphone » accessible depuis l'accueil (2 à 4 joueurs), hors parcours. Étoiles selon le classement et l'avance. Score du défi : nombre de tours pour gagner. Plateau lisible à 320 px, pions ≥ 44 px au toucher (zone tactile élargie si besoin).
+
+## Décisions après première revue (24 novembre) — s'appliquent aux huit jeux
+
+**R1. Un score ne se remet pas à zéro en cours de partie.** Dans les jeux où les étoiles comptent des essais ou des erreurs (`mot-secret`, `les-familles`, `cap-sur`), il n'y a pas de « Recommencer » en cours de partie : quitter puis revenir reprend la partie telle quelle. Dans les autres jeux, Recommencer reste possible quand il n'efface aucune pénalité.
+
+**R2. Un échec ne donne pas la solution.** Après un niveau perdu, le jeu ne révèle ni le mot, ni les familles, ni la ville : il propose « Réessayer » (nouvelle partie du même niveau, compteur à zéro) et « Niveaux ». Exception : les quiz (`cinq-sur-cinq`, `chanson-emojis`) montrent la bonne réponse après chaque question, c'est leur règle.
+
+**R3. Un défi se joue une fois par ouverture.** Sur l'écran de résultat d'un défi, pas de « Réessayer » ni de « Rejouer » : seulement « Renvoyer le défi » (si gagné) et « Accueil ». `challenge_result` part une seule fois par ouverture de lien. L'objectif d'un lien est borné aux valeurs atteignables du niveau ; hors bornes, le fragment est ignoré. Limite connue et acceptée tant qu'il n'y a pas de serveur : rien n'empêche de rouvrir le lien.
+
+**R4. Le lien partagé ne contient que `origin + pathname + #defi-…`.** Jamais la chaîne de requête de l'adresse courante (elle peut porter un jeton ou un numéro posé par l'app hôte). Testé avec une adresse qui porte `?token=…`.
+
+**R5. La solution n'est pas lisible par un joueur.** Rien dans le DOM, les attributs, le texte de partage ou le lien ne permet de déduire la solution (identifiants de tuiles mélangés par partie, par exemple). Un test inspecte le DOM.
+
+**R6. « Continuer » pointe toujours le premier niveau non terminé.** Rejouer un ancien niveau ne le déplace pas.
+
+**R7. Couleurs jamais seules, y compris dans le texte de partage** : des formes distinctes, pas seulement des carrés de couleur.
+
+**R8. Originalité, concrètement.** Chaque jeu a sa palette (dérivée de sa couleur d'accent), ses formes et ses libellés ; aucun ne reprend la combinaison de codes d'un jeu commercial ou télévisé connu :
+- `mot-secret` : pas de vert/jaune/gris, pas de carré plein + rond, pas de retournement de tuile. Marques : ▲ bien placée, ◆ ailleurs, · absente, dans la palette du jeu.
+- `les-familles` : pas de jaune/vert/bleu/violet ni de carrés emoji dans le partage ; « Deux sur trois » au lieu de « presque ».
+
+**R9. Contenu.**
+- `mot-secret` : pour chaque niveau, au moins 30 mots admis de même longueur et même première lettre (testé) ; la liste admise est nettoyée de tout mot religieux, politique, violent ou grossier, et complétée des mots les plus courants (famille, maison, nourriture, école) ; l'orthographe de chaque mot est contrôlée contre un dictionnaire libre si l'environnement permet d'en obtenir un (sinon le dire) ; la fiche de contenu ne doit rien affirmer qui ne soit vérifié par un script.
+- `les-familles` : les grilles 9, 10 et 12 ont une autre répartition légitime (tabouret/banc, piment/gingembre, soleil/orage) : changer un mot dans chacune ; la table « ce mot peut appartenir à ces familles » est relue en cherchant activement les autres lectures ; pas de famille entière réutilisée d'une grille à l'autre, et au plus un mot commun entre deux grilles.
+
+**R10. Dérogation assumée** : les touches lettres d'un clavier à l'écran peuvent faire moins de 44 px de large (jamais moins de 28) si elles font au moins 44 px de haut.
