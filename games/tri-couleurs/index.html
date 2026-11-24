@@ -724,7 +724,8 @@ function todayNum() {
 function dayIndex(day) { return ((day % ND) + ND) % ND; }
 
 // ---- persistence (always guarded: the game works without storage) ------------
-var save = { level: 1, max: 1, stars: [], best: [], cur: null, streak: 0, jokers: 0, lastDay: 0, badges: [], rankSeen: 0 };
+var save = { level: 1, max: 1, stars: [], best: [], cur: null, streak: 0, jokers: 0, lastDay: 0, badges: [], rankSeen: 0,
+  rev: {}, daily: null, chalGame: null };
 function totalStars() {
   var t = 0;
   for (var i = 0; i < save.stars.length; i++) t += save.stars[i] || 0;
@@ -753,9 +754,15 @@ function loadSave() {
       save.level = Math.min(clamp(s.level, N), save.max);
       if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = nat(s.stars[i], 3);
       if (Array.isArray(s.best)) for (i = 0; i < N && i < s.best.length; i++) save.best[i] = nat(s.best[i], 9999);
-      if (s.cur && Array.isArray(s.cur.hist)) {
-        save.cur = { level: s.cur.level | 0, hist: s.cur.hist };
-        if (Array.isArray(s.cur.hid)) save.cur.hid = s.cur.hid;
+      if (s.cur && Array.isArray(s.cur.hist)) save.cur = { level: s.cur.level | 0, hist: s.cur.hist };
+      // games in progress outside the normal run (daily level, friend's challenge) and revealed mystery balls
+      if (s.daily && Array.isArray(s.daily.hist)) save.daily = { idx: s.daily.idx | 0, day: s.daily.day | 0, hist: s.daily.hist };
+      if (s.chalGame && Array.isArray(s.chalGame.hist)) {
+        save.chalGame = { kind: s.chalGame.kind === 'day' ? 'day' : 'level', n: s.chalGame.n | 0, day: s.chalGame.day | 0,
+          target: s.chalGame.target | 0, hist: s.chalGame.hist };
+      }
+      if (s.rev && typeof s.rev === 'object') {
+        for (var k in s.rev) if (/^[LD]\d{1,3}$/.test(k) && Array.isArray(s.rev[k])) save.rev[k] = s.rev[k].slice(0, 20).map(function (v) { return nat(v, 9); });
       }
       save.streak = nat(s.streak, 9999);
       save.jokers = nat(s.jokers, 2);
@@ -779,8 +786,9 @@ var mode = 'level';   // 'level' (fixed levels) or 'daily'
 var cur = LV[0];      // current level object
 var level = 0;        // zero-based index of the fixed level
 var dailyIdx = -1;
-var dayN = 0;         // day the daily counts for (0 = practice, no effect on the streak)
-var free = false;     // challenge on a locked level: nothing is saved
+var dayN = 0;         // day of the daily level shown (links); 0 = practice
+var countDay = 0;     // day this game counts for in the series (the day it was started), 0 = none
+var free = false;     // challenge on a locked level: no stars, no unlocking
 var chal = null;      // {target, level, day} while a friend's challenge is on
 var cap = 4;
 var caps = [];        // capacity of each tube
@@ -1020,10 +1028,15 @@ function apply(from, to, wasLifted, quiet) {
   if (uncover(from)) revealTop(from);
   fly(e, from, to, wasLifted, quiet);
 }
+function revKey() { return mode === 'daily' ? 'D' + dailyIdx : 'L' + (level + 1); }
+// Three separate slots, so a challenge never touches the run in progress: save.cur (levels),
+// save.daily (today's level) and save.chalGame (a friend's challenge). Revealed mystery balls
+// are remembered per level in save.rev.
 function persistCur() {
-  if (mode !== 'level' || free) return;
-  save.cur = hist.length && !won ? { level: level + 1, hist: hist } : null;
-  if (save.cur && cur.mystery) save.cur.hid = hid.slice();
+  if (cur.mystery) save.rev[revKey()] = hid.slice();
+  if (chal) save.chalGame = won ? null : { kind: mode === 'daily' ? 'day' : 'level', n: level + 1, day: dayN, target: chal.target, hist: hist };
+  else if (mode === 'daily') save.daily = countDay && hist.length && !won ? { idx: dailyIdx, day: countDay, hist: hist } : null;
+  else save.cur = hist.length && !won ? { level: level + 1, hist: hist } : null;
   store();
 }
 function move(from, to, quiet) {
@@ -1068,38 +1081,42 @@ function undo() {
 }
 
 // ---- starting a level ----------------------------------------------------------
-// o = {mode, level, dailyIdx, dayN, free, chal, replay}
+// o = {mode, level, dailyIdx, dayN, free, chal, replay: {hist}}
 function begin(L, o) {
   clearTimeout(winTimer);
   mode = o.mode; cur = L;
   level = o.level | 0; dailyIdx = o.mode === 'daily' ? o.dailyIdx : -1; dayN = o.dayN | 0;
+  countDay = mode === 'daily' && dayN && dayN === todayNum() ? dayN : 0;
   free = !!o.free; chal = o.chal || null;
   cap = L.cap; caps = L.caps.slice();
   tubes = L.tubes.map(function (t) { return t.slice(); });
   hid = tubes.map(function (t) { return L.mystery ? Math.max(0, t.length - 1) : 0; });
+  var rv = L.mystery && save.rev[revKey()];   // balls revealed earlier stay revealed
+  if (rv && rv.length === hid.length) for (var k = 0; k < hid.length; k++) if (rv[k] < hid[k]) hid[k] = rv[k];
   hist = []; sel = -1; won = false; stuck = false;
   var r = o.replay;
-  if (r) {   // resume an unfinished level: replay the saved moves, drop them if invalid
+  if (r) {   // resume an unfinished game: replay the saved moves, drop them if invalid
+    var again = { mode: o.mode, level: o.level, dailyIdx: o.dailyIdx, dayN: o.dayN, free: o.free, chal: o.chal };
     for (var i = 0; i < r.hist.length; i++) {
       var m = r.hist[i];
-      if (!m || !tubes[m[0]] || !tubes[m[1]] || !canMove(m[0], m[1])) return begin(L, { mode: o.mode, level: o.level, free: o.free, chal: o.chal });
+      if (!m || !tubes[m[0]] || !tubes[m[1]] || !canMove(m[0], m[1])) return begin(L, again);
       tubes[m[1]].push(tubes[m[0]].pop());
       uncover(m[0]);
       hist.push([m[0], m[1]]);
     }
-    if (isWon()) return begin(L, { mode: o.mode, level: o.level, free: o.free, chal: o.chal });
-    if (L.mystery && Array.isArray(r.hid) && r.hid.length === hid.length) {   // reveals made then undone stay revealed
-      for (var k = 0; k < hid.length; k++) if (r.hid[k] >= 0 && r.hid[k] < hid[k]) hid[k] = r.hid[k] | 0;
-    }
+    if (isWon()) return begin(L, again);
   }
   $('win').hidden = true;
   say('');
   $('chal').hidden = !chal;
-  if (chal) $('chalT').textContent = 'À battre : ' + chal.target + ' coup' + (chal.target > 1 ? 's' : '');
+  if (chal) $('chalT').textContent = 'Objectif : ' + chal.target + ' coup' + (chal.target > 1 ? 's' : '') + ' ou moins';
   build();
-  if (mode === 'level' && !free) {
-    save.level = level + 1;
-    if (level + 1 > save.max) save.max = level + 1;
+  if (!chal) {   // a challenge never touches the run in progress
+    save.chalGame = null;
+    if (mode === 'level') {
+      save.level = level + 1;
+      if (level + 1 > save.max) save.max = level + 1;
+    }
   }
   persistCur();
   refresh();
@@ -1111,7 +1128,8 @@ function startLevel(n, replay, o) {
   begin(LV[n - 1], { mode: 'level', level: n - 1, replay: replay, free: o.free, chal: o.chal });
 }
 function startDaily(i, day, o) {
-  begin(DL[i], { mode: 'daily', dailyIdx: i, dayN: day, chal: o && o.chal });
+  o = o || {};
+  begin(DL[i], { mode: 'daily', dailyIdx: i, dayN: day, chal: o.chal, replay: o.replay });
 }
 function restart() {
   if (mode === 'daily') startDaily(dailyIdx, dayN, { chal: chal });
@@ -1119,21 +1137,23 @@ function restart() {
 }
 
 // ---- streak, jokers, rank, badges ------------------------------------------------
-// A missed day is covered by a joker if there is one; otherwise the streak is lost.
-function syncStreak() {
-  var t = todayNum();
-  if (save.streak > 0 && save.lastDay && t > save.lastDay + 1 && t - save.lastDay - 1 > save.jokers) {
-    save.streak = 0;
-    store();
-    emit({ event: 'streak_lost' });
+// Run when the game opens (and on a date change). Each missed day uses one joker; if the jokers
+// do not cover them all the series is lost and the jokers go back to zero. A daily level started
+// yesterday and still being played counts for yesterday, so it is not "missed" yet.
+function syncStreak(at) {
+  var t = at || todayNum();
+  if (!at && mode === 'daily' && countDay && !won && hist.length && countDay < t && countDay > save.lastDay) t = countDay;
+  if (save.streak > 0 && save.lastDay && t > save.lastDay + 1) {
+    var missed = t - save.lastDay - 1;
+    if (missed <= save.jokers) { save.jokers -= missed; save.lastDay = t - 1; store(); }
+    else { save.streak = 0; save.jokers = 0; store(); emit({ event: 'streak_lost' }); }
   }
 }
 function dailyDone() { return save.lastDay > 0 && todayNum() <= save.lastDay; }
-// First win of the day: +1 (jokers pay the missed days). A clock that went back changes nothing.
+// First win of the day: +1. A clock that went back changes nothing.
 function recordDaily(t) {
-  syncStreak();
+  syncStreak(t);
   if (save.lastDay && t <= save.lastDay) return false;
-  if (save.streak > 0 && save.lastDay && t - save.lastDay > 1) save.jokers -= t - save.lastDay - 1;
   save.streak = save.streak > 0 ? save.streak + 1 : 1;
   if (save.streak % 7 === 0 && save.jokers < 2) save.jokers++;
   save.lastDay = t;
@@ -1187,14 +1207,21 @@ function win() {
       info.prevBest = save.best[level] || 0;
       if (s > (save.stars[level] || 0)) save.stars[level] = s;
       if (!info.prevBest || moves < info.prevBest) save.best[level] = moves;
-      if (n < N) { save.max = Math.max(save.max, n + 1); save.level = n + 1; }
+      if (n < N) save.max = Math.max(save.max, n + 1);
+    }
+    if (!chal) {
+      if (n < N) save.level = n + 1;
       save.cur = null;
     }
     events.push({ event: 'level_complete', level: n, moves: moves, stars: s });
-  } else if (dayN && dayN === todayNum()) {
-    info.counted = recordDaily(dayN);
-    if (info.counted) events.push({ event: 'daily_complete', day: dayN, moves: moves, streak: save.streak });
+  } else {
+    if (!chal) save.daily = null;
+    if (countDay) {
+      info.counted = recordDaily(countDay);
+      if (info.counted) events.push({ event: 'daily_complete', day: countDay, moves: moves, streak: save.streak });
+    }
   }
+  if (chal) save.chalGame = null;
   if (chal) {
     var ok = moves <= chal.target;
     info.chal = { ok: ok, diff: moves - chal.target, target: chal.target };
@@ -1220,7 +1247,7 @@ function showWin(info) {
   $('wMoves').textContent = moves;
   var rec = '';
   if (daily) rec = info.counted ? 'Série : ' + save.streak + ' jour' + (save.streak > 1 ? 's' : '') :
-    dayN && dayN === todayNum() ? 'Déjà compté aujourd’hui' : 'Entraînement : la série ne bouge pas';
+    countDay ? 'Déjà compté aujourd’hui' : 'Entraînement : la série ne bouge pas';
   else if (info.prevBest) rec = moves < info.prevBest ? 'Nouveau record !' : 'Record : ' + info.prevBest + ' coups';
   else if (s < 3) rec = '3 étoiles en ' + limits()[0] + ' coups ou moins';
   $('wRec').textContent = rec;
@@ -1322,6 +1349,7 @@ function openChallenge() {
 // ---- screens -------------------------------------------------------------------
 var SCREENS = ['home', 'worlds', 'wgrid', 'badges'];
 function show(name) {
+  clearTimeout(winTimer);   // the win screen must not open over another screen
   screen = name;
   SCREENS.forEach(function (s) { $(s).hidden = s !== name; });
   if (name !== 'game') $('win').hidden = true;
@@ -1395,18 +1423,18 @@ function renderBadges() {
 }
 function goContinue() {
   var n = save.level;
-  if (mode === 'level' && !free && level + 1 === n && !won) { show('game'); return; }
+  if (mode === 'level' && !chal && level + 1 === n && !won) { show('game'); return; }
   startLevel(n, save.cur && save.cur.level === n ? save.cur : null);
   show('game');
 }
 function goDaily() {
-  var t = todayNum(), i = dayIndex(t);
-  if (mode === 'daily' && dayN === t && !won && hist.length) { show('game'); return; }
-  startDaily(i, t);
+  var t = todayNum(), i = dayIndex(t), d = save.daily;
+  if (mode === 'daily' && !chal && countDay === t && !won && hist.length) { show('game'); return; }
+  startDaily(i, t, d && d.day === t && d.idx === i ? { replay: d } : null);
   show('game');
 }
 function pickLevel(n) {
-  if (mode === 'level' && !free && n === level + 1 && !won && !chal) { show('game'); return; }   // keep the level in progress
+  if (mode === 'level' && !chal && n === level + 1 && !won) { show('game'); return; }   // keep the level in progress
   startLevel(n, null);
   show('game');
 }
@@ -1417,7 +1445,14 @@ function openGrid() {
 }
 
 // ---- input: pointer events, with a click fallback for keyboards and assistive tech ----
-var lastTap = 0;
+// A click that belongs to a touch/mouse gesture is never replayed (a long press must not tap twice);
+// only clicks without pointer events (keyboard, assistive tech) go through the fallback.
+var pressing = false, lastUp = 0;
+function stray() { return pressing || Date.now() - lastUp < 700; }
+document.addEventListener('pointerdown', function () { pressing = true; }, true);
+['pointerup', 'pointercancel'].forEach(function (ev) {
+  document.addEventListener(ev, function () { pressing = false; lastUp = Date.now(); }, true);
+});
 function onTap(el, fn) {
   var down = false;
   el.addEventListener('pointerdown', function () { down = true; });
@@ -1425,9 +1460,9 @@ function onTap(el, fn) {
   el.addEventListener('pointercancel', function () { down = false; });
   el.addEventListener('pointerup', function (e) {
     if (!down) return;
-    down = false; lastTap = Date.now(); fn(e);
+    down = false; fn(e);
   });
-  el.addEventListener('click', function (e) { if (Date.now() - lastTap > 600) fn(e); });
+  el.addEventListener('click', function (e) { if (!stray()) fn(e); });
 }
 function closestAttr(node, attr) {
   while (node && node !== document.body) {
@@ -1439,12 +1474,11 @@ function closestAttr(node, attr) {
 stage.addEventListener('pointerdown', function (e) {
   var t = closestAttr(e.target, 'data-tube');
   if (!t) return;
-  lastTap = Date.now();
   tapTube(+t.getAttribute('data-tube'));
 });
 stage.addEventListener('click', function (e) {
   var t = closestAttr(e.target, 'data-tube');
-  if (t && Date.now() - lastTap > 600) tapTube(+t.getAttribute('data-tube'));
+  if (t && !stray()) tapTube(+t.getAttribute('data-tube'));
 });
 onTap($('grid'), function (e) {
   var c = closestAttr(e.target, 'data-level');
@@ -1481,8 +1515,16 @@ window.addEventListener('hashchange', function () { if (/^#defi-/.test(location.
 // ---- boot --------------------------------------------------------------------
 loadSave();
 syncStreak();
-startLevel(save.level, save.cur && save.cur.level === save.level ? save.cur : null);
-show('home');
+var cg = save.chalGame;   // a challenge in progress is resumed where it was
+if (cg && cg.hist && cg.target > 0 && (cg.kind === 'day' ? cg.day > 0 : cg.n >= 1 && cg.n <= N)) {
+  if (cg.kind === 'day') startDaily(dayIndex(cg.day), cg.day, { replay: cg, chal: { target: cg.target, level: 0, day: cg.day } });
+  else startLevel(cg.n, cg, { free: cg.n > save.max, chal: { target: cg.target, level: cg.n, day: 0 } });
+  show('game');
+} else {
+  save.chalGame = null;
+  startLevel(save.level, save.cur && save.cur.level === save.level ? save.cur : null);
+  show('home');
+}
 if (/^#defi-/.test(location.hash)) openChallenge();
 
 // Test hooks. Solutions are never embedded: they live in tools/solutions.json.

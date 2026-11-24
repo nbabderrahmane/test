@@ -10,7 +10,7 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { chromium } = require('playwright');
 
-const FILE = path.join(__dirname, '..', 'games', 'tri-couleurs', 'index.html');
+const FILE = process.env.GAME_FILE || path.join(__dirname, '..', 'games', 'tri-couleurs', 'index.html');
 const URL = pathToFileURL(FILE).href;
 const KEY = 'mj:tri-couleurs:v1';
 const SHOTS = process.env.SHOTS || '';
@@ -373,11 +373,13 @@ function checkFit(m, tag) {
     assert.equal(s.moves, 0);
     assert.equal(sumHidden(s), prev, 'undo keeps revealed balls revealed');
     assert.deepEqual(s.tubes, s0.tubes);
-    // Restart hides everything again
+    // Restart keeps what was revealed
+    const revealed = s.hidden.slice();
     await page.evaluate(([a, b]) => window.__game.applyMove(a, b), sol[0]);
     await page.locator('#bReset').tap();
     s = await state(page);
-    assert.deepEqual(s.hidden, s0.hidden);
+    assert.deepEqual(s.hidden, revealed, 'restart must not hide the balls again');
+    assert.deepEqual(s.tubes, s0.tubes);
     // A full solution wins and shows every ball
     await page.evaluate(sl => sl.forEach(([f, t]) => window.__game.applyMove(f, t)), sol);
     s = await state(page);
@@ -495,30 +497,201 @@ function checkFit(m, tag) {
     await context.close();
   });
 
-  await test('dead end: the game says so and offers undo / restart', async () => {
+  for (const [label, from, to] of [['lot 1 levels', 1, 10], ['short-tube levels', 81, 100], ['mystery levels', 101, 120]]) {
+    await test(`dead end (${label}): the game says so and offers undo / restart`, async () => {
+      const { context, page } = await open();
+      const levels = await page.evaluate(() => window.__game.levels);
+      let n = -1, dead = null;
+      for (let i = from - 1; i < to && !dead; i++) {
+        dead = bfs(levels[i].tubes, levels[i].caps, t => !done(t, levels[i].caps) && noMove(t, levels[i].caps));
+        n = i + 1;
+      }
+      assert.ok(dead, 'no dead end found in ' + label);
+      await page.evaluate(k => window.__game.loadLevel(k), n);
+      await tapMoves(page, dead);
+      let s = await state(page);
+      assert.equal(s.stuck, true);
+      assert.equal(s.won, false);
+      assert.match(await page.locator('#msg').textContent(), /aucun coup possible/i);
+      assert.ok(await page.locator('#msg').isVisible());
+      assert.ok(await page.locator('#bUndo').isEnabled());
+      assert.ok(await page.locator('#bReset').isEnabled());
+      if (from === 1) await shot(page, 'dead-end-360x640');
+      await page.locator('#bUndo').tap();
+      s = await state(page);
+      assert.equal(s.stuck, false);
+      assert.equal(s.moves, dead.length - 1);
+      assert.doesNotMatch(await page.locator('#msg').textContent(), /aucun coup/i);
+      await context.close();
+    });
+  }
+
+  // ---------------------------------------------------------------- review fixes
+  await test('long press: a touch held 800 ms taps once, on the start tube and on the end tube', async () => {
     const { context, page } = await open();
-    const levels = await page.evaluate(() => window.__game.levels);
-    let n = -1, dead = null;
-    for (let i = 0; i < 10 && !dead; i++) {
-      dead = bfs(levels[i].tubes, levels[i].caps, t => !done(t, levels[i].caps) && noMove(t, levels[i].caps));
-      n = i + 1;
-    }
-    assert.ok(dead, 'no dead end found in the first levels');
-    await page.evaluate(k => window.__game.loadLevel(k), n);
-    for (const [from, to] of dead) await tapMove(page, from, to);
+    const cdp = await context.newCDPSession(page);
+    const c = await page.evaluate(() => [...document.querySelectorAll('[data-tube]')].map(e => { const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }));
+    const press = async (i, ms) => {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: c[i][0], y: c[i][1] }] });
+      await page.waitForTimeout(ms);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await page.waitForTimeout(150);
+    };
+    await page.evaluate(() => window.__game.loadLevel(1));
+    const [from, to] = SOL.levels[0][0];
+    const before = await state(page);
+    await press(from, 800);
     let s = await state(page);
-    assert.equal(s.stuck, true);
-    assert.equal(s.won, false);
-    assert.match(await page.locator('#msg').textContent(), /aucun coup possible/i);
-    assert.ok(await page.locator('#msg').isVisible());
-    assert.ok(await page.locator('#bUndo').isEnabled());
-    assert.ok(await page.locator('#bReset').isEnabled());
-    await shot(page, 'dead-end-360x640');
-    await page.locator('#bUndo').tap();
+    assert.equal(s.selected, from, 'the ball must stay lifted after a long press on the start tube');
+    await press(to, 800);
     s = await state(page);
-    assert.equal(s.stuck, false);
-    assert.equal(s.moves, dead.length - 1);
-    assert.doesNotMatch(await page.locator('#msg').textContent(), /aucun coup/i);
+    assert.equal(s.moves, 1, 'one move');
+    assert.equal(s.selected, -1);
+    assert.notDeepEqual(s.tubes, before.tubes);
+    assert.equal(s.tubes[to].length, before.tubes[to].length + 1, 'the dropped ball stays dropped');
+    await context.close();
+  });
+
+  await test('midnight: a daily level started on day J and won on J+1 counts for J', async () => {
+    const { context, page } = await open();
+    await page.evaluate(d => window.__game.setToday(d), dateOf(0));
+    await playToday(page);                                       // series: 1
+    await page.evaluate(d => window.__game.setToday(d), dateOf(1));
+    const idx = (await state(page)).todayIndex;
+    await page.evaluate(k => window.__game.loadDaily(k), idx);
+    const sol = SOL.daily[idx];
+    await page.evaluate(m => m.forEach(([f, t]) => window.__game.applyMove(f, t)), sol.slice(0, -1));
+    await page.evaluate(d => window.__game.setToday(d), dateOf(2));    // midnight passes while playing
+    let s = await state(page);
+    assert.equal(s.streak, 1, 'the series is not broken while the level of the day before is still being played');
+    await page.evaluate(m => window.__game.applyMove(m[0], m[1]), sol[sol.length - 1]);
+    s = await state(page);
+    assert.equal(s.won, true);
+    assert.equal(s.streak, 2, 'counted, not an "entraînement"');
+    assert.equal(s.lastDay, dayNum(1));
+    const dc = await events(page, 'daily_complete');
+    assert.deepEqual(dc.map(e => [e.day, e.streak]), [[dayNum(0), 1], [dayNum(1), 2]]);
+    assert.equal((await events(page, 'streak_lost')).length, 0);
+    await page.locator('#win').waitFor({ state: 'visible' });
+    assert.match(await page.locator('#wRec').textContent(), /Série : 2/);
+    // and the new day's level is still to be played
+    await page.locator('#bNext').tap();
+    assert.match(await page.locator('#hDailyT').textContent(), /pas encore joué/i);
+    await context.close();
+  });
+
+  await test('opening a challenge never changes the saved run (level, game in progress); only a win writes', async () => {
+    const hist = SOL.levels[11].slice(0, 6);
+    const save = { level: 12, max: 12, stars: stars(11, 3), best: stars(11, 20), cur: { level: 12, hist } };
+    const { context, page } = await open({ width: 360, height: 640 }, { save, hash: '#defi-3-50' });
+    let s = await state(page);
+    assert.equal(s.level, 3);
+    assert.equal(s.challenge.target, 50);
+    const stored = () => page.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY);
+    let st = await stored();
+    assert.equal(st.level, 12);
+    assert.equal(st.max, 12);
+    assert.deepEqual(st.cur, { level: 12, hist });
+    await tapMoves(page, SOL.levels[2].slice(0, 4));            // playing the challenge does not touch it either
+    st = await stored();
+    assert.deepEqual(st.cur, { level: 12, hist });
+    assert.equal(st.level, 12);
+    // go home: "Continuer" still resumes level 12 with its 6 moves
+    await page.locator('#bMap').tap();
+    await page.locator('#bGBack').tap(); await page.locator('#bWBack').tap();
+    assert.match(await page.locator('#bGo').textContent(), /Niveau 12/);
+    await page.locator('#bGo').tap();
+    s = await state(page);
+    assert.equal(s.level, 12);
+    assert.equal(s.moves, 6);
+    assert.equal(s.challenge, null);
+    await context.close();
+
+    // a win on an unlocked level writes its stars and nothing about the run
+    const b = await open({ width: 360, height: 640 }, { save, hash: '#defi-3-50' });
+    await tapMoves(b.page, SOL.levels[2]);
+    await b.page.locator('#win').waitFor({ state: 'visible' });
+    const w = await b.page.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY);
+    assert.equal(w.level, 12, 'the run in progress is not moved by a challenge win');
+    assert.deepEqual(w.cur, { level: 12, hist });
+    assert.equal(w.stars[2], 3);
+    assert.ok(w.badges.includes('defi'));
+    await b.context.close();
+  });
+
+  await test('resume move by move after a reload: daily level, mystery level (revealed balls), challenge (even locked)', async () => {
+    // daily level (real date: a reload loses the simulated one)
+    let { context, page } = await open();
+    const idx = (await state(page)).todayIndex;
+    await page.evaluate(k => window.__game.loadDaily(k), idx);
+    await page.evaluate(m => m.forEach(([f, t]) => window.__game.applyMove(f, t)), SOL.daily[idx].slice(0, 5));
+    const mid = await state(page);
+    assert.equal(mid.moves, 5);
+    await page.reload();
+    await page.waitForFunction(() => !!window.__game);
+    assert.equal((await state(page)).screen, 'home');
+    await page.locator('#bDaily').tap();
+    let s = await state(page);
+    assert.equal(s.mode, 'daily');
+    assert.equal(s.moves, 5);
+    assert.deepEqual(s.tubes, mid.tubes);
+    await page.locator('#bUndo').tap();
+    assert.equal((await state(page)).moves, 4, 'undo works after the resume');
+    await context.close();
+
+    // mystery level
+    ({ context, page } = await open());
+    await page.evaluate(k => window.__game.loadLevel(k), 101);
+    const first = await state(page);
+    await page.evaluate(m => m.forEach(([f, t]) => window.__game.applyMove(f, t)), SOL.levels[100].slice(0, 8));
+    const m1 = await state(page);
+    assert.ok(m1.hidden.reduce((a, b) => a + b, 0) < first.hidden.reduce((a, b) => a + b, 0), 'fixture: something was revealed');
+    await page.reload();
+    await page.waitForFunction(() => !!window.__game);
+    await page.locator('#bGo').tap();
+    s = await state(page);
+    assert.equal(s.moves, 8);
+    assert.deepEqual(s.tubes, m1.tubes);
+    assert.deepEqual(s.hidden, m1.hidden, 'revealed balls are still revealed after the reload');
+    assert.equal(await page.locator('.ball.hid').count(), s.hidden.reduce((a, b) => a + b, 0));
+    for (let k = 0; k < 8; k++) await page.locator('#bUndo').tap();
+    await page.reload();                                         // even back to move 0, then a reload
+    await page.waitForFunction(() => !!window.__game);
+    await page.locator('#bGo').tap();
+    assert.deepEqual((await state(page)).hidden, m1.hidden);
+    await context.close();
+
+    // challenge on a locked level
+    ({ context, page } = await open({ width: 360, height: 640 }, { hash: '#defi-7-30' }));
+    await tapMoves(page, SOL.levels[6].slice(0, 5));
+    const c1 = await state(page);
+    await page.reload();
+    await page.waitForFunction(() => !!window.__game);
+    s = await state(page);
+    assert.equal(s.screen, 'game');
+    assert.equal(s.level, 7);
+    assert.equal(s.moves, 5);
+    assert.deepEqual(s.tubes, c1.tubes);
+    assert.equal(s.challenge.target, 30);
+    assert.match(await page.locator('#chal').textContent(), /Objectif : 30/);
+    const st = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY);
+    assert.equal(st.level, 1); assert.equal(st.max, 1);
+    await tapMoves(page, SOL.levels[6].slice(5));
+    await page.locator('#win').waitFor({ state: 'visible' });
+    await page.reload();                                         // won: nothing left to resume
+    await page.waitForFunction(() => !!window.__game);
+    assert.equal((await state(page)).screen, 'home');
+    await context.close();
+  });
+
+  await test('the win screen never opens over another screen', async () => {
+    const { context, page } = await open();
+    await playLevel(page, 1);                                    // won; the win screen is due in ~480 ms
+    await page.locator('#bMap').tap();                           // leave at once
+    assert.equal((await state(page)).screen, 'wgrid');
+    await page.waitForTimeout(900);
+    assert.ok(await page.locator('#win').isHidden(), 'win screen opened over the grid');
+    assert.ok(await page.locator('#wgrid').isVisible());
     await context.close();
   });
 
@@ -744,7 +917,7 @@ function checkFit(m, tag) {
     await page.evaluate(d => window.__game.setToday(d), dateOf(32));   // days 30 and 31 missed
     let s = await state(page);
     assert.equal(s.streak, 30);
-    assert.equal(s.jokers, 2);
+    assert.equal(s.jokers, 0, 'jokers are spent as soon as the game opens, one per missed day');
     s = await playToday(page);
     assert.equal(s.streak, 31);
     assert.equal(s.jokers, 0, 'one joker per missed day');
@@ -757,6 +930,7 @@ function checkFit(m, tag) {
     assert.equal((await state(b.page)).jokers, 1);
     await b.page.evaluate(d => window.__game.setToday(d), dateOf(8));
     assert.equal((await state(b.page)).streak, 7, 'the joker covers the missed day');
+    assert.equal((await state(b.page)).jokers, 0, 'and is spent on opening');
     let t = await playToday(b.page);
     assert.equal(t.streak, 8);
     assert.equal(t.jokers, 0);
@@ -767,6 +941,7 @@ function checkFit(m, tag) {
     await c.page.evaluate(d => window.__game.setToday(d), dateOf(9));
     t = await state(c.page);
     assert.equal(t.streak, 0, 'a single joker cannot cover two days');
+    assert.equal(t.jokers, 0, 'a lost series loses its jokers');
     assert.equal((await events(c.page, 'streak_lost')).length, 1);
     await c.context.close();
   });
@@ -911,7 +1086,7 @@ function checkFit(m, tag) {
     assert.equal(s.level, 7);
     assert.deepEqual(s.challenge, { target: 30, level: 7, day: 0 });
     assert.ok(await page.locator('#chal').isVisible());
-    assert.match(await page.locator('#chal').textContent(), /À battre : 30 coups/);
+    assert.match(await page.locator('#chal').textContent(), /Objectif : 30 coups ou moins/);
     assert.deepEqual(await events(page, 'challenge_open'), [{ source: 'mini-jeu', game: 'tri-couleurs', event: 'challenge_open', level: 7, target: 30 }]);
     assert.equal(await page.evaluate(() => location.hash), '', 'the link is consumed');
     await shot(page, 'challenge-banner');
@@ -926,7 +1101,7 @@ function checkFit(m, tag) {
     assert.equal(stored.stars[6] || 0, 0, 'a locked level played for a challenge is not recorded');
     assert.equal(stored.max, 1, 'and does not unlock anything');
     await page.locator('#bAgain').tap();                        // "Rejouer" keeps the challenge
-    assert.match(await page.locator('#chal').textContent(), /À battre : 30/);
+    assert.match(await page.locator('#chal').textContent(), /Objectif : 30 coups ou moins/);
     await context.close();
 
     // lost: target 20, solution 24
