@@ -9,6 +9,13 @@ Petits jeux originaux, courts, à tester sur mobile puis à intégrer dans une s
 4. **Recette mobile** : `npm test` (Playwright, viewport téléphone, tactile). Rien n'est livré rouge.
 5. **Intégration** : seulement après validation du propriétaire du produit.
 
+## Rôles (décision du propriétaire du produit, 24 novembre)
+- **Session principale** : orchestre, conçoit (fiche et architecture du lot), supervise. Ne code pas les jeux.
+- **Sonnet** : code, un agent par lot, dans son seul périmètre.
+- **Opus** : revue du code de chaque lot avant livraison (justesse, règles ci-dessous, simplicité). Ses remarques retournent à Sonnet.
+- **Haiku** : contrôles d'ensemble en fin de lot (`npm test`, poids, absence de réseau, cohérence entre jeux, docs à jour).
+Un lot n'est livré que revue et contrôles passés.
+
 ## Règles non négociables
 1. **Un jeu = un seul fichier** `index.html`, CSS et JS en ligne, vanilla. Aucune dépendance, aucune requête réseau, aucune police ni image externe.
 2. **Moins de 150 Ko**. Dessin par CSS, SVG ou canvas 2D ; pas de WebGL, pas de flou ni d'ombre coûteuse.
