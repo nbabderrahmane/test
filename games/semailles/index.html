@@ -216,11 +216,12 @@ footer{flex:none;display:flex;gap:10px;padding:4px 10px 12px}
       <p class="cres" id="wChal" hidden></p>
       <div class="acts">
         <button class="btn acc" id="bNext">Suivant</button>
-        <div class="row">
+        <div class="row" id="wRow">
           <button class="btn line" id="bAgain">Rejouer</button>
           <button class="btn line" id="bShare">Partager</button>
         </div>
         <button class="btn line" id="bChal">Défier un ami</button>
+        <button class="btn line" id="bToLevels">Niveaux</button>
       </div>
     </div>
   </section>
@@ -485,7 +486,7 @@ function loadSave() {
       if (Array.isArray(s.best)) for (i = 0; i < N && i < s.best.length; i++) save.best[i] = nat(s.best[i], 48);
       var lvOk = function (g) { return g.level === (g.level | 0) && g.level >= 1 && g.level <= save.max; };
       save.cur = cleanGame(s.cur, lvOk);
-      var cg = cleanGame(s.chalGame, function (g) { return g.level === (g.level | 0) && g.level >= 1 && g.level <= N && g.target >= 1 && g.target <= 48; });
+      var cg = cleanGame(s.chalGame, function (g) { return g.level === (g.level | 0) && g.level >= 1 && g.level <= N && g.target >= 1 && g.target <= WIN; });
       save.chalGame = cg;
     }
   } catch (e) { /* no storage: play without it */ }
@@ -514,7 +515,7 @@ function startBoard(lv) { var L = LEVELS[lv - 1]; return mkBoard(L.p, L.s); }
 
 function persist() {
   if (!S || S.over) return;
-  var g = { level: S.lv, hist: S.hist.slice(), rss: S.rss.slice(), rs: rng.s };
+  var g = { level: S.lv, hist: S.hist.slice(), rss: S.rss.slice(), rs: rng.s, u: S.undone ? 1 : 0 };
   if (chal) { g.target = chal.target; save.chalGame = g; } else { save.cur = g; }
   store();
 }
@@ -524,7 +525,7 @@ function newGame(lv, opts) {
   gen++; busy = false;
   clearTimeout(winTimer);
   chal = opts.chal || null; free = !!opts.free;
-  S = { lv: lv, b: startBoard(lv), t: 0, n: 0, hist: [], rss: [], snaps: [], over: false, res: null, last: -1 };
+  S = { lv: lv, b: startBoard(lv), t: 0, n: 0, hist: [], rss: [], snaps: [], over: false, res: null, last: -1, undone: false };
   var from = opts.from;
   if (from) {
     var ok = true, i, rsv, r;
@@ -539,8 +540,8 @@ function newGame(lv, opts) {
       S.b = r.b; S.t = 1 - S.t; S.n++; S.hist.push(from.hist[i]); S.last = r.last;
     }
     if (ok && (status(S.b, S.t, S.n) || S.rss.length !== from.rss.length)) ok = false;
-    if (ok) rng.s = from.rs | 0;
-    else S = { lv: lv, b: startBoard(lv), t: 0, n: 0, hist: [], rss: [], snaps: [], over: false, res: null, last: -1 };   // corrupted: start clean
+    if (ok) { rng.s = from.rs | 0; S.undone = !!from.u; }
+    else S = { lv: lv, b: startBoard(lv), t: 0, n: 0, hist: [], rss: [], snaps: [], over: false, res: null, last: -1, undone: false };   // corrupted: start clean
   }
   view = S.b.slice(); lastBump = [view[12], view[13]];
   $('win').hidden = true; $('help').hidden = true;
@@ -588,11 +589,24 @@ function next() {
     busy = false; paintAll();
     var mv = moves(S.b, 0);
     if (sideSum(S.b, 1) === 0 && S.hist.length) say('L’adversaire n’a plus de graines : donne-lui en.', 'warn');
-    else if (!S.hist.length) say(S.lv <= 2 ? 'Touche une case entourée pour semer.' : 'À toi de jouer.', 'hi');
+    else if (!S.hist.length) say(startText(), 'hi');
     else if (mv.length === 1) say('Un seul coup possible.', '');
   }
 }
+// What is announced before the first move: the special start of the level, then what to do.
+function startText() {
+  var L = levelDef(), t = '';
+  if (L.note) {
+    t = L.note;
+    if (L.s[0] || L.s[1]) t += ' : ' + (L.s[1] ? L.s[0] + ' graines contre ' + L.s[1] + ' déjà prises.' : 'tu as déjà ' + L.s[0] + ' graines.');
+    else t += '.';
+    t += ' ';
+  }
+  return t + (S.lv <= 2 ? 'Touche une case entourée.' : 'À toi de jouer.');
+}
+var lockUntil = 0;   // right after a button of the result screen, a second tap must not reach the board
 function tapPit(i) {
+  if (Date.now() < lockUntil) return;
   if (busy || !S || S.over || screen !== 'game' || !$('win').hidden || !$('help').hidden) return;
   var el = pitEls[i];
   var refuse = function (m) {
@@ -620,12 +634,14 @@ function starsFor(mine, theirs) { var m = mine - theirs; return m < 1 ? 0 : 1 + 
 var WHY = { stuck: 'Plus de coup possible : chacun garde ses graines.', cap: 'Partie très longue : on compte les graines restantes.', win: '' };
 function onOver() {
   var res = S.res, mine = res.b[12], theirs = res.b[13], won = res.winner === 0, stars = won ? starsFor(mine, theirs) : 0;
+  if (S.undone && !chal) stars = Math.min(stars, 2);   // Annuler erased mistakes: 2 stars at most
   busy = false; view = res.b.slice(); paintAll();
   last = { score: mine, stars: stars };
   var lv = S.lv;
   if (chal) {
     save.chalGame = null; store();
-    emit({ event: 'challenge_result', level: lv, score: mine, target: chal.target, won: mine >= chal.target });
+    var cs = Math.min(mine, WIN);
+    emit({ event: 'challenge_result', level: lv, score: cs, target: chal.target, won: cs >= chal.target });
   } else {
     save.cur = null;
     if (won) {
@@ -643,26 +659,32 @@ function onOver() {
 function openResult() {
   var res = S.res, mine = res.b[12], theirs = res.b[13], won = res.winner === 0, L = levelDef();
   $('wScore').textContent = mine + ' – ' + theirs;
-  $('wWhy').textContent = WHY[res.why] || '';
+  $('wWhy').textContent = (WHY[res.why] || '') + (S.undone && !chal ? ' Annuler utilisé : 2 étoiles au plus.' : '');
   var h = $('wStars'); h.innerHTML = '';
   var cr = $('wChal');
-  if (chal) {
-    var ok = mine >= chal.target;
+  $('wTitle').className = '';
+  if (chal) {   // a challenge is played once per opening: no replay, no retry
+    var sc = Math.min(mine, WIN), ok = sc >= chal.target;
     $('wTitle').textContent = ok ? 'Défi relevé !' : 'Défi manqué';
     $('wSub').textContent = 'Niveau ' + S.lv + ' · contre ' + L.nm;
     cr.hidden = false; cr.className = 'cres' + (ok ? '' : ' lost');
-    cr.textContent = 'Objectif ' + chal.target + ' · toi ' + mine;
+    cr.textContent = 'Objectif ' + chal.target + ' · toi ' + sc;
     $('bNext').hidden = false; $('bNext').textContent = 'Accueil';
+    $('bAgain').hidden = true; $('bShare').hidden = true; $('bToLevels').hidden = true;
+    $('bChal').hidden = !ok; $('bChal').textContent = 'Renvoyer le défi';
   } else {
     cr.hidden = true;
     $('wTitle').textContent = won ? 'Gagné !' : res.winner === -1 ? 'Égalité' : 'Perdu';
     $('wSub').textContent = 'Niveau ' + S.lv + ' · contre ' + L.nm;
     for (var i = 1; i <= 3; i++) h.insertAdjacentHTML('beforeend', '<svg viewBox="0 0 24 24" class="' + (i <= last.stars ? 'on' : '') + '"><use href="#star"/></svg>');
     $('bNext').hidden = !won; $('bNext').textContent = S.lv < N ? 'Suivant' : 'Niveaux';
+    $('bAgain').hidden = false; $('bAgain').textContent = won ? 'Rejouer' : 'Réessayer';
+    $('bShare').hidden = !won; $('bChal').hidden = !won; $('bChal').textContent = 'Défier un ami';
+    $('bToLevels').hidden = won;
   }
+  $('wRow').hidden = $('bAgain').hidden && $('bShare').hidden;
   h.hidden = !!chal || !won;
-  $('bAgain').className = 'btn line';
-  if (!chal && !won) $('bAgain').className = 'btn acc';
+  $('bAgain').className = !chal && !won ? 'btn acc' : 'btn line';
   $('win').hidden = false;
 }
 
@@ -672,19 +694,25 @@ function shareText() {
   return NAME + ' · Niveau ' + S.lv + ' · ' + (last.stars ? starsText(last.stars) + ' · ' : '') + last.score + ' graines';
 }
 // The link base: MJ_CONFIG.shareBaseUrl, else the current address if it is http(s); otherwise no link.
+// Only origin + pathname are kept: never a query string (it may carry a token of the host app).
 function shareBase() {
   var b = window.MJ_CONFIG && window.MJ_CONFIG.shareBaseUrl;
-  if (typeof b !== 'string' || !b) b = /^https?:/i.test(String(location.href)) ? String(location.href) : '';
-  return b.split('#')[0];
+  if (typeof b !== 'string' || !b) b = String(location.href);
+  try {
+    var u = new URL(b);
+    return /^https?:$/.test(u.protocol) ? u.origin + u.pathname : '';
+  } catch (e) { return ''; }
 }
 // Fragment: letters, digits and hyphens only.
 function challengeLink() {
   var base = shareBase();
-  return base ? base + '#defi-' + S.lv + '-' + Math.max(1, last.score) : '';
+  return base ? base + '#defi-' + S.lv + '-' + chalScore() : '';
 }
+// A challenge score is a number of seeds that a game can reach: 1 to 25.
+function chalScore() { return Math.min(WIN, Math.max(1, last.score)); }
 function challengeText() {
   var link = challengeLink();
-  return NAME + ' · Niveau ' + S.lv + ' : j’ai pris ' + last.score + ' graines. À toi de faire mieux !' + (link ? ' ' + link : '');
+  return NAME + ' · Niveau ' + S.lv + ' : j’ai pris ' + chalScore() + ' graines. À toi de faire mieux !' + (link ? ' ' + link : '');
 }
 function sendText(text, kind, btn) {
   var done = function () { emit({ event: 'share', kind: kind }); };
@@ -724,7 +752,7 @@ function openChallenge() {
   m = /^#defi-(\d{1,2})-(\d{1,2})$/.exec(h);
   if (!m) return false;
   var n = +m[1], target = +m[2];
-  if (n < 1 || n > N || target < 1 || target > 48) return false;
+  if (n < 1 || n > N || target < 1 || target > WIN) return false;
   newGame(n, { chal: { target: target, level: n }, free: n > save.max, keep: true });
   emit({ event: 'challenge_open', level: n, target: target });
   show('game');
@@ -782,6 +810,7 @@ function paintAll() {
   $('lvl').textContent = chal ? 'Défi · Niveau ' + S.lv : 'Niveau ' + S.lv;
   $('foeName').textContent = levelDef().nm;
   $('chal').hidden = !chal;
+  document.querySelector('footer').hidden = !!chal;   // no undo, no restart: a challenge is played once
   if (chal) { $('chalT').textContent = 'Défi : prends au moins ' + chal.target + (chal.target > 1 ? ' graines' : ' graine'); }
   var goal = $('goal');
   if (chal) goal.innerHTML = '';   // the banner above is the one goal on screen
@@ -826,18 +855,23 @@ function show(name) {
   else if (name === 'levels') renderLevels();
 }
 var LOCK = '<svg viewBox="0 0 24 24"><path d="M7 10V8a5 5 0 0 1 10 0v2h1.500v10h-13V10zm2.500 0h5V8a2.500 2.500 0 0 0-5 0z"/></svg>';
+// "Continuer" always points to the first level that is not won yet (replaying an old level does not move it).
+function firstOpen() {
+  for (var i = 0; i < N; i++) if (!save.stars[i]) return i + 1;
+  return N;
+}
 function renderHome() {
   var done = 0;
   for (var i = 0; i < N; i++) if (save.stars[i] > 0) done++;
   $('hStars').textContent = totalStars();
   $('hDone').textContent = done;
-  $('bGo').textContent = 'Continuer · Niveau ' + save.level;
+  $('bGo').textContent = 'Continuer · Niveau ' + firstOpen();
 }
 function renderLevels() {
   var html = '';
   for (var i = 0; i < N; i++) {
     var open = i + 1 <= save.max, s = save.stars[i];
-    html += '<button class="cell' + (i + 1 === save.level ? ' cur' : '') + (s ? ' ok' : '') + '" data-lv="' + (i + 1) + '"' + (open ? '' : ' disabled') +
+    html += '<button class="cell' + (i + 1 === firstOpen() ? ' cur' : '') + (s ? ' ok' : '') + '" data-lv="' + (i + 1) + '"' + (open ? '' : ' disabled') +
       ' aria-label="Niveau ' + (i + 1) + (open ? ', ' + s + (s > 1 ? ' étoiles' : ' étoile') : ', verrouillé') + '">' +
       '<span class="n">' + (open ? i + 1 : LOCK) + '</span><span class="s">';
     for (var k = 1; k <= 3; k++) html += '<svg viewBox="0 0 24 24" class="' + (k <= s ? 'on' : '') + '"><use href="#star"/></svg>';
@@ -877,7 +911,7 @@ function onTap(el, fn) {
   el.addEventListener('click', function (e) { if (!stray()) fn(e); });
 }
 function goContinue() {
-  startLevel(save.level, true);
+  startLevel(firstOpen(), true);
   show('game');
 }
 pitEls.forEach(function (el, i) { onTap(el, function () { tapPit(i); }); });
@@ -901,7 +935,10 @@ onTap($('bUndo'), function () {
   gen++;
   S.b = sn.b; S.t = 0; S.n = sn.n; S.hist.length = sn.hl; S.rss.length = S.rss.length - 1; S.last = -1;
   rng.s = sn.rs; view = S.b.slice(); lastBump = [view[12], view[13]];
+  var first = !S.undone;
+  S.undone = true;
   persist(); paintAll(); next();
+  if (first) say('Annuler utilisé : cette partie ne vaudra plus que 2 étoiles.', 'warn');
 });
 onTap($('bReset'), function () { if (S) restart(); });
 function restart() {
@@ -910,12 +947,14 @@ function restart() {
   $('win').hidden = true;
 }
 onTap($('bNext'), function () {
+  lockUntil = Date.now() + 300;
   $('win').hidden = true;
   if (chal) show('home');
   else if (S.lv < N) startLevel(S.lv + 1);
   else show('levels');
 });
-onTap($('bAgain'), function () { $('win').hidden = true; restart(); });
+onTap($('bAgain'), function () { lockUntil = Date.now() + 300; $('win').hidden = true; restart(); });
+onTap($('bToLevels'), function () { $('win').hidden = true; show('levels'); });
 onTap($('bShare'), function () { sendText(shareText(), 'result', $('bShare')); });
 onTap($('bChal'), function () { sendText(challengeText(), 'challenge', $('bChal')); });
 document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
@@ -943,9 +982,9 @@ window.__game = {
       mode: chal ? 'challenge' : 'level', level: S ? S.lv : 0, board: s.pits, store: s.store,
       turn: S ? S.t : 0, plies: S ? S.n : 0, busy: busy, over: !!(S && S.over), winner: S && S.res ? S.res.winner : null,
       why: S && S.res ? S.res.why : '', won: !!(S && S.res && S.res.winner === 0),
-      stars: S && S.over && S.res && S.res.winner === 0 && !chal ? starsFor(S.res.b[12], S.res.b[13]) : 0,
+      stars: S && S.over && S.res && S.res.winner === 0 && !chal ? (S.undone ? Math.min(2, starsFor(S.res.b[12], S.res.b[13])) : starsFor(S.res.b[12], S.res.b[13])) : 0, undone: !!(S && S.undone),
       legal: S && !S.over && S.t === 0 ? moves(S.b, 0) : [], hist: S ? S.hist.slice() : [],
-      screen: screen, total: totalStars(), max: save.max, current: save.level, free: free,
+      screen: screen, total: totalStars(), max: save.max, current: firstOpen(), playing: S ? S.lv : 0, free: free,
       challenge: chal ? { target: chal.target, level: chal.level } : null, seed: rng.s
     };
   },

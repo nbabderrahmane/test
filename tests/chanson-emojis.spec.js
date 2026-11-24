@@ -364,6 +364,7 @@ function checkFit(m, tag) {
     page.on('pageerror', e => problems.push('pageerror: ' + e.message));
     await page.goto(URL);
     await page.waitForFunction(() => !!window.__game);
+    await page.evaluate(() => window.__game.guard(false));
     await page.locator('#bGo').tap();
     await play(page, 'rrr');
     assert.ok((await state(page)).won);
