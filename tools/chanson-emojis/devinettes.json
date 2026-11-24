@@ -31,7 +31,7 @@
 "n": ""
 },
 {
-"e": "🌳 🚶 🗼",
+"e": "🌳 🚶 🚗",
 "t": "Les Champs-Élysées",
 "a": "Joe Dassin",
 "y": 1969,
@@ -71,7 +71,7 @@
 "n": "Avec Chawki ; le titre seul est affiché."
 },
 {
-"e": "1️⃣ 👨 😵",
+"e": "🔝 👨 😵",
 "t": "Premier Gaou",
 "a": "Magic System",
 "y": 2002,
@@ -95,7 +95,7 @@
 "e": "🔚 💃",
 "t": "Dernière danse",
 "a": "Indila",
-"y": 2014,
+"y": 2013,
 "g": "A",
 "r": "France, très écouté en Afrique francophone",
 "c": "Très élevée",
@@ -223,7 +223,7 @@
 "n": ""
 },
 {
-"e": "❤️ 🎷 💃",
+"e": "🎷 💃 🌴",
 "t": "Soul Makossa",
 "a": "Manu Dibango",
 "y": 1972,
@@ -233,10 +233,10 @@
 "n": ""
 },
 {
-"e": "🃏 😐",
-"t": "Poker Face",
-"a": "Lady Gaga",
-"y": 2008,
+"e": "🔢 ⭐ 🌌",
+"t": "Counting Stars",
+"a": "OneRepublic",
+"y": 2013,
 "g": "M",
 "r": "États-Unis",
 "c": "Très élevée",
@@ -313,7 +313,7 @@
 "n": ""
 },
 {
-"e": "7️⃣ ⏳",
+"e": "🕖 ⏳ 🎶",
 "t": "7 Seconds",
 "a": "Youssou N'Dour et Neneh Cherry",
 "y": 1994,
@@ -423,14 +423,15 @@
 "n": ""
 },
 {
-"e": "🎩 👑 🎶",
-"t": "Milord",
+"e": "🎻 ❤️",
+"t": "Hymne à l'amour",
 "a": "Édith Piaf",
-"y": 1959,
+"y": 1950,
 "g": "A",
 "r": "France",
 "c": "Très élevée",
-"n": ""
+"n": "Décennie non affichée : écrite en 1949, enregistrée en 1950.",
+"h": 1
 },
 {
 "e": "⬇️ ☀️ 🌴",
@@ -528,7 +529,7 @@
 "a": "Corneille",
 "y": 2002,
 "g": "A",
-"r": "Canada (né au Rwanda)",
+"r": "Canada (né en Allemagne, enfance au Rwanda)",
 "c": "Élevée",
 "n": "Titre et artiste sûrs ; année 2002 ou 2003 selon la source, décennie 2000 dans les deux cas."
 },
@@ -543,27 +544,27 @@
 "n": ""
 },
 {
-"e": "📅 ⭐ 🎉",
-"t": "Weekend Special",
-"a": "Brenda Fassie",
-"y": 1983,
+"e": "👋 💑",
+"t": "Salut les amoureux",
+"a": "Joe Dassin",
+"y": 1972,
 "g": "A",
-"r": "Afrique du Sud",
+"r": "France",
+"c": "Élevée",
+"n": "Titre et artiste sûrs ; année 1972 ou 1973 selon la source, décennie 1970 dans les deux cas."
+},
+{
+"e": "🎶 👍 😄",
+"t": "Quand la musique est bonne",
+"a": "Jean-Jacques Goldman",
+"y": 1982,
+"g": "A",
+"r": "France",
 "c": "Très élevée",
 "n": ""
 },
 {
-"e": "🐄 🌿 🎺",
-"t": "Grazing in the Grass",
-"a": "Hugh Masekela",
-"y": 1968,
-"g": "A",
-"r": "Afrique du Sud",
-"c": "Très élevée",
-"n": ""
-},
-{
-"e": "💛 🚢 🌊",
+"e": "💛 ⬇️ 🌊 🐟",
 "t": "Yellow Submarine",
 "a": "The Beatles",
 "y": 1966,
@@ -583,7 +584,7 @@
 "n": ""
 },
 {
-"e": "💓 💃",
+"e": "🚶 💓 😎",
 "t": "Stayin' Alive",
 "a": "Bee Gees",
 "y": 1977,
@@ -593,10 +594,10 @@
 "n": ""
 },
 {
-"e": "🐶 🎸",
-"t": "Hound Dog",
-"a": "Elvis Presley",
-"y": 1956,
+"e": "🐯 📢",
+"t": "Roar",
+"a": "Katy Perry",
+"y": 2013,
 "g": "M",
 "r": "États-Unis",
 "c": "Très élevée",

@@ -462,7 +462,7 @@ function emit(msg) {
 var rng = mkRng((Date.now() ^ Math.floor(Math.random() * 1e9)) | 0);
 
 // ---- persistence (always guarded: the game works without storage) -------------------------
-var save = { level: 1, max: 1, stars: [], best: [], cur: null, chalGame: null };
+var save = { level: 1, max: 1, stars: [], best: [], games: {}, chalGame: null };   // games: one game in progress per level
 function totalStars() { var t = 0; for (var i = 0; i < N; i++) t += save.stars[i] || 0; return t; }
 function cleanGame(g, lvOk) {
   if (!g || typeof g !== 'object' || !Array.isArray(g.hist) || !Array.isArray(g.rss)) return null;
@@ -472,6 +472,8 @@ function cleanGame(g, lvOk) {
   if (!ok || !lvOk(g)) return null;
   return g;
 }
+// A challenge target is a number of seeds: more than what the start already gives, at most 25.
+function targetOk(lv, t) { return t === (t | 0) && t > LEVELS[lv - 1].s[0] && t <= WIN; }
 function loadSave() {
   var i;
   save.stars = []; save.best = [];
@@ -485,8 +487,12 @@ function loadSave() {
       if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = nat(s.stars[i], 3);
       if (Array.isArray(s.best)) for (i = 0; i < N && i < s.best.length; i++) save.best[i] = nat(s.best[i], 48);
       var lvOk = function (g) { return g.level === (g.level | 0) && g.level >= 1 && g.level <= save.max; };
-      save.cur = cleanGame(s.cur, lvOk);
-      var cg = cleanGame(s.chalGame, function (g) { return g.level === (g.level | 0) && g.level >= 1 && g.level <= N && g.target >= 1 && g.target <= WIN; });
+      save.games = {};
+      var cand = [];
+      if (s.games && typeof s.games === 'object') for (var key in s.games) cand.push(s.games[key]);
+      if (s.cur) cand.push(s.cur);   // saves of the first version kept one game only
+      cand.forEach(function (c) { var g = cleanGame(c, lvOk); if (g && !save.games[g.level]) save.games[g.level] = g; });
+      var cg = cleanGame(s.chalGame, function (g) { return g.level === (g.level | 0) && g.level >= 1 && g.level <= N && targetOk(g.level, g.target); });
       save.chalGame = cg;
     }
   } catch (e) { /* no storage: play without it */ }
@@ -516,7 +522,7 @@ function startBoard(lv) { var L = LEVELS[lv - 1]; return mkBoard(L.p, L.s); }
 function persist() {
   if (!S || S.over) return;
   var g = { level: S.lv, hist: S.hist.slice(), rss: S.rss.slice(), rs: rng.s, u: S.undone ? 1 : 0 };
-  if (chal) { g.target = chal.target; save.chalGame = g; } else { save.cur = g; }
+  if (chal) { g.target = chal.target; save.chalGame = g; } else { save.games[S.lv] = g; }
   store();
 }
 // Builds a game; `from` is a saved game to resume (replayed move by move, never trusted).
@@ -545,13 +551,13 @@ function newGame(lv, opts) {
   }
   view = S.b.slice(); lastBump = [view[12], view[13]];
   $('win').hidden = true; $('help').hidden = true;
-  if (!from || !S.hist.length) { if (chal) save.chalGame = null; else if (!opts.keep) save.cur = null; }
+  if (!from || !S.hist.length) { if (chal) save.chalGame = null; else if (opts.fresh) delete save.games[lv]; }
   paintAll();
   next();
 }
 function startLevel(lv, resume) {
   var from = null;
-  if (resume && save.cur && save.cur.level === lv) from = save.cur;
+  if (resume && save.games[lv]) from = save.games[lv];
   newGame(lv, { from: from });
   if (!chal) { save.level = lv; store(); }
 }
@@ -641,9 +647,9 @@ function onOver() {
   if (chal) {
     save.chalGame = null; store();
     var cs = Math.min(mine, WIN);
-    emit({ event: 'challenge_result', level: lv, score: cs, target: chal.target, won: cs >= chal.target });
+    emit({ event: 'challenge_result', level: lv, score: cs, target: chal.target, won: won && cs >= chal.target });
   } else {
-    save.cur = null;
+    delete save.games[lv];
     if (won) {
       if (stars > save.stars[lv - 1]) save.stars[lv - 1] = stars;
       if (mine > save.best[lv - 1]) save.best[lv - 1] = mine;
@@ -664,7 +670,7 @@ function openResult() {
   var cr = $('wChal');
   $('wTitle').className = '';
   if (chal) {   // a challenge is played once per opening: no replay, no retry
-    var sc = Math.min(mine, WIN), ok = sc >= chal.target;
+    var sc = Math.min(mine, WIN), ok = won && sc >= chal.target;
     $('wTitle').textContent = ok ? 'Défi relevé !' : 'Défi manqué';
     $('wSub').textContent = 'Niveau ' + S.lv + ' · contre ' + L.nm;
     cr.hidden = false; cr.className = 'cres' + (ok ? '' : ' lost');
@@ -709,7 +715,7 @@ function challengeLink() {
   return base ? base + '#defi-' + S.lv + '-' + chalScore() : '';
 }
 // A challenge score is a number of seeds that a game can reach: 1 to 25.
-function chalScore() { return Math.min(WIN, Math.max(1, last.score)); }
+function chalScore() { return Math.min(WIN, Math.max(LEVELS[S.lv - 1].s[0] + 1, last.score)); }
 function challengeText() {
   var link = challengeLink();
   return NAME + ' · Niveau ' + S.lv + ' : j’ai pris ' + chalScore() + ' graines. À toi de faire mieux !' + (link ? ' ' + link : '');
@@ -752,7 +758,7 @@ function openChallenge() {
   m = /^#defi-(\d{1,2})-(\d{1,2})$/.exec(h);
   if (!m) return false;
   var n = +m[1], target = +m[2];
-  if (n < 1 || n > N || target < 1 || target > WIN) return false;
+  if (n < 1 || n > N || !targetOk(n, target)) return false;
   newGame(n, { chal: { target: target, level: n }, free: n > save.max, keep: true });
   emit({ event: 'challenge_open', level: n, target: target });
   show('game');
@@ -845,9 +851,16 @@ function animateMove(prev, r, who, from, cb) {
 }
 
 // ---- screens -----------------------------------------------------------------------------
+// Leaving an unfinished challenge abandons it for good: it is not saved and never comes back.
+function abandonChallenge() {
+  gen++; busy = false;
+  save.chalGame = null; store();
+  chal = null; S = null; free = false;
+}
 var SCREENS = ['home', 'levels'];
 function show(name) {
   clearTimeout(winTimer);
+  if (name !== 'game' && chal && S && !S.over) abandonChallenge();
   screen = name;
   SCREENS.forEach(function (s) { $(s).hidden = s !== name; });
   if (name !== 'game') { $('win').hidden = true; $('help').hidden = true; }
@@ -943,14 +956,14 @@ onTap($('bUndo'), function () {
 onTap($('bReset'), function () { if (S) restart(); });
 function restart() {
   var lv = S.lv;
-  if (chal) newGame(lv, { chal: chal, free: free, keep: true }); else { newGame(lv); save.level = lv; store(); }
+  if (chal) newGame(lv, { chal: chal, free: free, keep: true }); else { newGame(lv, { fresh: true }); save.level = lv; store(); }
   $('win').hidden = true;
 }
 onTap($('bNext'), function () {
   lockUntil = Date.now() + 300;
   $('win').hidden = true;
   if (chal) show('home');
-  else if (S.lv < N) startLevel(S.lv + 1);
+  else if (S.lv < N) startLevel(S.lv + 1, true);
   else show('levels');
 });
 onTap($('bAgain'), function () { lockUntil = Date.now() + 300; $('win').hidden = true; restart(); });
@@ -992,7 +1005,7 @@ window.__game = {
   loadLevel: function (n) {
     n = n | 0;
     if (n < 1 || n > N) throw new Error('level must be 1..' + N);
-    newGame(n); save.level = Math.min(n, save.max); show('game');
+    newGame(n, { fresh: true }); save.level = Math.min(n, save.max); show('game');
     return this.state();
   },
   applyMove: applyMove,

@@ -187,6 +187,9 @@ footer{flex:none;display:flex;gap:10px;padding:4px 12px 10px}
 .cell:not([disabled]):active{transform:scale(.96)}
 
 #hot{justify-content:flex-start}
+#help{justify-content:flex-start}
+#rules{flex:1;list-style:none;margin:16px 0;display:flex;flex-direction:column;justify-content:center;gap:10px}
+#rules li{background:var(--panel);border-radius:14px;padding:11px 14px;font-size:15px;line-height:1.25}
 #hotl{flex:1;display:flex;flex-direction:column;justify-content:center;gap:12px}
 #hotl .btn{min-height:64px;font-size:18px;justify-content:flex-start;padding:0 18px;gap:12px}
 .pr{display:flex;gap:4px}
@@ -228,6 +231,7 @@ footer{flex:none;display:flex;gap:10px;padding:4px 12px 10px}
   <footer>
     <button class="btn" id="bUndo"><svg viewBox="0 0 24 24"><path d="M9 7 4 12l5 5M4 12h10a6 6 0 0 1 0 12" transform="translate(0 -3)"/></svg>Annuler</button>
     <button class="btn" id="bReset"><svg viewBox="0 0 24 24"><path d="M4 5v6h6M5 11a8 8 0 1 1 2 7"/></svg>Recommencer</button>
+    <button class="btn" id="bHelp" aria-label="Règles du jeu" style="flex:none;width:50px;padding:0;font-size:20px">?</button>
   </footer>
 
   <section class="over" id="res" hidden aria-live="polite">
@@ -237,12 +241,14 @@ footer{flex:none;display:flex;gap:10px;padding:4px 12px 10px}
       <div class="stars" id="wStars"></div>
       <div class="big"><span id="wTurns">0</span><small>tours</small></div>
       <div class="rank" id="wRank"></div>
+      <p class="rec" id="wLead"></p>
       <p class="cres" id="wChal" hidden></p>
       <div class="acts" id="acts"></div>
     </div>
   </section>
 
   <section class="scr" id="home" hidden>
+    <button class="icon" id="bHHelp" aria-label="Règles du jeu" style="position:absolute;right:14px;top:calc(env(safe-area-inset-top) + 10px);font-size:22px;font-weight:800">?</button>
     <div class="hbrand">
       <div class="hpions" id="hpions" aria-hidden="true"></div>
       <h1>Ronde Vive</h1><div class="sub">Fais le tour, rentre tes pions avant les autres.</div>
@@ -261,6 +267,22 @@ footer{flex:none;display:flex;gap:10px;padding:4px 12px 10px}
     </div>
     <div id="grid"></div>
     <button class="btn acc" id="bBack" style="flex:none">Reprendre</button>
+  </section>
+
+  <section class="scr" id="help" hidden>
+    <div class="top">
+      <button class="icon" id="bKBack" aria-label="Retour"><svg class="st" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="tt"><h1>Règles</h1></div>
+    </div>
+    <ul id="rules">
+      <li>Fais un tour du plateau et rentre tous tes pions au centre avant les autres.</li>
+      <li>Un 6 fait sortir un pion et fait rejouer. Sans pion en jeu, tu as trois essais.</li>
+      <li>Tu tombes sur un pion adverse : il retourne à sa base.</li>
+      <li>Les cases à cercle sont des refuges : personne n’y est pris.</li>
+      <li>Pour rentrer au centre, il faut le compte exact.</li>
+      <li>Les étoiles récompensent l’avance à l’arrivée.</li>
+    </ul>
+    <button class="btn acc" id="bKOk" style="flex:none">Compris</button>
   </section>
 
   <section class="scr" id="hot" hidden>
@@ -526,7 +548,7 @@ function freshSeed() {
 }
 
 // ---- persistence (always guarded: the game works without storage) ---------------------------------
-var save = { max: 1, level: 1, stars: [], best: [], cur: null, chal: null, fast: false };
+var save = { max: 1, level: 1, stars: [], best: [], cur: {}, last: 0, chal: null, hot: null, fast: false };   // cur: one game in progress per level
 function frontier() {   // the first level not finished yet: what "Continuer" opens
   for (var i = 0; i < N; i++) if (!save.stars[i]) return i + 1;
   return N;
@@ -587,8 +609,14 @@ function loadSave() {
     if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = int(s.stars[i], 0, 3) || 0;
     if (Array.isArray(s.best)) for (i = 0; i < N && i < s.best.length; i++) save.best[i] = int(s.best[i], 0, 9999) || 0;
     save.fast = s.fast === true;
-    var cl = s.cur && int(s.cur.level, 1, N);
-    if (cl) { var c = cleanPack(s.cur, cl); if (c) save.cur = { level: cl, seed: c.seed, S: c.S, undo: c.undo.map(function (u) { return u.st; }) }; }
+    var packs = s.cur && typeof s.cur === 'object' ? s.cur : {};
+    for (i = 1; i <= N; i++) {
+      var c = packs[i] && cleanPack(packs[i], i);
+      if (c && packs[i].level === i) save.cur[i] = { level: i, seed: c.seed, S: c.S, undo: c.undo.map(function (u) { return u.st; }) };
+    }
+    save.last = int(s.last, 1, N) || 0;
+    var hp = s.hot && cleanPack(s.hot, 0);
+    if (hp && hp.S.ks.every(function (k) { return k === 2; }) && hp.S.tiers.every(function (t) { return t === null; })) save.hot = { level: 0, seed: hp.seed, S: hp.S, undo: hp.undo.map(function (u) { return u.st; }) };
     if (s.chal && int(s.chal.level, 1, N) && int(s.chal.target, 1, 999)) {
       var d = cleanPack(s.chal, s.chal.level);
       if (d) save.chal = { level: s.chal.level, target: s.chal.target, seed: d.seed, S: d.S, undo: d.undo.map(function (u) { return u.st; }) };
@@ -605,9 +633,10 @@ function clone(o) { return JSON.parse(JSON.stringify(o)); }
 var G = null, screen = 'home', timer = 0, note = null, noteTimer = 0;
 function humanAt(p) { return G.S.tiers[p] === null; }
 function persist() {
-  if (!G || G.kind === 'hot') return;
+  if (!G) return;
   var pack = { level: G.level, seed: G.seed, S: G.S.over ? null : G.S, undo: G.undo.slice(-10).map(function (u) { return u.st; }) };
-  if (G.kind === 'level') save.cur = G.S.over ? null : pack;
+  if (G.kind === 'level') { if (G.S.over) delete save.cur[G.level]; else save.cur[G.level] = pack; save.last = G.level; }
+  else if (G.kind === 'hot') save.hot = G.S.over ? null : pack;
   else { pack.target = G.target; save.chal = G.S.over ? null : pack; }
   store();
 }
@@ -627,7 +656,7 @@ function begin(g) {
 function startLevel(n, pack) {
   var g = newGameFor('level', n);
   if (pack) { g.S = pack.S; g.undo = pack.undo.map(function (s) { return { rng: s.rng, st: s }; }); g.seed = pack.seed; }
-  else { save.cur = null; }
+  else { delete save.cur[n]; }
   begin(g);
   persist(); store();
 }
@@ -637,7 +666,12 @@ function startChal(n, target, pack) {
   begin(g);
   persist();
 }
-function startHot(np) { begin(newGameFor('hot', 0, { np: np })); }
+function resumeHot() {
+  var g = newGameFor('hot', 0, { np: save.hot.S.np });
+  g.S = save.hot.S; g.undo = save.hot.undo.map(function (s) { return { rng: s.rng, st: s }; }); g.seed = save.hot.seed;
+  begin(g);
+}
+function startHot(np) { begin(newGameFor('hot', 0, { np: np })); persist(); }
 function replay() {   // a new game of the same kind (new seed)
   if (G.kind === 'hot') startHot(G.S.np);
   else if (G.kind === 'chal') { save.chal = null; startChal(G.level, G.target); }
@@ -701,6 +735,9 @@ function resolve(mv, choice) {
   if (mv && mv.cap.length) say('Pion renvoyé à sa base !', 'warn', 1500);
   else if (mv && mv.to === HOME) say('Un pion est rentré !', 'hint', 1500);
   else if (six && !S.over) say('6 : ' + (humanAt(p0) && G.kind !== 'hot' ? 'tu rejoues' : NAMES[p0] + ' rejoue') + ' !', 'hint', 1200);
+  if (G.kind === 'chal' && !S.over && S.turns[0] > G.target) {   // the objective cannot be met any more: the challenge ends, lost
+    S.over = true; S.winner = ENGINE.ranking(S).filter(function (q) { return q !== 0; })[0];
+  }
   persist();
   movePions(before);
   refresh();
@@ -747,13 +784,13 @@ function finishGame() {
       ev.push({ event: 'level_complete', level: n, score: turns, stars: stars });
     }
     save.level = frontier();
-    save.cur = null;
+    delete save.cur[n];
   } else if (G.kind === 'chal') {
     result.chalOk = win && turns <= G.target;
     result.target = G.target;
     ev.push({ event: 'challenge_result', level: n, score: turns, target: G.target, won: result.chalOk });
     save.chal = null;
-  }
+  } else save.hot = null;
   store();
   showResult();
   ev.forEach(emit);
@@ -763,7 +800,7 @@ function chip(p) { return '<svg viewBox="0 0 24 24" class="k' + p + '"><use href
 function showResult() {
   var r = result, S = G.S, hot = r.kind === 'hot', acts = [];
   var rank = r.rank.indexOf(0) + 1;
-  $('wTitle').textContent = hot ? NAMES[S.winner] + ' gagne !' : r.kind === 'chal' ? (r.chalOk ? 'Défi relevé !' : r.win ? 'Gagné, mais trop lent' : 'Pas cette fois') :
+  $('wTitle').textContent = hot ? NAMES[S.winner] + ' gagne !' : r.kind === 'chal' ? (r.chalOk ? 'Défi relevé !' : 'Pas cette fois') :
     r.win ? (r.stars === 3 ? 'Superbe course !' : 'Gagné !') : 'Pas cette fois';
   $('wSub').textContent = hot ? 'Tous les pions sont rentrés' : r.kind === 'chal' ? 'Défi · Niveau ' + r.level : 'Niveau ' + r.level + (r.win ? ' terminé' : ' · tu finis ' + ord(rank));
   $('wStars').hidden = hot || r.kind === 'chal' || !r.win;
@@ -774,10 +811,11 @@ function showResult() {
   $('wRank').innerHTML = r.rank.map(function (p, i) {
     return '<span' + (p === 0 && !hot ? ' class="me"' : '') + '>' + chip(p) + ord(i + 1) + '</span>';
   }).join('');
+  $('wLead').textContent = r.win && r.kind === 'level' ? 'Avance : ' + plural(ENGINE.lead(S), 'case') + ' · 3 étoiles dès ' + ENGINE.STAR3 * S.k : '';
   var c = $('wChal');
   c.hidden = r.kind !== 'chal';
   if (r.kind === 'chal') {
-    c.textContent = r.chalOk ? 'Tu égales ou bats l’objectif' : r.win ? plural(r.turns - r.target, 'tour') + ' de trop' : 'Défi raté';
+    c.textContent = r.chalOk ? 'Tu égales ou bats l’objectif' : 'Défi raté';
     c.className = 'cres' + (r.chalOk ? '' : ' lost');
   }
   if (hot) acts = [['again', 'Rejouer', 'acc'], ['home', 'Accueil', 'line']];
@@ -979,7 +1017,7 @@ function dieSvg(v, p, live) {
   PIPS[v].forEach(function (k) { h += '<circle cx="' + (11 + (k % 3) * 9) + '" cy="' + (11 + Math.floor(k / 3) * 9) + '" r="3.300" fill="' + ink + '"/>'; });
   return h + '</svg>';
 }
-var dieSpin = false, firstEver = false;
+var dieSpin = false, readySince = 0, wasReady = false;   // a press counts only if it began after the die became ready
 function refresh() {
   if (!G) return;
   var S = G.S, p = S.turn, human = humanAt(p), hot = G.kind === 'hot', over = S.over;
@@ -992,13 +1030,15 @@ function refresh() {
   else goal.innerHTML = starSvg(1) + starSvg(1) + starSvg(1) + '<span>' + ENGINE.STAR3 * S.k + ' cases d’avance</span>';
   var kk = S.ks, same = kk.slice(1).every(function (x) { return x === kk[1]; });
   $('vs').textContent = hot ? 'Chacun : ' + plural(kk[0], 'pion') : 'Toi : ' + plural(kk[0], 'pion') + ' · ' + (kk.length === 2 ? 'Adversaire' : (kk.length - 1) + ' adversaires') + ' : ' + plural(kk[1], 'pion') + (kk.length > 2 && same ? ' chacun' : '');
-  document.querySelector('footer').hidden = G.kind === 'chal';
+  $('bUndo').hidden = $('bReset').hidden = G.kind === 'chal';
   $('tn').textContent = hot ? S.turns[over ? S.winner : p] : S.turns[0];
   // die
   var d = $('die'), v = S.roll || S.last, ready = !over && S.roll === 0 && human;
   d.innerHTML = dieSvg(v, S.roll ? p : S.lastBy, !!v);
   d.className = (ready ? 'ready' : '') + (dieSpin && S.roll ? ' spin' : '');
   dieSpin = false;
+  if (ready && !wasReady) readySince = performance.now();
+  wasReady = ready;
   d.disabled = !ready;
   d.setAttribute('aria-label', ready ? 'Lancer le dé' : v ? 'Dé : ' + v : 'Dé');
   d.setAttribute('data-v', S.roll || 0);
@@ -1025,15 +1065,22 @@ function refresh() {
 }
 
 // ---- screens -------------------------------------------------------------------------------------------------
-var SCREENS = ['home', 'levels', 'hot'];
+var SCREENS = ['home', 'levels', 'hot', 'help'];
+var helpBack = 'home';
 function show(name) {
   clearTimeout(timer);
   screen = name;
+  if (name !== 'game' && name !== 'help' && G && G.kind === 'chal' && !G.S.over) {   // a challenge that is left is dropped for good
+    save.chal = null;
+    var back = frontier();
+    startLevel(back, save.cur[back] || null);
+  }
   SCREENS.forEach(function (s) { $(s).hidden = s !== name; });
   if (name !== 'game') $('res').hidden = true;
   if (name === 'home') renderHome();
   else if (name === 'levels') renderLevels();
   else if (name === 'hot') renderHot();
+  else if (name === 'help') { /* static */ }
   else { fit(); if (G) { if (G.S.over && result && result.kind === G.kind) $('res').hidden = false; else step(); } }
 }
 function renderHome() {
@@ -1057,7 +1104,7 @@ function renderLevels() {
   $('gTotal').textContent = totalStars() + '/' + (N * 3);
 }
 function renderHot() {
-  var h = '';
+  var h = save.hot ? '<button class="btn acc" data-np="0">Reprendre la partie à ' + save.hot.S.np + ' joueurs</button>' : '';
   for (var np = 2; np <= 4; np++) {
     var pr = '';
     for (var p = 0; p < np; p++) pr += '<i class="k' + p + '" style="background:' + COL[p] + '">' + SY(p, 'x').replace('<svg class="x"', '<svg style="fill:' + INK[p] + '"') + '</i>';
@@ -1068,12 +1115,12 @@ function renderHot() {
 function goContinue() {
   var n = frontier();
   if (G && G.kind === 'level' && G.level === n && !G.S.over) { show('game'); return; }
-  startLevel(n, save.cur && save.cur.level === n ? save.cur : null);
+  startLevel(n, save.cur[n] || null);
   show('game');
 }
 function pickLevel(n) {
   if (G && G.kind === 'level' && G.level === n && !G.S.over) { show('game'); return; }
-  startLevel(n, save.cur && save.cur.level === n ? save.cur : null);
+  startLevel(n, save.cur[n] || null);
   show('game');
 }
 function openGrid() {
@@ -1095,7 +1142,6 @@ function allow(kind, e) {
   var now = Date.now(), x = e && e.clientX || 0, y = e && e.clientY || 0;
   if (!instant && lastTap.k) {
     var dt = now - lastTap.t;
-    if (lastTap.k === kind && (kind === 'die' || kind === 'pion') && dt < 350) return false;
     if (lastTap.k !== kind && dt < 350 && Math.abs(x - lastTap.x) < 60 && Math.abs(y - lastTap.y) < 60) return false;
   }
   lastTap = { t: now, x: x, y: y, k: kind };
@@ -1117,7 +1163,7 @@ function closestAttr(node, attr) {
   return null;
 }
 // the die and the pions answer on the press itself (one gesture, one reaction)
-$('die').addEventListener('pointerdown', function (e) { if (allow('die', e)) tapDie(); });
+$('die').addEventListener('pointerdown', function (e) { if (e.timeStamp >= readySince && allow('die', e)) tapDie(); });
 $('die').addEventListener('click', function (e) { if (!stray() && allow('die', e)) tapDie(); });
 board.addEventListener('pointerdown', function (e) {
   var t = closestAttr(e.target, 'data-p');
@@ -1128,7 +1174,11 @@ board.addEventListener('click', function (e) {
   if (t && !stray() && allow('pion', e)) tapPion(+t.getAttribute('data-p'), +t.getAttribute('data-i'));
 });
 onTap($('grid'), function (e) { var c = closestAttr(e.target, 'data-level'); if (c && !c.disabled) pickLevel(+c.getAttribute('data-level')); });
-onTap($('hotl'), function (e) { var c = closestAttr(e.target, 'data-np'); if (c) { startHot(+c.getAttribute('data-np')); show('game'); } });
+onTap($('hotl'), function (e) { var c = closestAttr(e.target, 'data-np'); if (c) { if (+c.getAttribute('data-np')) startHot(+c.getAttribute('data-np')); else resumeHot(); show('game'); } });
+onTap($('bHelp'), function () { helpBack = 'game'; show('help'); });
+onTap($('bHHelp'), function () { helpBack = 'home'; show('help'); });
+onTap($('bKBack'), function () { show(helpBack); });
+onTap($('bKOk'), function () { show(helpBack); });
 onTap($('bUndo'), undo);
 onTap($('bReset'), function () { if (G) replay(); });
 onTap($('bMap'), openGrid);
@@ -1161,9 +1211,11 @@ fast = save.fast;
 (function boot() {
   var cg = save.chal;
   if (cg) { screen = 'game'; startChal(cg.level, cg.target, cg); show('game'); }
+  else if (save.hot) { resumeHot(); show('game'); }
   else {
     save.chal = null;
-    if (save.cur) startLevel(save.cur.level, save.cur); else startLevel(save.level);
+    var l = save.cur[save.last] ? save.last : save.cur[save.level] ? save.level : 0;
+    if (l) startLevel(l, save.cur[l]); else startLevel(save.level);
     show('home');
   }
   if (/^#defi-/.test(location.hash)) openChallenge();

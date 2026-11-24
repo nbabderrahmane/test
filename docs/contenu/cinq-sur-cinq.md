@@ -31,7 +31,7 @@ Certitude : **certain** = fait ancien et établi ; **très sûr** = fait établi
 |---|---|---|---|---|
 | 11 | Quel pays a organisé et gagné la toute première Coupe du monde, en 1930 ? | **L’Uruguay** | Le Brésil ; L’Argentine ; La France | certain |
 | 12 | Combien d’équipes ont joué la première Coupe du monde, en 1930 ? | **13** | 8 ; 24 ; 32 | très sûr, à vérifier en priorité |
-| 13 | Quel pays africain a participé pour la première fois à une Coupe du monde, en 1934 ? | **L’Égypte** | Le Cameroun ; Le Ghana ; L’Algérie | certain |
+| 13 | Quel fut le premier pays africain à jouer une Coupe du monde, en 1934 ? | **L’Égypte** | Le Cameroun ; Le Ghana ; L’Algérie | certain |
 | 14 | Quel pays a gagné la Coupe du monde en 1934, puis de nouveau en 1938 ? | **L’Italie** | Le Brésil ; L’Uruguay ; L’Angleterre | certain |
 | 15 | Quel nom portait le trophée de la Coupe du monde jusqu’en 1970 ? | **Coupe Jules-Rimet** | Coupe Pelé ; Coupe Henri-Delaunay ; Coupe des Nations | certain |
 
@@ -100,7 +100,7 @@ Certitude : **certain** = fait ancien et établi ; **très sûr** = fait établi
 | # | Question | Bonne réponse | Mauvaises réponses | Certitude |
 |---|---|---|---|---|
 | 46 | Quel pays a gagné la CAN en 1968 puis en 1974 (alors appelé Congo-Kinshasa puis Zaïre) ? | **La RD Congo** | Le Congo (Brazzaville) ; La Zambie ; Le Gabon | certain |
-| 47 | Quel pays a gagné sa seule CAN en 1976 ? | **Le Maroc** | La Tunisie ; L’Algérie ; Le Sénégal | certain |
+| 47 | Quel pays a gagné la CAN 1976 ? | **Le Maroc** | La Tunisie ; L’Algérie ; Le Sénégal | certain |
 | 48 | Quel pays a gagné la CAN 1980, jouée chez lui à Lagos ? | **Le Nigeria** | Le Ghana ; Le Cameroun ; L’Égypte | certain |
 | 49 | Quel pays a gagné la CAN 1984, jouée en Côte d’Ivoire ? | **Le Cameroun** | La Côte d’Ivoire ; Le Sénégal ; Le Mali | certain |
 | 50 | Quel pays a gagné la CAN 1986, jouée chez lui ? | **L’Égypte** | Le Maroc ; La Tunisie ; Le Soudan | certain |
@@ -195,7 +195,7 @@ Certitude : **certain** = fait ancien et établi ; **très sûr** = fait établi
 | 94 | Quel pays a organisé en 2010 la première Coupe du monde sur le sol africain ? | **L’Afrique du Sud** | Le Maroc ; L’Égypte ; Le Nigeria | certain |
 | 95 | Quel pays africain a gagné l’or olympique de football en 1996, à Atlanta ? | **Le Nigeria** | Le Ghana ; Le Cameroun ; Le Maroc | certain |
 
-## Niveau 20 — Le grand final
+## Niveau 20 — La grande finale
 
 | # | Question | Bonne réponse | Mauvaises réponses | Certitude |
 |---|---|---|---|---|

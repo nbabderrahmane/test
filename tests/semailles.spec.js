@@ -80,7 +80,19 @@ const myTurn = (page, after = -1) => page.evaluate(a => new Promise((resolve, re
   f();
 }), after);
 // Reloads after letting the page's storage writes reach the browser (a reload right after a write can read the old value).
-async function reload(page) { await page.waitForTimeout(250); await page.reload(); await page.waitForFunction(() => !!window.__game); }
+// Chromium on file:// sometimes shows an empty localStorage right after a reload (and the game then starts clean and
+// overwrites it): when a game was in the save before and is gone after, the save is put back and the page loaded again.
+async function reload(page) {
+  const get = () => page.evaluate(k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, KEY);
+  const has = raw => { try { const o = JSON.parse(raw); return !!(o && (o.chalGame || o.cur || (o.games && Object.keys(o.games).length))); } catch (e) { return false; } };
+  await page.waitForTimeout(250);
+  const before = await get();
+  for (let k = 0; k < 4; k++) {
+    await page.reload(); await page.waitForFunction(() => !!window.__game);
+    if (!has(before) || has(await get())) return;
+    await page.evaluate(([key, v]) => localStorage.setItem(key, v), [KEY, before]);
+  }
+}
 const refOf = s => R.initial(s.board, s.store, 0);
 
 // One real tap on a pit, then waits until the adversary has answered (or the game is over).
@@ -449,7 +461,7 @@ const ENDS = [
       totalStars += want;
       lines.push(`${String(n).padStart(2)} ${levels[n - 1].nm.padEnd(12)} ${s.store[0]}-${s.store[1]} ${'*'.repeat(want)} (${s.plies} moves, ${Date.now() - t0} ms)`);
       const sv = await saved(page);
-      assert.equal(sv.stars[n - 1], want); assert.equal(sv.max, Math.min(20, n + 1)); assert.equal(sv.cur, null);
+      assert.equal(sv.stars[n - 1], want); assert.equal(sv.max, Math.min(20, n + 1)); assert.ok(!sv.games[n], 'no game left in progress');
       await page.evaluate(sd => window.__game.seed(sd), SEED(Math.min(20, n + 1)));
       await page.locator('#bNext').tap();
       await page.waitForTimeout(350);   // the board ignores taps for 300 ms after a result button
@@ -482,7 +494,7 @@ const ENDS = [
     const vis = await page.evaluate(() => [...document.querySelectorAll('#win .btn')].filter(b => b.offsetWidth > 0).map(b => b.textContent));
     assert.deepEqual(vis, ['Réessayer', 'Niveaux']);
     const sv = await saved(page);
-    assert.equal(sv.max, 1); assert.deepEqual(sv.stars, stars(20, 0)); assert.equal(sv.cur, null);
+    assert.equal(sv.max, 1); assert.deepEqual(sv.stars, stars(20, 0)); assert.deepEqual(sv.games, {});
     assert.equal((await events(page, 'level_complete')).length, 0);
     await page.locator('#bAgain').tap();
     const a = await state(page);
@@ -552,7 +564,7 @@ const ENDS = [
     const r = await state(page);
     assert.equal(r.plies, 0); assert.deepEqual(r.board, std()); assert.equal(r.level, 4);
     const sv = await saved(page);
-    assert.equal(sv.cur, null, 'restart forgets the game in progress');
+    assert.ok(!sv.games[4], 'restart forgets the game in progress');
     await context.close();
   });
 
@@ -732,8 +744,8 @@ const ENDS = [
     await A.page.evaluate(() => { window.__game.still(true); window.__game.seed(8); window.__game.loadLevel(3); });
     await tapPit(A.page, 2); await tapPit(A.page, 5);
     const snapshot = await saved(A.page);
-    assert.ok(snapshot.cur && snapshot.cur.hist.length === 4);
-    const keep = ({ level, max, stars, best, cur }) => JSON.stringify({ level, max, stars, best, cur });
+    assert.ok(snapshot.games[3] && snapshot.games[3].hist.length === 4);
+    const keep = ({ level, max, stars, best, games }) => JSON.stringify({ level, max, stars, best, games });
     // an equal result: the reference run is a strong player on level 12 (locked) with a fixed seed
     const lvls = await A.page.evaluate(() => window.__game.levels);
     const ref = await open({ width: 360, height: 640 });
@@ -778,7 +790,7 @@ const ENDS = [
     assert.equal((await state(A.page)).screen, 'home');
     await A.page.locator('#bGo').tap();
     s = await state(A.page);
-    assert.equal(s.mode, 'level'); assert.equal(s.level, 3); assert.deepEqual(s.hist, snapshot.cur.hist);
+    assert.equal(s.mode, 'level'); assert.equal(s.level, 3); assert.deepEqual(s.hist, snapshot.games[3].hist);
     // lost: a target nobody reaches
     await A.page.evaluate(() => { window.location.hash = '#defi-20-25'; });
     await A.page.waitForFunction(() => window.__game.state().mode === 'challenge' && window.__game.state().level === 20);
@@ -894,14 +906,14 @@ const ENDS = [
     await ctx.close();
   });
 
-  await test('R3: only the targets a game can reach (1 to 25) open a challenge', async () => {
-    for (const h of ['#defi-3-26', '#defi-3-30', '#defi-3-48']) {
+  await test('R3/R19: only the targets a game can reach open a challenge (above the seeds of the start, up to 25)', async () => {
+    for (const h of ['#defi-3-26', '#defi-3-30', '#defi-3-48', '#defi-1-16', '#defi-1-1', '#defi-3-5', '#defi-6-12']) {
       const b = await open({ width: 360, height: 640 }, { hash: h });
       const st = await state(b.page);
       assert.equal(st.mode, 'level', h); assert.equal((await events(b.page, 'challenge_open')).length, 0, h);
       await b.context.close();
     }
-    for (const h of ['#defi-3-1', '#defi-3-25']) {
+    for (const h of ['#defi-4-1', '#defi-4-25', '#defi-1-17']) {
       const b = await open({ width: 360, height: 640 }, { hash: h });
       assert.equal((await state(b.page)).mode, 'challenge', h);
       await b.context.close();
@@ -1024,6 +1036,60 @@ const ENDS = [
       const got = [RP.rate(L, RP.hasard, NG), RP.rate(L, RP.debutant, NG), RP.rate(L, RP.bonJoueur, NG)].map(x => Math.round(x * 100));
       got.forEach((v, k) => assert.ok(Math.abs(v - pub[n - 1][k + 1]) <= TOL, `level ${n}: ${['hasard', 'debutant', 'bon joueur'][k]} ${v} % against ${pub[n - 1][k + 1]} % published`));
     }
+  });
+
+  await test('R19: a challenge asks for a win; a lost game never "relève" it, even above the target', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { hash: '#defi-20-2' });
+    await page.evaluate(() => { window.__game.still(true); window.__game.seed(3); });
+    const fin = await playByHook(page, s => R.legalMoves(s)[0]);
+    assert.equal(fin.winner, 1); assert.ok(fin.store[0] >= 2, 'the target of 2 seeds was reached in a lost game: ' + fin.store);
+    await page.locator('#win').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#wTitle').innerText(), 'Défi manqué');
+    const ev = await events(page, 'challenge_result');
+    assert.equal(ev.length, 1); assert.equal(ev[0].won, false);
+    await context.close();
+  });
+
+  await test('R19: an abandoned challenge is gone for good (grid, "Reprendre", reload)', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { hash: '#defi-6-20' });
+    await page.evaluate(() => { window.__game.still(true); window.__game.seed(2); });
+    await tapPit(page, 1);
+    assert.ok((await saved(page)).chalGame, 'the challenge in progress is saved');
+    await page.locator('#bMap').tap();
+    await page.locator('#bBack').tap();               // "Reprendre": a normal game
+    let s = await state(page);
+    assert.equal(s.mode, 'level'); assert.equal(s.screen, 'game');
+    assert.equal((await saved(page)).chalGame, null, 'the abandoned challenge is erased');
+    await reload(page);
+    s = await state(page);
+    assert.equal(s.mode, 'level'); assert.equal(s.screen, 'home', 'the challenge does not come back');
+    assert.equal((await events(page, 'challenge_result')).length, 0);
+    await context.close();
+  });
+
+  await test('one game in progress per level: opening another level from the grid keeps the first', async () => {
+    const save = { level: 1, max: 20, stars: stars(20, 0), best: stars(20, 0), games: {} };
+    const { context, page } = await open({ width: 360, height: 640 }, { save });
+    await page.evaluate(() => { window.__game.still(true); window.__game.seed(7); });
+    await page.locator('#bLevels').tap();
+    await page.locator('.cell[data-lv="5"]').tap();
+    await tapPit(page, (await state(page)).legal[0]);
+    const g5 = await state(page);
+    await page.locator('#bMap').tap();
+    await page.locator('.cell[data-lv="6"]').tap();
+    await tapPit(page, (await state(page)).legal[1]);
+    const g6 = await state(page);
+    assert.equal(g6.level, 6);
+    await page.locator('#bMap').tap();
+    await page.locator('.cell[data-lv="5"]').tap();
+    const back = await state(page);
+    assert.deepEqual([back.level, back.hist, back.board], [5, g5.hist, g5.board], 'level 5 is back as it was');
+    const sv = await saved(page);
+    assert.deepEqual(Object.keys(sv.games).sort(), ['5', '6']);
+    await reload(page);
+    await page.locator('#bLevels').tap(); await page.locator('.cell[data-lv="6"]').tap();
+    assert.deepEqual((await state(page)).hist, g6.hist, 'and level 6 survives a reload');
+    await context.close();
   });
 
   // ------------------------------------------------------------------ layout

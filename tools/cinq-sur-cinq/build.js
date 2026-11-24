@@ -22,7 +22,18 @@ data.forEach((l, i) => {
   });
 });
 
-const block = 'var DATA=' + JSON.stringify(data.map(l => [l.theme, l.qs.map(q => [q.q, q.a, ...q.w])])) + ';';
+// Options are stored base64-encoded in a scrambled order (fixed per question, from its rank), with the right index
+// XOR-masked by the rank: light obfuscation only, not protection (a quiz has to ship its answers).
+function mulberry(a) { return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+let rank = 0;
+const packed = data.map(l => [l.theme, l.qs.map(q => {
+  const rnd = mulberry(rank * 2654435761 + 12345), o = [q.a, ...q.w];
+  for (let i = 3; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [o[i], o[j]] = [o[j], o[i]]; }
+  const code = o.indexOf(q.a) ^ ((rank * 7 + 3) & 3);
+  rank++;
+  return [q.q, o.map(t => Buffer.from(t, 'utf8').toString('base64')), code];
+})]);
+const block = 'var DATA=' + JSON.stringify(packed) + ';';
 let html = fs.readFileSync(GAME, 'utf8');
 const re = /(\/\*DATA:BEGIN[^\n]*\*\/\n)[\s\S]*?(\n\/\*DATA:END\*\/)/;
 if (!re.test(html)) throw new Error('data markers not found');

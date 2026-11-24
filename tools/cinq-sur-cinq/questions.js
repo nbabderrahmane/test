@@ -26,7 +26,7 @@ module.exports = [
   L('Premiers mondiaux', [
     Q('Quel pays a organisé et gagné la toute première Coupe du monde, en 1930 ?', 'L’Uruguay', ['Le Brésil', 'L’Argentine', 'La France']),
     Q('Combien d’équipes ont joué la première Coupe du monde, en 1930 ?', '13', ['8', '24', '32'], 2),
-    Q('Quel pays africain a participé pour la première fois à une Coupe du monde, en 1934 ?', 'L’Égypte', ['Le Cameroun', 'Le Ghana', 'L’Algérie']),
+    Q('Quel fut le premier pays africain à jouer une Coupe du monde, en 1934 ?', 'L’Égypte', ['Le Cameroun', 'Le Ghana', 'L’Algérie']),
     Q('Quel pays a gagné la Coupe du monde en 1934, puis de nouveau en 1938 ?', 'L’Italie', ['Le Brésil', 'L’Uruguay', 'L’Angleterre']),
     Q('Quel nom portait le trophée de la Coupe du monde jusqu’en 1970 ?', 'Coupe Jules-Rimet', ['Coupe Pelé', 'Coupe Henri-Delaunay', 'Coupe des Nations'])
   ]),
@@ -74,7 +74,7 @@ module.exports = [
   ]),
   L('CAN 1968-1986', [
     Q('Quel pays a gagné la CAN en 1968 puis en 1974 (alors appelé Congo-Kinshasa puis Zaïre) ?', 'La RD Congo', ['Le Congo (Brazzaville)', 'La Zambie', 'Le Gabon']),
-    Q('Quel pays a gagné sa seule CAN en 1976 ?', 'Le Maroc', ['La Tunisie', 'L’Algérie', 'Le Sénégal']),
+    Q('Quel pays a gagné la CAN 1976 ?', 'Le Maroc', ['La Tunisie', 'L’Algérie', 'Le Sénégal']),
     Q('Quel pays a gagné la CAN 1980, jouée chez lui à Lagos ?', 'Le Nigeria', ['Le Ghana', 'Le Cameroun', 'L’Égypte']),
     Q('Quel pays a gagné la CAN 1984, jouée en Côte d’Ivoire ?', 'Le Cameroun', ['La Côte d’Ivoire', 'Le Sénégal', 'Le Mali']),
     Q('Quel pays a gagné la CAN 1986, jouée chez lui ?', 'L’Égypte', ['Le Maroc', 'La Tunisie', 'Le Soudan'])
@@ -142,7 +142,7 @@ module.exports = [
     Q('Quel pays a organisé en 2010 la première Coupe du monde sur le sol africain ?', 'L’Afrique du Sud', ['Le Maroc', 'L’Égypte', 'Le Nigeria']),
     Q('Quel pays africain a gagné l’or olympique de football en 1996, à Atlanta ?', 'Le Nigeria', ['Le Ghana', 'Le Cameroun', 'Le Maroc'])
   ]),
-  L('Le grand final', [
+  L('La grande finale', [
     Q('Quel joueur a marqué trois buts en finale de la Coupe du monde 1966 ?', 'Geoff Hurst', ['Bobby Charlton', 'Eusébio', 'Franz Beckenbauer']),
     Q('Quel pays a gagné la Coupe du monde 1950, au Brésil ?', 'L’Uruguay', ['Le Brésil', 'L’Argentine', 'L’Italie']),
     Q('Quel pays a gagné la Coupe du monde 1954, en Suisse ?', 'L’Allemagne de l’Ouest', ['L’Italie', 'L’Uruguay', 'Le Brésil']),

@@ -244,20 +244,40 @@ function checkFit(m, tag) {
     await page.locator('#bNext').tap();
     s = await state(page);
     assert.equal(s.level, 1); assert.equal(s.pos, 0); assert.deepEqual(s.answers, [-1, -1, -1]); assert.ok(!s.over);
-    await play(page, 'rwr');
+    assert.ok((await page.locator('#goal').textContent()).includes('2 étoiles au plus'), 'the cap is announced before playing');
+    await play(page, 'rrr');
     s = await state(page);
-    assert.ok(s.won); assert.equal(s.stars, 2); assert.equal(s.points, 200);
+    // R11 (quiz): a new attempt after a failure is capped at 2 stars
+    assert.ok(s.won); assert.equal(s.stars, 2); assert.equal(s.points, 300);
+    assert.equal(await page.locator('#wRec').textContent(), '2 étoiles au plus après un échec');
     assert.equal(s.max, 2);
-    // a worse replay never lowers the stars
+    // R11: the stars are frozen at the first win; a replay never changes them, better or worse
     await page.locator('#bAgain').tap();
     await play(page, 'xhw');
     s = await state(page);
     assert.ok(!s.won);
+    await page.locator('#bAgain').tap();
+    await play(page, 'rrr');
+    s = await state(page);
+    assert.ok(s.won); assert.equal(s.stars, 2, 'frozen stars');
+    assert.equal(await page.locator('#wRec').textContent(), 'Étoiles déjà acquises : elles ne changent pas');
     assert.deepEqual((await stored(page)).stars.slice(0, 2), [2, 0]);
+    // first try, perfect: 3 stars, frozen too; first win with hints only: 1 star, never raised afterwards
+    await page.evaluate(() => window.__game.loadLevel(2));
+    await play(page, 'rrr');
+    assert.equal((await state(page)).stars, 3);
+    await page.locator('#bAgain').tap(); await play(page, 'hhh');
+    assert.equal((await state(page)).stars, 3);
+    await page.evaluate(() => window.__game.loadLevel(3));
+    await play(page, 'hhh');
+    assert.equal((await state(page)).stars, 1);
+    await page.locator('#bAgain').tap(); await play(page, 'rrr');
+    assert.equal((await state(page)).stars, 1);
+    assert.deepEqual((await stored(page)).stars.slice(0, 3), [2, 3, 1]);
     await context.close();
   });
 
-  await test('stars and points: hint costs the star and half the points, shows artist and decade; restart is always possible', async () => {
+  await test('stars and points: hint costs the star and half the points, shows artist and decade; no Recommencer in a quiz', async () => {
     const { context, page } = await open();
     await page.locator('#bGo').tap();
     const s0 = await state(page);
@@ -273,8 +293,10 @@ function checkFit(m, tag) {
     await tapOpt(page, rightIdx(s0));
     assert.equal((await state(page)).points, 50);
     await page.locator('#bNextQ').tap();
-    // restart mid-level
-    await page.locator('#bReset').tap();
+    // R20: no "Recommencer" in the middle of a level (the right answer was just shown)
+    assert.equal(await page.locator('#bReset').count(), 0);
+    assert.ok(!/Recommencer/.test(await page.evaluate(() => document.body.innerText)));
+    await page.evaluate(() => window.__game.restart());
     let s = await state(page);
     assert.deepEqual(s.answers, [-1, -1, -1]); assert.deepEqual(s.hints, [0, 0, 0]); assert.equal(s.pos, 0);
     // 3 right, 1 with a hint: 2 stars, 250 points
@@ -285,7 +307,7 @@ function checkFit(m, tag) {
     await page.locator('#bAgain').tap();
     await play(page, 'hhh');
     s = await state(page);
-    assert.equal(s.stars, 1); assert.equal(s.points, 150);
+    assert.equal(s.stars, 2, 'frozen at the first win'); assert.equal(s.points, 150);
     // a hint after the answer is refused
     assert.equal(await page.evaluate(() => window.__game.hint()), false);
     // the best result is kept
@@ -437,7 +459,7 @@ function checkFit(m, tag) {
     // lost: open the link again
     await page.evaluate(() => { location.hash = '#defi-12-250'; });
     await page.waitForFunction(() => window.__game.state().mode === 'chal');
-    assert.ok(await page.locator('#bReset').isHidden(), 'Recommencer during a challenge');
+    assert.equal(await page.locator('#bReset').count(), 0, 'Recommencer during a challenge');
     await play(page, 'rrw');
     assert.equal(await page.locator('#wTitle').textContent(), 'Presque !');
     assert.ok((await page.locator('#wChal').textContent()).includes('50'));
