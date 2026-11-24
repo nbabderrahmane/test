@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0E1B1C">
+<title>Carton Plein</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0E1B1C;--panel:#183033;--line:#4C6D70;--ink:#F3F5EC;--dim:#A6BEBC;--acc:#3DDC84;--acc-ink:#04210F;
+  --off:#2F4A4D;--warn:#FFB347;--bad:#FF7A7A;--bad-bg:#4A2328;--ok-bg:#175A3A;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);overscroll-behavior:none}
+body{
+  position:fixed;top:0;right:0;bottom:0;left:0;color:var(--ink);
+  font:16px/1.25 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif;
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-text-size-adjust:100%;
+}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;touch-action:manipulation}
+button:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+svg{display:block}
+#app{position:absolute;top:0;right:0;bottom:0;left:0}
+
+.scr{position:absolute;top:0;right:0;bottom:0;left:0;display:flex;flex-direction:column;background:var(--bg);
+  padding:calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 14px) calc(env(safe-area-inset-bottom) + 10px) calc(env(safe-area-inset-left) + 14px)}
+.icon{width:48px;height:48px;border-radius:14px;background:var(--panel);display:flex;align-items:center;justify-content:center;flex:none}
+.icon svg{width:24px;height:24px;fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.btn{
+  flex:1;min-height:50px;border-radius:14px;background:var(--panel);font-weight:700;font-size:15px;
+  display:flex;align-items:center;justify-content:center;gap:8px;padding:0 10px;
+}
+.btn:active{transform:scale(.97)}
+.btn.acc{background:var(--acc);color:var(--acc-ink)}
+.btn.line{background:none;box-shadow:inset 0 0 0 2px var(--line)}
+.btn[disabled]{color:#6F8D8B;box-shadow:inset 0 0 0 2px var(--off);cursor:default}
+.btn[disabled]:active{transform:none}
+
+/* home */
+#home{justify-content:center;gap:12px}
+.hero{text-align:center}
+.hero svg{width:128px;height:128px;margin:0 auto 6px}
+.hero h1{font-size:38px;font-weight:800;color:var(--acc);letter-spacing:.01em;line-height:1.1}
+.hero .sub{color:var(--dim);font-size:14px;margin-top:4px}
+.total{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--panel);border-radius:16px;min-height:52px;padding:0 14px;font-weight:800;font-size:18px;font-variant-numeric:tabular-nums}
+.total svg{width:22px;height:22px;fill:var(--acc)}
+.total small{font-size:13px;font-weight:600;color:var(--dim)}
+#bGo{flex:none;min-height:58px;font-size:17px}
+#bLevels{flex:none}
+
+/* level grid */
+.top{flex:none;display:flex;align-items:center;gap:10px}
+.top .tt{flex:1;min-width:0}
+.top h2{font-size:24px;font-weight:800;color:var(--acc);white-space:nowrap}
+.top .sub{font-size:12px;color:var(--dim);margin-top:2px}
+.top .total{min-height:44px;height:44px;border-radius:14px;font-size:16px;flex:none}
+#cells{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,1fr));gap:8px;margin:12px 0 0}
+.cell{position:relative;min-height:48px;border-radius:14px;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;overflow:hidden}
+.cell .n{font-weight:800;font-size:19px;line-height:1;font-variant-numeric:tabular-nums}
+.cell .n svg{width:18px;height:18px;fill:#6F8D8B}
+.cell .s{display:flex;gap:1px}
+.cell .s svg{width:14px;height:14px;fill:var(--off)}
+.cell .s svg.on{fill:var(--acc)}
+.cell.cur{box-shadow:inset 0 0 0 2px var(--acc)}
+.cell.ok{background:#1B4A3B}
+.cell[disabled]{background:#13262A;cursor:default}
+.cell:not([disabled]):active{transform:scale(.96)}
+
+/* game */
+#game{padding-left:calc(env(safe-area-inset-left) + 12px);padding-right:calc(env(safe-area-inset-right) + 12px)}
+.gh{flex:none;display:flex;align-items:center;gap:8px}
+.gh .ttl{flex:1;min-width:0;text-align:center}
+.brand{display:block;font-size:12px;font-weight:700;color:var(--acc);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#lvl{display:block;font-size:17px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pts{width:60px;height:48px;border-radius:14px;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none}
+.pts b{font-size:18px;line-height:1;font-weight:800;font-variant-numeric:tabular-nums}
+.pts small{font-size:10px;color:var(--dim);margin-top:2px}
+#chal{flex:none;display:flex;align-items:center;justify-content:center;gap:6px;height:26px;margin-top:6px;border-radius:13px;background:rgba(61,220,132,.15);color:var(--acc);font-size:13px;font-weight:700}
+#chal svg{width:14px;height:14px;fill:var(--acc)}
+.mrow{flex:none;display:flex;align-items:center;gap:10px;margin-top:8px}
+#pips{flex:1;display:flex;gap:6px}
+.pip{width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--off);flex:none}
+.pip svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round}
+.pip.ok{background:var(--acc);color:var(--acc-ink)}
+.pip.ko{background:var(--warn);color:#3A2100;border-radius:7px}
+.pip.cur{background:none;box-shadow:inset 0 0 0 3px var(--ink)}
+#secs{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;min-width:56px;text-align:right}
+#secs.low{color:var(--warn)}
+.bar{flex:none;height:8px;border-radius:4px;background:var(--off);margin-top:6px;overflow:hidden}
+.bar u{display:block;height:100%;width:100%;background:var(--acc);transform-origin:left;text-decoration:none}
+.bar.low u{background:var(--warn)}
+#qwrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:6px 4px}
+#q{font-size:20px;font-weight:700;line-height:1.25;text-align:center;overflow:hidden}
+#ans{flex:none;display:flex;flex-direction:column;gap:8px}
+.a{min-height:52px;border-radius:14px;background:var(--panel);display:flex;align-items:center;gap:10px;padding:6px 10px;text-align:left;font-size:16px;font-weight:600;line-height:1.15;box-shadow:inset 0 0 0 2px transparent}
+.a:active{transform:scale(.98)}
+.a .l{width:30px;height:30px;border-radius:9px;background:var(--off);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex:none}
+.a .t{flex:1;min-width:0}
+.a .m{width:24px;height:24px;flex:none;fill:none;stroke:currentColor;stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round;display:none}
+.a.right{background:var(--ok-bg);box-shadow:inset 0 0 0 2px var(--acc)}
+.a.right .l{background:var(--acc);color:var(--acc-ink)}
+.a.right .m{display:block;color:var(--acc)}
+.a.wrong{background:var(--bad-bg);box-shadow:inset 0 0 0 2px var(--bad)}
+.a.wrong .m{display:block;color:var(--bad)}
+.a.dim{opacity:.55}
+.a.shake{animation:no .28s}
+@keyframes no{25%{transform:translateX(-5px)}50%{transform:translateX(5px)}75%{transform:translateX(-3px)}}
+#foot{flex:none;height:60px;margin-top:8px;display:flex;align-items:center;gap:10px}
+#goal{flex:1;text-align:center;font-size:13px;font-weight:600;color:var(--dim);line-height:1.2}
+#goal b{color:var(--acc);font-weight:800}
+#fb{flex:1;min-width:0;line-height:1.2}
+#fb b{display:block;font-size:16px}
+#fb span{display:block;font-size:13px;color:var(--dim);margin-top:2px}
+#fb.good b{color:var(--acc)}
+#fb.bad b{color:var(--warn)}
+#bNext{flex:none;width:138px}
+
+/* result */
+.over{position:absolute;top:0;right:0;bottom:0;left:0;z-index:5;display:flex;align-items:center;justify-content:center;background:rgba(7,16,17,.92);padding:12px 16px;animation:fade .2s}
+@keyframes fade{from{opacity:0}}
+.card{width:100%;max-width:330px;background:var(--panel);border-radius:22px;padding:18px 18px 14px;text-align:center;animation:pop .28s cubic-bezier(.2,1.3,.5,1)}
+@keyframes pop{from{transform:translateY(24px) scale(.94);opacity:0}}
+.card h2{font-size:26px;font-weight:800}
+.card p{color:var(--dim);margin-top:4px;font-size:15px}
+.stars{display:flex;justify-content:center;align-items:flex-end;gap:6px;margin:10px 0 4px}
+.stars svg{width:50px;height:50px;fill:var(--off)}
+.stars svg:nth-child(2){width:62px;height:62px}
+.stars svg.on{fill:var(--acc);animation:star .4s cubic-bezier(.2,1.6,.4,1) backwards}
+.stars svg.on:nth-child(2){animation-delay:.14s}
+.stars svg.on:nth-child(3){animation-delay:.28s}
+@keyframes star{from{transform:scale(.2) rotate(-40deg);opacity:0}}
+.big{font-size:40px;font-weight:800;line-height:1;margin-top:6px;font-variant-numeric:tabular-nums}
+.big small{font-size:16px;font-weight:600;color:var(--dim);margin-left:6px}
+#rPips{display:flex;justify-content:center;gap:6px;margin-top:10px}
+.card p.rec{min-height:20px}
+.card p.cres{margin-top:6px;font-weight:800;font-size:16px;color:var(--acc)}
+.card p.cres.lost{color:var(--warn)}
+.acts{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.acts .row{display:flex;gap:8px}
+.acts .btn{min-height:48px}
+
+@media (max-height:600px){
+  .scr{padding-top:calc(env(safe-area-inset-top) + 4px)}
+  .hero h1{font-size:32px}
+  #home{gap:9px}
+  #q{font-size:18px}
+  .a{min-height:50px;font-size:15px;padding-top:4px;padding-bottom:4px}
+  .a .l{width:28px;height:28px}
+  #ans{gap:6px}
+  #foot{height:56px;margin-top:6px}
+  .stars svg{width:40px;height:40px}.stars svg:nth-child(2){width:50px;height:50px}
+  .card{padding:14px 16px 12px}.card h2{font-size:22px}
+  .big{font-size:34px}
+  .acts{gap:6px;margin-top:8px}.acts .btn{min-height:46px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*:before,*:after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <section class="scr" id="home">
+    <div class="hero">
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <g transform="rotate(-16 60 60)"><rect x="22" y="14" width="46" height="64" rx="8" fill="#FFC53D"/></g>
+        <g transform="rotate(14 60 60)"><rect x="52" y="14" width="46" height="64" rx="8" fill="#FF6B6B"/></g>
+        <circle cx="60" cy="72" r="34" fill="#F3F5EC"/>
+        <path d="M60 61l10.500 7.600-4 12.400H53.500l-4-12.400z" fill="#0E1B1C"/>
+        <path d="M60 61V44M70.500 68.600l16.100-5.300M66.500 81l10 13.700M53.500 81l-10 13.700M49.500 68.600l-16.100-5.300" stroke="#0E1B1C" stroke-width="3" stroke-linecap="round" fill="none"/>
+      </svg>
+      <h1>Carton Plein</h1>
+      <div class="sub">5 questions, 12 secondes, tout le foot.</div>
+    </div>
+    <div class="total" aria-label="Étoiles obtenues"><svg viewBox="0 0 24 24"><use href="#star"/></svg><span id="hTotal">0</span><small>sur 60</small></div>
+    <button class="btn acc" id="bGo">Continuer · Niveau 1</button>
+    <button class="btn" id="bLevels">Tous les niveaux</button>
+  </section>
+
+  <section class="scr" id="grid" hidden>
+    <div class="top">
+      <button class="icon" id="bGBack" aria-label="Accueil"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="tt"><h2>Niveaux</h2><div class="sub">20 niveaux</div></div>
+      <div class="total" aria-label="Étoiles obtenues"><svg viewBox="0 0 24 24"><use href="#star"/></svg><span id="gTotal">0/60</span></div>
+    </div>
+    <div id="cells"></div>
+  </section>
+
+  <section class="scr" id="game" hidden>
+    <div class="gh">
+      <button class="icon" id="bMap" aria-label="Niveaux"><svg viewBox="0 0 24 24" style="fill:var(--ink);stroke:none"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg></button>
+      <div class="ttl"><span class="brand" id="theme">Carton Plein</span><span id="lvl">Niveau 1</span></div>
+      <div class="pts" aria-label="Points"><b id="pts">0</b><small>pts</small></div>
+    </div>
+    <div id="chal" hidden><svg viewBox="0 0 24 24"><path d="M5 3h2v18H5zM8 4h11l-3 4.500 3 4.500H8z"/></svg><span id="chalT"></span></div>
+    <div class="mrow"><div id="pips"></div><div id="secs" aria-label="Secondes restantes">12</div></div>
+    <div class="bar" id="bar"><u id="barU"></u></div>
+    <div id="qwrap"><div id="q" role="heading" aria-level="2"></div></div>
+    <div id="ans"></div>
+    <div id="foot">
+      <div id="goal"></div>
+      <div id="fb" hidden role="status" aria-live="polite"><b id="fbT"></b><span id="fbS"></span></div>
+      <button class="btn acc" id="bNext" hidden>Suivante</button>
+    </div>
+  </section>
+
+  <section class="over" id="res" hidden aria-live="polite">
+    <div class="card">
+      <h2 id="rTitle">Bravo !</h2>
+      <p id="rSub"></p>
+      <div class="stars" id="rStars"></div>
+      <div class="big"><span id="rScore">0</span><small>points</small></div>
+      <div id="rPips"></div>
+      <p class="rec" id="rRec"></p>
+      <p class="cres" id="rChal" hidden></p>
+      <div class="acts">
+        <button class="btn acc" id="bRNext">Suivant</button>
+        <div class="row">
+          <button class="btn line" id="bAgain">Rejouer</button>
+          <button class="btn line" id="bShare">Partager</button>
+          <button class="btn line" id="bHome" hidden>Accueil</button>
+        </div>
+        <button class="btn line" id="bChal">Défier un ami</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <path id="star" d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.400l6.600-.9z"/>
+</defs></svg>
+
+<script>
+(function () {
+'use strict';
+
+var GAME = 'cinq-sur-cinq';
+var NAME = 'Carton Plein';
+var KEY = 'mj:' + GAME + ':v1';
+var N = 20, PER = 5, QMS = 12000, NEED = 3, TARGET_MAX = PER * 200;
+
+/*DATA:BEGIN (generated by tools/cinq-sur-cinq/build.js, do not edit by hand)*/
+var DATA=[["Les bases",[["Combien de joueurs une équipe aligne-t-elle sur le terrain, gardien compris ?","11","9","10","12"],["Qui peut toucher le ballon à la main dans sa surface de réparation, pendant le jeu ?","Le gardien","Le capitaine","Le défenseur central","L’attaquant"],["Combien de minutes dure un match, sans prolongation ni temps additionnel ?","90","70","80","100"],["Combien de minutes dure une mi-temps ?","45","30","40","60"],["Quel carton signifie l’expulsion immédiate d’un joueur ?","Le rouge","Le jaune","Le blanc","Le noir"]]],["Sur le terrain",[["À quelle distance du but est tiré un penalty ?","11 mètres","7 mètres","9 mètres","14 mètres"],["Où se joue le coup d’envoi d’un match ?","Au centre du terrain","Dans la surface de réparation","Sur la ligne de touche","Près du poteau de corner"],["Quand le ballon sort sur le côté du terrain, comment le remet-on en jeu ?","Par une touche, à la main","Par un penalty","Par un corner","Par un coup de pied de but"],["Comment appelle-t-on trois buts marqués par un même joueur dans un match ?","Un triplé (hat-trick)","Un doublé","Un quadruplé","Un grand chelem"],["Que porte le capitaine d’une équipe au bras ?","Un brassard","Un bracelet rouge","Un ruban blanc","Un filet"]]],["Premiers mondiaux",[["Quel pays a organisé et gagné la toute première Coupe du monde, en 1930 ?","L’Uruguay","Le Brésil","L’Argentine","La France"],["Combien d’équipes ont joué la première Coupe du monde, en 1930 ?","13","8","24","32"],["Quel pays africain a participé pour la première fois à une Coupe du monde, en 1934 ?","L’Égypte","Le Cameroun","Le Ghana","L’Algérie"],["Quel pays a gagné la Coupe du monde en 1934, puis de nouveau en 1938 ?","L’Italie","Le Brésil","L’Uruguay","L’Angleterre"],["Quel nom portait le trophée de la Coupe du monde jusqu’en 1970 ?","Coupe Jules-Rimet","Coupe Pelé","Coupe Henri-Delaunay","Coupe des Nations"]]],["Les débuts de la CAN",[["Quel pays a gagné la toute première Coupe d’Afrique des Nations, en 1957 ?","L’Égypte","Le Ghana","Le Nigeria","Le Maroc"],["Quel pays a gagné la CAN en 1963 puis en 1965 ?","Le Ghana","Le Cameroun","La Tunisie","Le Sénégal"],["Quel pays a gagné la CAN 1970, jouée chez lui ?","Le Soudan","Le Ghana","L’Égypte","La Guinée"],["Quel pays a gagné la CAN 1972, jouée au Cameroun ?","Le Congo (Brazzaville)","Le Mali","Le Nigeria","L’Algérie"],["Quel pays a accueilli la toute première CAN, en 1957 ?","Le Soudan","Le Maroc","Le Nigeria","La Côte d’Ivoire"]]],["Arbitre et sanctions",[["Que siffle l’arbitre après un hors-jeu ?","Un coup franc indirect","Un penalty","Un corner","Une touche"],["Que se passe-t-il quand un joueur reçoit deux cartons jaunes dans le même match ?","Il est expulsé","Il continue de jouer","Il est remplacé par l’arbitre","Son équipe perd 1 but"],["Combien de minutes dure chaque période de prolongation ?","15","5","10","20"],["Combien de tirs tire chaque équipe au début d’une séance de tirs au but ?","5","3","7","11"],["Combien de joueurs une équipe doit-elle avoir au minimum pour que le match continue ?","7","4","9","10"]]],["Surnoms de sélections",[["Quelle sélection est surnommée « les Lions Indomptables » ?","Le Cameroun","Le Sénégal","Le Maroc","Le Nigeria"],["Quelle sélection est surnommée « les Éléphants » ?","La Côte d’Ivoire","Le Ghana","Le Mali","Le Gabon"],["Quelle sélection est surnommée « les Lions de la Teranga » ?","Le Sénégal","Le Cameroun","La Guinée","Le Togo"],["Quelle sélection est surnommée « les Pharaons » ?","L’Égypte","La Tunisie","Le Soudan","La Libye"],["Quelle sélection est surnommée « les Super Eagles » ?","Le Nigeria","Le Ghana","Le Bénin","Le Congo"]]],["Mondiaux 1950-1970",[["Dans quelle ville se trouve le célèbre stade du Maracanã ?","Rio de Janeiro","São Paulo","Brasilia","Buenos Aires"],["Quel pays a gagné la Coupe du monde 1966, jouée chez lui ?","L’Angleterre","L’Italie","Le Brésil","La France"],["À quel âge Pelé a-t-il marqué en finale de la Coupe du monde 1958 ?","17 ans","21 ans","25 ans","30 ans"],["Quel pays a gardé définitivement le trophée Jules-Rimet après sa victoire de 1970 ?","Le Brésil","L’Italie","L’Uruguay","L’Angleterre"],["Combien de buts le Français Just Fontaine a-t-il marqués à la Coupe du monde 1958 ?","13","7","9","20"]]],["Records et légendes",[["Quel Camerounais est devenu en 1994 le plus vieux buteur de l’histoire de la Coupe du monde ?","Roger Milla","Samuel Eto’o","Thomas N’Kono","Rigobert Song"],["Quel joueur brésilien est célèbre pour avoir gagné trois Coupes du monde (1958, 1962, 1970) ?","Pelé","Garrincha","Zico","Romário"],["Quel joueur portugais, né au Mozambique, fut meilleur buteur de la Coupe du monde 1966 ?","Eusébio","Cristiano Ronaldo","Luís Figo","Pauleta"],["Qui a reçu le tout premier Ballon d’or, en 1956 ?","Stanley Matthews","Pelé","Lev Yachine","Johan Cruyff"],["Quel gardien de but a reçu le Ballon d’or en 1963 ?","Lev Yachine","Gianluigi Buffon","Gordon Banks","Sepp Maier"]]],["Stades et clubs d’Europe",[["Dans quelle ville se trouve le stade Santiago-Bernabéu ?","Madrid","Barcelone","Séville","Valence"],["Quel club joue à Old Trafford ?","Manchester United","Liverpool","Arsenal","Chelsea"],["Quel club joue à Anfield ?","Liverpool","Manchester United","Tottenham","Chelsea"],["Dans quelle ville se trouve le stade Vélodrome ?","Marseille","Lyon","Lille","Bordeaux"],["Quel club a gagné les cinq premières Coupes d’Europe des clubs champions (1956 à 1960) ?","Le Real Madrid","Le FC Barcelone","Le Milan AC","Le Bayern Munich"]]],["CAN 1968-1986",[["Quel pays a gagné la CAN en 1968 puis en 1974 (alors appelé Congo-Kinshasa puis Zaïre) ?","La RD Congo","Le Congo (Brazzaville)","La Zambie","Le Gabon"],["Quel pays a gagné sa seule CAN en 1976 ?","Le Maroc","La Tunisie","L’Algérie","Le Sénégal"],["Quel pays a gagné la CAN 1980, jouée chez lui à Lagos ?","Le Nigeria","Le Ghana","Le Cameroun","L’Égypte"],["Quel pays a gagné la CAN 1984, jouée en Côte d’Ivoire ?","Le Cameroun","La Côte d’Ivoire","Le Sénégal","Le Mali"],["Quel pays a gagné la CAN 1986, jouée chez lui ?","L’Égypte","Le Maroc","La Tunisie","Le Soudan"]]],["Règles : cas particuliers",[["Quel autre nom donne-t-on au penalty ?","Coup de pied de réparation","Coup de pied de but","Coup de pied de coin","Coup franc indirect"],["Un défenseur passe volontairement le ballon du pied à son gardien. Que ne peut pas faire le gardien ?","Le prendre à la main","Le dégager du pied","Le passer de la tête","Courir avec le ballon"],["Le ballon sort derrière la ligne de but, touché en dernier par un défenseur. Que siffle l’arbitre ?","Un corner","Un penalty","Une touche","Un coup de pied de but"],["Le ballon sort derrière la ligne de but, touché en dernier par un attaquant. Que siffle l’arbitre ?","Un coup de pied de but","Un corner","Un penalty","Un coup franc direct"],["À quelle distance minimale du ballon doit se tenir le mur lors d’un coup franc ?","9,15 mètres","3 mètres","5 mètres","20 mètres"]]],["Légendes du ballon",[["Quel est le vrai nom de Pelé ?","Edson Arantes do Nascimento","Diego Armando Maradona","Manuel dos Santos","Arthur Antunes Coimbra"],["Quel Allemand surnommé « le Kaiser » a gagné la Coupe du monde comme joueur puis comme entraîneur ?","Franz Beckenbauer","Gerd Müller","Jürgen Klinsmann","Lothar Matthäus"],["En 1995, quel Africain a reçu le Ballon d’or ?","George Weah","Roger Milla","Abedi Pelé","Samuel Eto’o"],["Avec quel club italien Diego Maradona a-t-il gagné deux titres de champion, en 1987 et 1990 ?","Naples","Milan","Turin","Rome"],["Combien de Ballons d’or Michel Platini a-t-il gagnés, de 1983 à 1985 ?","3","1","2","5"]]],["Mondiaux 1974-1998",[["Quel pays a gagné la Coupe du monde 1978, jouée chez lui ?","L’Argentine","Le Brésil","Les Pays-Bas","L’Italie"],["Quel pays a gagné la Coupe du monde 1982, jouée en Espagne ?","L’Italie","La France","Le Brésil","L’Angleterre"],["Quel pays a organisé la Coupe du monde en 1970 et de nouveau en 1986 ?","Le Mexique","Le Brésil","L’Espagne","L’Argentine"],["Quel pays a organisé la Coupe du monde 1994 ?","Les États-Unis","Le Japon","Le Mexique","L’Afrique du Sud"],["Quel joueur a marqué deux buts de la tête en finale de la Coupe du monde 1998 ?","Zinédine Zidane","Thierry Henry","Ronaldo","Michel Platini"]]],["Clubs d’Afrique",[["Quel club guinéen a gagné trois fois la Coupe d’Afrique des clubs champions dans les années 1970 ?","Hafia FC","Étoile du Sahel","Canon de Yaoundé","Asante Kotoko"],["Dans quelle ville de RD Congo joue le club TP Mazembe ?","Lubumbashi","Kinshasa","Goma","Kisangani"],["Dans quelle ville joue l’Espérance sportive, grand club tunisien ?","Tunis","Alger","Casablanca","Tripoli"],["Dans quelle ville se trouvent Al Ahly et Zamalek, deux grands clubs rivaux ?","Le Caire","Alexandrie","Khartoum","Tunis"],["Dans quelle ville joue l’ASEC Mimosas, grand club ivoirien ?","Abidjan","Accra","Dakar","Bamako"]]],["Surnoms de sélections 2",[["Quelle sélection est surnommée « les Fennecs » ?","L’Algérie","Le Maroc","La Tunisie","La Libye"],["Quelle sélection est surnommée « les Aigles de Carthage » ?","La Tunisie","Le Mali","Le Maroc","L’Algérie"],["Quelle sélection est surnommée « les Lions de l’Atlas » ?","Le Maroc","Le Cameroun","Le Sénégal","La Guinée"],["Quelle sélection est surnommée « les Black Stars » ?","Le Ghana","Le Nigeria","Le Togo","Le Gabon"],["Quelle sélection est surnommée « les Étalons » ?","Le Burkina Faso","Le Mali","Le Niger","La Guinée"]]],["Europe : sélections et clubs",[["Quel pays a gagné l’Euro 1984, joué chez lui, avec Michel Platini ?","La France","L’Espagne","L’Italie","Le Portugal"],["Quel pays a gagné l’Euro 1992 ?","Le Danemark","La Suède","Les Pays-Bas","La France"],["Quel club français a gagné la Ligue des champions en 1993 ?","L’Olympique de Marseille","Le Paris Saint-Germain","L’AS Monaco","Lyon"],["Quel pays a créé la surprise en gagnant l’Euro 2004 ?","La Grèce","Le Portugal","La Suisse","La Pologne"],["Quel Algérien a marqué du talon en finale de la Coupe d’Europe 1987 avec Porto ?","Rabah Madjer","Roger Milla","Abedi Pelé","Salif Keita"]]],["Histoire du football",[["En quelle année ont été fixées les premières règles modernes du football, en Angleterre ?","1863","1763","1913","1953"],["Dans quelle ville a été fondée la FIFA en 1904 ?","Paris","Londres","Zurich","Rome"],["Quel magazine a créé le Ballon d’or ?","France Football","Onze Mondial","Paris Match","Le Monde"],["Combien d’équipes ont joué la Coupe du monde 1998, pour la première fois à ce nombre ?","32","16","24","48"],["Quels pays ont organisé ensemble la Coupe du monde 2002 ?","Le Japon et la Corée du Sud","La Chine et le Japon","L’Espagne et le Portugal","Les États-Unis et le Mexique"]]],["CAN 1990-2012",[["Quel pays a gagné la CAN 1990, jouée chez lui ?","L’Algérie","Le Nigeria","Le Maroc","La Tunisie"],["Quel pays a gagné sa première CAN en 1992, jouée au Sénégal ?","La Côte d’Ivoire","Le Ghana","Le Sénégal","Le Cameroun"],["Quel pays a gagné la CAN 1996, jouée chez lui ?","L’Afrique du Sud","Le Nigeria","L’Égypte","Le Ghana"],["Quel pays a gagné la CAN en 2000 puis en 2002 ?","Le Cameroun","L’Égypte","Le Sénégal","Le Mali"],["Quel pays a gagné la CAN 2012, jouée au Gabon et en Guinée équatoriale ?","La Zambie","Le Ghana","Le Gabon","Le Mali"]]],["L’Afrique au Mondial",[["Quelle équipe africaine a remporté la première victoire africaine en Coupe du monde, en 1978 ?","La Tunisie","Le Maroc","L’Algérie","Le Zaïre"],["En 1990, quelle équipe africaine a atteint les quarts de finale de la Coupe du monde ?","Le Cameroun","Le Nigeria","L’Algérie","Le Maroc"],["Quel joueur a marqué le seul but du match d’ouverture de la Coupe du monde 2002, pour le Sénégal ?","Papa Bouba Diop","El Hadji Diouf","Henri Camara","Khalilou Fadiga"],["Quel pays a organisé en 2010 la première Coupe du monde sur le sol africain ?","L’Afrique du Sud","Le Maroc","L’Égypte","Le Nigeria"],["Quel pays africain a gagné l’or olympique de football en 1996, à Atlanta ?","Le Nigeria","Le Ghana","Le Cameroun","Le Maroc"]]],["Le grand final",[["Quel joueur a marqué trois buts en finale de la Coupe du monde 1966 ?","Geoff Hurst","Bobby Charlton","Eusébio","Franz Beckenbauer"],["Quel pays a gagné la Coupe du monde 1950, au Brésil ?","L’Uruguay","Le Brésil","L’Argentine","L’Italie"],["Quel pays a gagné la Coupe du monde 1954, en Suisse ?","L’Allemagne de l’Ouest","L’Italie","L’Uruguay","Le Brésil"],["De quelle nationalité était Jules Rimet, le président de la FIFA qui a donné son nom au trophée ?","Français","Anglais","Brésilien","Suisse"],["Quel pays africain a gagné l’or olympique de football en 2000, à Sydney ?","Le Cameroun","Le Nigeria","Le Ghana","Le Sénégal"]]]];
+/*DATA:END*/
+
+var $ = function (id) { return document.getElementById(id); };
+var LETTERS = ['A', 'B', 'C', 'D'];
+var CHECK = '<svg viewBox="0 0 24 24"><path d="M5 12.500l4.500 4.500L19 7.500"/></svg>';
+var CROSS = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+var STAR = '<svg viewBox="0 0 24 24"><use href="#star"/></svg>';
+var LOCK = '<svg viewBox="0 0 24 24"><path d="M7 10V8a5 5 0 0 1 10 0v2h1.500v10h-13V10zm2.500 0h5V8a2.500 2.500 0 0 0-5 0z"/></svg>';
+
+// ---- host page (only the events listed in the game sheet, no personal data) ----
+function emit(msg) {
+  msg.source = 'mini-jeu'; msg.game = GAME;
+  try { window.parent.postMessage(msg, '*'); } catch (e) { /* ignore */ }
+}
+
+// ---- seeded random (all randomness goes through here) ----------------------------
+function mulberry32(a) {
+  return function () {
+    a = (a + 0x6D2B79F5) | 0;
+    var t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function orderFor(seed, n, att, qi) {
+  var h = Math.imul(seed | 0, 73856093) ^ Math.imul(n + 1, 19349663) ^ Math.imul(att + 1, 83492791) ^ Math.imul(qi + 1, 2654435761);
+  var rnd = mulberry32(h), o = [0, 1, 2, 3], i, j, t;
+  for (i = 3; i > 0; i--) { j = Math.floor(rnd() * (i + 1)); t = o[i]; o[i] = o[j]; o[j] = t; }
+  return o;   // displayed position -> index in DATA (0 = the right answer)
+}
+
+// ---- persistence (always guarded: the game works without storage) ------------
+var save = { seed: 1, att: 0, level: 1, max: 1, stars: [], best: [], cur: null };
+function int(v, lo, hi) { v = v | 0; return v < lo ? lo : v > hi ? hi : v; }
+function loadSave() {
+  var i;
+  save.stars = []; save.best = [];
+  for (i = 0; i < N; i++) { save.stars.push(0); save.best.push(0); }
+  save.seed = (Date.now() & 0xFFFF) + 1;
+  try {
+    var s = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (s && typeof s === 'object') {
+      save.seed = int(s.seed, 1, 1e9) || save.seed;
+      save.att = int(s.att, 0, 1e6);
+      save.max = int(s.max, 1, N) || 1;
+      save.level = Math.min(int(s.level, 1, N) || 1, save.max);
+      if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = int(s.stars[i], 0, 3);
+      if (Array.isArray(s.best)) for (i = 0; i < N && i < s.best.length; i++) save.best[i] = int(s.best[i], 0, TARGET_MAX);
+      var c = s.cur;
+      if (c && typeof c === 'object' && Array.isArray(c.res) && c.res.length <= PER) {
+        var n = int(c.n, 0, N - 1), res = [], ok = n < save.max;
+        c.res.forEach(function (r) {
+          if (!Array.isArray(r)) { ok = false; return; }
+          res.push({ ok: r[0] === 1, pts: int(r[1], 0, 200), pick: int(r[2], -1, 3) });
+        });
+        var sel = c.sel === null || c.sel === undefined ? null : int(c.sel, -1, 3);
+        var qi = sel === null ? res.length : res.length - 1;   // an answered question is already in res
+        if (ok && qi >= 0 && qi < PER) save.cur = { n: n, att: int(c.att, 0, 1e6), seed: int(c.seed, 1, 1e9) || save.seed, res: res, sel: sel, rem: int(c.rem, 0, QMS) };
+      }
+    }
+  } catch (e) { /* no storage or corrupted: start clean */ }
+}
+function store() {
+  try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) { /* ignore */ }
+}
+function totalStars() { var t = 0; for (var i = 0; i < N; i++) t += save.stars[i]; return t; }
+
+// ---- live game ------------------------------------------------------------------
+// G: { n, att, seed, qi, res:[{ok,pts,pick}], sel (null | -1 timeout | displayed index), rem, order, chal, fin }
+var G = null;
+var screen = 'home';
+var frozen = false;
+var lastTick = 0;
+var lastSec = -1;
+var chalRuns = 0;
+
+function levelScore(res) { var s = 0; res.forEach(function (r) { s += r.pts; }); return s; }
+function goodCount(res) { var c = 0; res.forEach(function (r) { if (r.ok) c++; }); return c; }
+function starsFor(c) { return c >= 5 ? 3 : c >= 4 ? 2 : c >= 3 ? 1 : 0; }
+function starsText(s) { var t = ''; while (s-- > 0) t += '⭐'; return t || '☆'; }
+function question() { return DATA[G.n][1][G.qi]; }
+
+function persist() {
+  if (!G || G.chal) return;
+  if (G.fin) save.cur = null;
+  else save.cur = { n: G.n, att: G.att, seed: G.seed, res: G.res.map(function (r) { return [r.ok ? 1 : 0, r.pts, r.pick]; }), sel: G.sel, rem: Math.round(G.rem) };
+  store();
+}
+
+function startLevel(num, opts) {   // num: 1-based
+  opts = opts || {};
+  var c = save.cur;
+  if (!opts.chal && !opts.fresh && c && c.n === num - 1) {   // resume the saved game
+    G = { n: c.n, att: c.att, seed: c.seed, qi: c.sel === null ? c.res.length : c.res.length - 1, res: c.res.slice(), sel: c.sel, rem: c.rem, chal: null, fin: null };
+  } else {
+    if (!opts.chal) save.att++;
+    G = { n: num - 1, att: opts.chal ? 5000 + (chalRuns++) : save.att, seed: save.seed, qi: 0, res: [], sel: null, rem: QMS, chal: opts.chal || null, fin: null };
+    if (!opts.chal) { save.cur = null; }
+  }
+  G.order = orderFor(G.seed, G.n, G.att, G.qi);
+  lastSec = -1;
+  if (!G.chal) { if (num <= save.max) save.level = num; persist(); }
+  show('game');
+  renderGame();
+}
+
+function nextQuestion() {
+  if (!G || G.sel === null || G.fin) return;
+  G.qi++; G.sel = null; G.rem = QMS;
+  G.order = orderFor(G.seed, G.n, G.att, G.qi);
+  lastSec = -1;
+  persist();
+  renderGame();
+}
+
+function answer(d) {
+  if (!G || G.sel !== null || G.fin || screen !== 'game') return false;
+  d = d | 0;
+  if (d < 0 || d > 3) return false;
+  var ok = G.order[d] === 0;
+  G.res.push({ ok: ok, pts: ok ? 100 + Math.floor(100 * G.rem / QMS) : 0, pick: d });
+  G.sel = d;
+  afterAnswer();
+  return true;
+}
+function timeout() {
+  G.res.push({ ok: false, pts: 0, pick: -1 });
+  G.sel = -1;
+  afterAnswer();
+}
+function afterAnswer() {
+  if (G.res.length >= PER) finish(); else persist();
+  renderGame();
+}
+
+function finish() {
+  var c = goodCount(G.res), score = levelScore(G.res), won = c >= NEED;
+  G.fin = { score: score, good: c, stars: starsFor(c), won: won };
+  if (G.chal) {
+    G.fin.chalWon = score >= G.chal.target;
+    emit({ event: 'challenge_result', level: G.n + 1, score: score, target: G.chal.target, won: G.fin.chalWon });
+    return;
+  }
+  var i = G.n;
+  G.fin.prevBest = save.best[i];
+  if (G.fin.stars > save.stars[i]) save.stars[i] = G.fin.stars;
+  if (score > save.best[i]) save.best[i] = score;
+  if (won) {
+    save.max = Math.max(save.max, Math.min(N, i + 2));
+    save.level = Math.min(N, i + 2);
+    emit({ event: 'level_complete', level: i + 1, score: score, stars: G.fin.stars });
+  } else {
+    save.level = i + 1;
+  }
+  persist();   // G.fin is set: clears the saved game
+}
+
+// ---- timer (real time unless frozen by the test hooks) -----------------------------
+function running() { return G && !G.fin && G.sel === null && screen === 'game' && !document.hidden; }
+function drain(ms) {
+  if (!running()) return;
+  G.rem -= ms;
+  if (G.rem <= 0) { G.rem = 0; timeout(); return; }
+  renderTimer();
+  var s = Math.ceil(G.rem / 1000);
+  if (s !== lastSec) { lastSec = s; persist(); }
+}
+setInterval(function () {
+  var now = Date.now(), dt = Math.min(now - lastTick, 250);
+  lastTick = now;
+  if (!frozen && dt > 0) drain(dt);
+}, 100);
+
+// ---- rendering -----------------------------------------------------------------
+function pipHtml(cls, inner) { return '<span class="pip ' + cls + '">' + (inner || '') + '</span>'; }
+function pipsHtml(upto) {
+  var h = '';
+  for (var i = 0; i < PER; i++) {
+    if (i < G.res.length) h += G.res[i].ok ? pipHtml('ok', CHECK) : pipHtml('ko', CROSS);
+    else h += pipHtml(i === upto ? 'cur' : '');
+  }
+  return h;
+}
+function renderTimer() {
+  var f = Math.max(0, G.rem / QMS), s = Math.ceil(G.rem / 1000), low = G.rem <= 4000;
+  $('barU').style.transform = 'scaleX(' + f.toFixed(3) + ')';
+  $('secs').textContent = G.sel === null ? s : '';
+  $('secs').className = low && G.sel === null ? 'low' : '';
+  $('bar').className = 'bar' + (low && G.sel === null ? ' low' : '');
+}
+function renderGame() {
+  var q = question(), revealed = G.sel !== null, right = G.order.indexOf(0);
+  $('lvl').textContent = 'Niveau ' + (G.n + 1);
+  $('theme').textContent = DATA[G.n][0];
+  $('pts').textContent = levelScore(G.res);
+  $('q').textContent = q[0];
+  $('pips').innerHTML = pipsHtml(G.qi);
+  var h = '';
+  for (var d = 0; d < 4; d++) {
+    var cls = 'a';
+    if (revealed) cls += d === right ? ' right' : d === G.sel ? ' wrong' : ' dim';
+    h += '<button class="' + cls + '" data-d="' + d + '"' + (revealed ? ' disabled' : '') + '><span class="l">' + LETTERS[d] + '</span>' +
+      '<span class="t"></span><svg class="m" viewBox="0 0 24 24">' + (d === right ? '<path d="M5 12.500l4.500 4.500L19 7.500"/>' : '<path d="M6 6l12 12M18 6L6 18"/>') + '</svg></button>';
+  }
+  $('ans').innerHTML = h;
+  var bs = $('ans').children;
+  for (d = 0; d < 4; d++) bs[d].querySelector('.t').textContent = q[1 + G.order[d]];
+  $('chal').hidden = !G.chal;
+  if (G.chal) $('chalT').textContent = 'Défi : ' + G.chal.target + ' points';
+  $('goal').hidden = revealed || !!G.chal;
+  $('goal').innerHTML = '<b>★</b> 3 bonnes · <b>★★</b> 4 · <b>★★★</b> 5';
+  $('fb').hidden = !revealed;
+  $('bNext').hidden = !revealed;
+  if (revealed) {
+    var last = G.res[G.res.length - 1], ok = last.ok;
+    $('fb').className = ok ? 'good' : 'bad';
+    $('fbT').textContent = ok ? 'Bonne réponse !' : G.sel === -1 ? 'Temps écoulé' : 'Raté';
+    $('fbS').textContent = ok ? '+' + last.pts + ' points' : 'Bonne réponse : ' + LETTERS[right];
+    $('bNext').textContent = G.fin ? 'Résultat' : 'Suivante';
+  }
+  renderTimer();
+}
+function renderHome() {
+  $('hTotal').textContent = totalStars();
+  $('bGo').textContent = 'Continuer · Niveau ' + (save.cur ? save.cur.n + 1 : save.level);
+}
+function renderGrid() {
+  var h = '';
+  for (var i = 0; i < N; i++) {
+    var locked = i + 1 > save.max, st = '';
+    for (var k = 0; k < 3; k++) st += '<svg viewBox="0 0 24 24" class="' + (k < save.stars[i] ? 'on' : '') + '"><use href="#star"/></svg>';
+    h += '<button class="cell' + (i + 1 === (save.cur ? save.cur.n + 1 : save.level) ? ' cur' : '') + (save.stars[i] ? ' ok' : '') + '" data-n="' + (i + 1) + '"' +
+      (locked ? ' disabled aria-label="Niveau ' + (i + 1) + ' verrouillé"' : ' aria-label="Niveau ' + (i + 1) + ', ' + save.stars[i] + ' étoiles"') + '>' +
+      '<span class="n">' + (locked ? LOCK : i + 1) + '</span><span class="s">' + st + '</span></button>';
+  }
+  $('cells').innerHTML = h;
+  $('gTotal').textContent = totalStars() + '/' + (N * 3);
+}
+function renderResult() {
+  var f = G.fin, c = G.chal, st = '';
+  for (var k = 0; k < 3; k++) st += '<svg viewBox="0 0 24 24" class="' + (!c && k < f.stars ? 'on' : '') + '"><use href="#star"/></svg>';
+  $('rStars').innerHTML = st;
+  $('rStars').hidden = !!c;
+  $('rScore').textContent = f.score;
+  var p = '';
+  G.res.forEach(function (r) { p += r.ok ? pipHtml('ok', CHECK) : pipHtml('ko', CROSS); });
+  $('rPips').innerHTML = p;
+  $('rChal').hidden = !c;
+  if (c) {
+    $('rTitle').textContent = f.chalWon ? 'Défi relevé !' : 'Défi perdu';
+    $('rSub').textContent = f.good + ' bonne' + (f.good > 1 ? 's' : '') + ' réponse' + (f.good > 1 ? 's' : '') + ' sur ' + PER;
+    $('rChal').textContent = f.chalWon ? f.score + ' points : objectif de ' + c.target + ' atteint' : f.score + ' points : il en fallait ' + c.target;
+    $('rChal').className = 'cres' + (f.chalWon ? '' : ' lost');
+    $('rRec').textContent = '';
+  } else {
+    $('rTitle').textContent = f.won ? (f.stars === 3 ? 'Carton plein !' : 'Bien joué !') : 'Presque !';
+    $('rSub').textContent = f.good + ' bonne' + (f.good > 1 ? 's' : '') + ' réponse' + (f.good > 1 ? 's' : '') + ' sur ' + PER + (f.won ? '' : ' : il en faut ' + NEED);
+    $('rRec').textContent = f.score > f.prevBest && f.prevBest > 0 ? 'Nouveau record !' : f.prevBest > 0 ? 'Record : ' + Math.max(f.prevBest, f.score) : '';
+  }
+  $('bRNext').hidden = !!c || !f.won || G.n >= N - 1;
+  $('bShare').hidden = !!c;
+  $('bChal').hidden = !!c;
+  $('bChal').disabled = f.score < 1;
+  $('bHome').hidden = !c;
+}
+
+var SCREENS = ['home', 'grid', 'game'];
+function show(name) {
+  screen = name;
+  SCREENS.forEach(function (s) { $(s).hidden = s !== name; });
+  $('res').hidden = true;
+  if (name === 'home') renderHome();
+  else if (name === 'grid') renderGrid();
+}
+function showResult() {
+  if (!G || !G.fin) return;
+  screen = 'result';
+  renderResult();
+  $('res').hidden = false;
+}
+
+// ---- sharing -----------------------------------------------------------------
+function marks() { return G.res.map(function (r) { return r.ok ? '✅' : '❌'; }).join(''); }
+function shareText() {
+  return NAME + ' · Niveau ' + (G.n + 1) + ' · ' + starsText(G.fin.stars) + ' · ' + G.fin.score + ' pts ' + marks();
+}
+// The link base: MJ_CONFIG.shareBaseUrl, else the current address if it is http(s); otherwise no link.
+function shareBase() {
+  var b = window.MJ_CONFIG && window.MJ_CONFIG.shareBaseUrl;
+  if (typeof b !== 'string' || !b) b = /^https?:/i.test(String(location.href)) ? String(location.href) : '';
+  return b.split('#')[0];
+}
+function challengeText() {
+  var base = shareBase();
+  return NAME + ' · Niveau ' + (G.n + 1) + ' : ' + G.fin.score + ' points. À toi de faire mieux !' +
+    (base ? ' ' + base + '#defi-' + (G.n + 1) + '-' + G.fin.score : '');
+}
+function sendText(text, kind, btn, idle) {
+  var done = function () { emit({ event: 'share', kind: kind }); };
+  var copied = function () { btn.textContent = 'Copié !'; setTimeout(function () { btn.textContent = idle; }, 1800); done(); };
+  var legacy = function () {
+    var ok = false;
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;left:0;top:0;opacity:0';
+      document.body.appendChild(ta);
+      ta.select(); ta.setSelectionRange(0, text.length);
+      ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (e) { ok = false; }
+    btn.textContent = ok ? 'Copié !' : 'Copie impossible';
+    setTimeout(function () { btn.textContent = idle; }, 1800);
+    if (ok) done();
+  };
+  var clip = function () {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(copied, legacy);
+    } catch (e) { /* fall through */ }
+    legacy();
+  };
+  try {
+    if (navigator.share) {
+      return navigator.share({ text: text }).then(done, function (e) { if (!e || e.name !== 'AbortError') clip(); });
+    }
+  } catch (e) { /* fall through */ }
+  clip();
+}
+
+// ---- challenges (#defi-<level>-<points>) ---------------------------------------
+function openChallenge() {
+  var h = String(location.hash || ''), m;
+  try { if (h) history.replaceState(null, '', String(location.href).split('#')[0]); } catch (e) { /* ignore */ }
+  m = /^#defi-(\d{1,2})-(\d{1,4})$/.exec(h);
+  if (!m) return false;
+  var n = +m[1], target = +m[2];
+  if (n < 1 || n > N || target < 1 || target > TARGET_MAX) return false;
+  startLevel(n, { chal: { target: target } });
+  emit({ event: 'challenge_open', level: n, target: target });
+  return true;
+}
+
+// ---- input (pointer events; Enter/Space reach click with detail 0) ------------------
+function tap(el, fn) {
+  el.addEventListener('pointerup', function (e) { if (e.button > 0 || el.disabled) return; fn(e); });
+  el.addEventListener('click', function (e) { if (e.detail === 0 && !el.disabled) fn(e); });
+}
+function tapIn(box, sel, fn) {
+  box.addEventListener('pointerup', function (e) {
+    var t = e.target.closest && e.target.closest(sel);
+    if (t && box.contains(t) && !t.disabled && e.button <= 0) fn(t);
+  });
+  box.addEventListener('click', function (e) {
+    var t = e.target.closest && e.target.closest(sel);
+    if (e.detail === 0 && t && box.contains(t) && !t.disabled) fn(t);
+  });
+}
+tapIn($('ans'), '.a', function (b) { answer(+b.getAttribute('data-d')); });
+tap($('bNext'), function () { if (G && G.fin) showResult(); else nextQuestion(); });
+tap($('bGo'), function () { startLevel(save.cur ? save.cur.n + 1 : save.level); });
+tap($('bLevels'), function () { show('grid'); });
+tap($('bGBack'), function () { show('home'); });
+tap($('bMap'), function () { show('grid'); });
+tapIn($('cells'), '.cell', function (b) { startLevel(+b.getAttribute('data-n')); });
+tap($('bRNext'), function () { startLevel(G.n + 2, { fresh: true }); });
+tap($('bAgain'), function () {
+  if (G.chal) startLevel(G.n + 1, { chal: G.chal }); else startLevel(G.n + 1, { fresh: true });
+});
+tap($('bShare'), function () { if (G && G.fin) sendText(shareText(), 'result', $('bShare'), 'Partager'); });
+tap($('bChal'), function () { if (G && G.fin && G.fin.score > 0) sendText(challengeText(), 'challenge', $('bChal'), 'Défier un ami'); });
+tap($('bHome'), function () { show('home'); });
+
+document.addEventListener('visibilitychange', function () { lastTick = Date.now(); });
+window.addEventListener('hashchange', function () { if (/^#defi-/.test(location.hash)) openChallenge(); });
+
+// ---- boot -----------------------------------------------------------------------
+loadSave();
+lastTick = Date.now();
+show('home');
+if (/^#defi-/.test(location.hash)) openChallenge();
+
+// ---- test hooks (never carry the answers) ------------------------------------------
+window.__game = {
+  levels: DATA.map(function (l, i) { return { n: i + 1, theme: l[0], questions: l[1].length }; }),
+  state: function () {
+    var o = {
+      screen: screen, max: save.max, level: save.level, stars: save.stars.slice(), best: save.best.slice(),
+      totalStars: totalStars(), seed: save.seed, att: save.att, hasSaved: !!save.cur, frozen: frozen, game: null
+    };
+    if (G) {
+      var q = question();
+      o.game = {
+        level: G.n + 1, theme: DATA[G.n][0], index: G.qi, total: PER, question: q[0],
+        options: G.order.map(function (k) { return q[1 + k]; }), remaining: G.rem, answered: G.sel !== null,
+        picked: G.sel, results: G.res.map(function (r) { return { ok: r.ok, pts: r.pts }; }), score: levelScore(G.res),
+        good: goodCount(G.res), finished: !!G.fin, stars: G.fin ? G.fin.stars : null, won: G.fin ? G.fin.won : null,
+        challenge: G.chal ? { target: G.chal.target, won: G.fin ? G.fin.chalWon : null } : null
+      };
+    }
+    return o;
+  },
+  loadLevel: function (n) { n = n | 0; if (n < 1 || n > N) return false; startLevel(n, { fresh: true }); return true; },
+  answer: function (d) { return answer(d); },
+  next: function () { if (G && G.fin) showResult(); else nextQuestion(); },
+  seed: function (n) { save.seed = int(n, 1, 1e9) || 1; save.att = 0; store(); return save.seed; },
+  freeze: function (b) { frozen = b !== false; lastTick = Date.now(); },
+  advance: function (ms) { drain(Math.max(0, +ms || 0)); }
+};
+})();
+</script>
+</body>
+</html>

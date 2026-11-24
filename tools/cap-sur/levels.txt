@@ -1,0 +1,21 @@
+# niveau|ville a trouver (1-8 : capitales, 9-20 : grandes villes)
+1|Nairobi
+2|Dakar
+3|Le Caire
+4|Alger
+5|Kinshasa
+6|Windhoek
+7|Niamey
+8|Lilongwe
+9|Casablanca
+10|Lagos
+11|Le Cap
+12|Douala
+13|Dar es Salaam
+14|Alexandrie
+15|Kumasi
+16|Lubumbashi
+17|Marrakech
+18|Durban
+19|Bobo-Dioulasso
+20|Toamasina

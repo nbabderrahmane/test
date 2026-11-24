@@ -1,0 +1,955 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="theme-color" content="#0F1B2D">
+<title>Girouette</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0F1B2D;--panel:#192A42;--line:#3F5878;--glass:rgba(255,255,255,.05);
+  --ink:#F2F5F7;--dim:#A3B5CB;--acc:#34D6BE;--acc-ink:#04211D;--off:#34475F;--warm:#FF9A4D;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);overscroll-behavior:none}
+body{
+  position:fixed;top:0;right:0;bottom:0;left:0;color:var(--ink);
+  font:16px/1.25 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif;
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-text-size-adjust:100%;
+}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;touch-action:manipulation}
+button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+svg{display:block}
+
+#app{
+  position:absolute;top:0;right:0;bottom:0;left:0;display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+header{display:flex;align-items:center;gap:8px;padding:8px 12px 4px;flex:none}
+.icon{width:48px;height:48px;border-radius:14px;background:var(--panel);display:flex;align-items:center;justify-content:center;flex:none}
+.icon svg{width:24px;height:24px;fill:var(--ink)}
+.icon svg.st{fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.ttl{flex:1;min-width:0;text-align:center}
+.brand{display:block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#lvl{display:block;font-size:20px;font-weight:800;white-space:nowrap}
+
+#chal{flex:none;display:flex;align-items:center;justify-content:center;gap:6px;height:26px;margin:0 12px;border-radius:13px;background:rgba(52,214,190,.16);color:var(--acc);font-size:13px;font-weight:700}
+#chal svg{width:14px;height:14px;fill:var(--acc)}
+#goal{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;height:24px;margin:0 14px;font-size:13px;color:var(--dim);white-space:nowrap}
+#goal b{color:var(--ink);font-weight:800}
+#goal .g{color:var(--acc);font-weight:700}
+
+#list{position:relative;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;margin:4px 0 0;padding:2px 12px;display:flex;flex-direction:column;gap:6px;scrollbar-width:none}
+#list::-webkit-scrollbar{display:none}
+.row{flex:none;display:flex;align-items:center;gap:6px;min-height:46px;border-radius:14px;background:var(--panel);padding:4px 10px}
+.row.empty{background:none;box-shadow:inset 0 0 0 2px var(--off);color:var(--off);font-weight:800;justify-content:center}
+.row.hit{background:var(--acc);color:var(--acc-ink)}
+.row .nm{flex:1;min-width:0}
+.row .nm b{display:block;font-size:15px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .nm span{display:block;font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row.hit .nm span{color:var(--acc-ink)}
+.row .ds{flex:none;font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right;min-width:62px}
+.row .ar{flex:none;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center}
+.row .ar svg{width:22px;height:22px;fill:var(--acc)}
+.row.hit .ar{background:rgba(4,33,29,.18)}
+.row.hit .ar svg{fill:var(--acc-ink)}
+.row .pc{flex:none;width:50px;text-align:right}
+.row .pc b{display:block;font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.row .pc u{display:block;height:4px;border-radius:2px;background:rgba(255,255,255,.14);margin-top:3px;overflow:hidden;text-decoration:none}
+.row .pc i{display:block;height:100%;background:var(--warm)}
+.row .pc i.mid{background:#FFD24D}
+.row .pc i.hot{background:var(--acc)}
+.row.hit .pc u{background:rgba(4,33,29,.2)}
+.row.hit .pc i{background:var(--acc-ink)}
+.row.new{animation:in .25s ease-out}
+@keyframes in{from{transform:translateY(8px);opacity:0}}
+
+#msg{flex:none;margin:0 14px;min-height:20px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:13px;font-weight:600;color:var(--dim);line-height:1.15}
+#msg:empty{display:none}
+#msg.warn{color:#FFD9A0}
+#comp{flex:none;padding:6px 12px 10px}
+#sugg{display:flex;flex-direction:column;overflow-y:auto;margin-bottom:6px;border-radius:14px;background:var(--panel);scrollbar-width:none}
+#sugg::-webkit-scrollbar{display:none}
+#sugg:empty{display:none}
+.sg{flex:none;min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 14px;text-align:left;border-bottom:1px solid rgba(255,255,255,.07)}
+.sg:last-child{border-bottom:0}
+.sg b{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.sg span{font-size:12px;color:var(--dim);white-space:nowrap;flex:none;max-width:48%;overflow:hidden;text-overflow:ellipsis}
+.sg:active{background:rgba(255,255,255,.08)}
+.sn{flex:none;min-height:44px;display:flex;align-items:center;padding:0 14px;font-size:14px;color:var(--dim)}
+#inrow{display:flex;gap:8px}
+#inp{flex:1;min-width:0;height:50px;border-radius:14px;border:2px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;font-size:16px;padding:0 14px;-webkit-user-select:text;user-select:text;-webkit-appearance:none;appearance:none}
+#inp::placeholder{color:#7C8FA8}
+#inp:focus{border-color:var(--acc);outline:0}
+.btn{
+  flex:1;min-height:50px;border-radius:14px;background:var(--panel);font-weight:700;font-size:15px;
+  display:flex;align-items:center;justify-content:center;gap:8px;padding:0 10px;
+}
+.btn:active{transform:scale(.97)}
+.btn[disabled]{color:#6B7E97;cursor:default}
+.btn.acc{background:var(--acc);color:var(--acc-ink)}
+.btn.acc[disabled]{background:var(--off);color:#8EA0B8}
+.btn.line{background:none;box-shadow:inset 0 0 0 2px var(--line)}
+#bOk{flex:none;width:104px}
+
+.over{position:absolute;top:0;right:0;bottom:0;left:0;z-index:5;display:flex;align-items:center;justify-content:center;
+  background:rgba(8,15,27,.92);padding:12px 16px;overflow:hidden;animation:fade .2s}
+@keyframes fade{from{opacity:0}}
+.card{position:relative;z-index:1;width:100%;max-width:330px;background:var(--panel);border-radius:22px;padding:18px 18px 14px;text-align:center;animation:pop .28s cubic-bezier(.2,1.3,.5,1)}
+@keyframes pop{from{transform:translateY(24px) scale(.94);opacity:0}}
+.card h2{font-size:26px;font-weight:800}
+.card p{color:var(--dim);margin-top:4px;font-size:15px}
+.stars{display:flex;justify-content:center;align-items:flex-end;gap:6px;margin:10px 0 4px}
+.stars svg{width:50px;height:50px;fill:var(--off)}
+.stars svg:nth-child(2){width:62px;height:62px}
+.stars svg.on{fill:var(--acc);animation:star .4s cubic-bezier(.2,1.6,.4,1) backwards}
+.stars svg.on:nth-child(2){animation-delay:.14s}
+.stars svg.on:nth-child(3){animation-delay:.28s}
+@keyframes star{from{transform:scale(.2) rotate(-40deg);opacity:0}}
+.big{font-size:40px;font-weight:800;line-height:1;margin-top:6px;font-variant-numeric:tabular-nums}
+.big small{font-size:16px;font-weight:600;color:var(--dim);margin-left:6px}
+.card p.rec{min-height:20px}
+.card p.cres{margin-top:6px;font-weight:800;font-size:16px;color:var(--acc)}
+.card p.cres.lost{color:#FFB4BC}
+.acts{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.acts .row2{display:flex;gap:8px}
+.acts .btn{min-height:48px}
+.bit{position:absolute;top:-24px;width:14px;height:14px;animation:fall 1.5s cubic-bezier(.3,.2,.6,1) forwards}
+.bit svg{width:100%;height:100%}
+@keyframes fall{to{transform:translate(var(--dx),105vh) rotate(var(--rot));opacity:.9}}
+
+.scr{position:absolute;top:0;right:0;bottom:0;left:0;z-index:4;background:var(--bg);display:flex;flex-direction:column;
+  padding:calc(env(safe-area-inset-top) + 10px) calc(env(safe-area-inset-right) + 14px) calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 14px)}
+.top{flex:none;display:flex;align-items:center;gap:10px}
+.top .tt{flex:1;min-width:0}
+.top h1{font-size:24px;font-weight:800;color:var(--acc);letter-spacing:.01em;white-space:nowrap}
+.top .sub{font-size:12px;color:var(--dim);margin-top:2px;line-height:1.2}
+.total{display:flex;align-items:center;gap:6px;background:var(--panel);border-radius:14px;height:44px;padding:0 12px;font-weight:800;font-variant-numeric:tabular-nums;flex:none}
+.total svg{width:18px;height:18px;fill:var(--acc)}
+
+#home{justify-content:center;gap:14px}
+.hbrand{text-align:center}
+.hbrand svg{width:104px;height:104px;margin:0 auto 6px}
+.hbrand h1{font-size:38px;font-weight:800;color:var(--acc);letter-spacing:.01em;line-height:1.1}
+.hbrand .sub{color:var(--dim);font-size:14px;margin-top:4px}
+.stat{background:var(--panel);border-radius:16px;padding:12px 14px;display:flex;align-items:center;gap:12px}
+.stat svg{width:30px;height:30px;fill:var(--acc);flex:none}
+.stat .tx{flex:1;min-width:0}
+.stat b{display:block;font-size:22px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.stat small{display:block;font-size:12px;color:var(--dim);margin-top:3px}
+.pbar{height:6px;border-radius:3px;background:var(--off);margin-top:8px;overflow:hidden}
+.pbar u{display:block;height:100%;background:var(--acc);text-decoration:none}
+#home .btn{flex:none}
+#bGo{min-height:58px;font-size:17px}
+
+#grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,1fr));gap:8px;margin:12px 0}
+.cell{position:relative;min-height:48px;border-radius:14px;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;overflow:hidden}
+.cell .n{font-weight:800;font-size:19px;line-height:1;font-variant-numeric:tabular-nums}
+.cell .n svg{width:18px;height:18px;fill:#6B7E97}
+.cell .s{display:flex;gap:1px}
+.cell .s svg{width:14px;height:14px;fill:var(--off)}
+.cell .s svg.on{fill:var(--acc)}
+.cell.cur{box-shadow:inset 0 0 0 2px var(--acc)}
+.cell.ok{background:#17463F}
+.cell[disabled]{background:#14223A;cursor:default}
+.cell:not([disabled]):active{transform:scale(.96)}
+
+.tight header{padding:2px 12px 0}
+.tight .icon{width:44px;height:44px}
+.tight #lvl{font-size:17px}
+.tight #goal,.tight .brand{display:none}
+.tight #comp{padding-bottom:6px}
+.tight #inp{height:46px}.tight .btn{min-height:46px}
+.tight .row{min-height:44px}
+.tight .row.empty,.sg-on .row.empty{display:none}
+@media (max-height:600px){
+  header{padding-top:4px}
+  .card{padding:14px 16px 12px}.card h2{font-size:22px}
+  .stars svg{width:40px;height:40px}.stars svg:nth-child(2){width:50px;height:50px}
+  .big{font-size:34px}
+  .acts{gap:6px;margin-top:8px}
+  .hbrand svg{width:76px;height:76px}.hbrand h1{font-size:32px}
+  #home{gap:10px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*:before,*:after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button class="icon" id="bMap" aria-label="Niveaux">
+      <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
+    </button>
+    <div class="ttl"><span class="brand">Girouette</span><span id="lvl">Niveau 1</span></div>
+    <button class="icon" id="bReset" aria-label="Recommencer">
+      <svg class="st" viewBox="0 0 24 24"><path d="M4 5v6h6M5 11a8 8 0 1 1 2 7"/></svg>
+    </button>
+  </header>
+  <div id="chal" hidden><svg viewBox="0 0 24 24"><path d="M5 3h2v18H5zM8 4h11l-3 4.500 3 4.500H8z"/></svg><span id="chalT"></span></div>
+  <div id="goal"><span id="gAtt"></span><span id="gStars" class="g"></span></div>
+  <main id="list" aria-label="Essais"></main>
+  <div id="msg" role="status" aria-live="polite"></div>
+  <div id="comp">
+    <div id="sugg" role="listbox" aria-label="Suggestions"></div>
+    <div id="inrow">
+      <input id="inp" type="text" inputmode="text" enterkeyhint="done" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Nom d’une ville" aria-label="Ville">
+      <button class="btn acc" id="bOk" disabled>Valider</button>
+    </div>
+  </div>
+
+  <section class="over" id="win" hidden aria-live="polite">
+    <div class="card">
+      <h2 id="wTitle">Trouvé !</h2>
+      <p id="wSub"></p>
+      <div class="stars" id="wStars"></div>
+      <div class="big" id="wBig"><span id="wN">0</span><small id="wU">essais</small></div>
+      <p class="rec" id="wRec"></p>
+      <p class="cres" id="wChal" hidden></p>
+      <div class="acts">
+        <button class="btn acc" id="bNext">Suivant</button>
+        <div class="row2">
+          <button class="btn line" id="bAgain">Rejouer</button>
+          <button class="btn line" id="bShare">Partager</button>
+        </div>
+        <button class="btn line" id="bChal">Défier un ami</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="scr" id="home" hidden>
+    <div class="hbrand">
+      <svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="44" fill="none" stroke="#3F5878" stroke-width="3"/><circle cx="50" cy="50" r="36" fill="#192A42"/><path d="M50 8v8M50 84v8M8 50h8M84 50h8" stroke="#A3B5CB" stroke-width="4" stroke-linecap="round"/><path d="M50 18 62 50 50 82 38 50z" fill="#34475F"/><path d="M50 18 62 50H38z" fill="#34D6BE"/><circle cx="50" cy="50" r="4" fill="#F2F5F7"/></svg>
+      <h1>Girouette</h1>
+      <div class="sub">Trouve la ville d’Afrique, flèche après flèche.</div>
+    </div>
+    <div class="stat">
+      <svg viewBox="0 0 24 24"><use href="#star"/></svg>
+      <div class="tx"><b id="hStars">0 / 60</b><small>étoiles</small><div class="pbar"><u id="hBar"></u></div></div>
+    </div>
+    <button class="btn acc" id="bGo">Continuer</button>
+    <button class="btn" id="bLevels">Niveaux</button>
+  </section>
+
+  <section class="scr" id="levels" hidden>
+    <div class="top">
+      <button class="icon" id="bLBack" aria-label="Accueil"><svg class="st" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="tt"><h1>Niveaux</h1><div class="sub">1-8 : capitales · 9-20 : villes</div></div>
+      <div class="total" aria-label="Étoiles gagnées"><svg viewBox="0 0 24 24"><use href="#star"/></svg><span id="lTotal">0/60</span></div>
+    </div>
+    <div id="grid"></div>
+    <button class="btn acc" id="bBack" style="flex:none">Reprendre</button>
+  </section>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <path id="star" d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/>
+</defs></svg>
+
+<script>
+(function () {
+'use strict';
+
+var GAME = 'cap-sur';
+var NAME = 'Girouette';
+var KEY = 'mj:' + GAME + ':v1';
+var MAX_TRIES = 6, SCALE_KM = 9000;
+
+/*DATA:BEGIN (generated by tools/cap-sur/build.js, do not edit by hand)*/
+var CITIES = [
+  "Alger|Algérie|36.8|3.1|c",
+  "Luanda|Angola|-8.8|13.2|c",
+  "Porto-Novo|Bénin|6.5|2.6|c",
+  "Gaborone|Botswana|-24.7|25.9|c",
+  "Ouagadougou|Burkina Faso|12.4|-1.5|c",
+  "Yaoundé|Cameroun|3.9|11.5|c",
+  "Praia|Cap-Vert|14.9|-23.5|c",
+  "Bangui|Centrafrique|4.4|18.6|c",
+  "N'Djamena|Tchad|12.1|15.0|c",
+  "Moroni|Comores|-11.7|43.3|c",
+  "Brazzaville|Congo|-4.3|15.3|c",
+  "Kinshasa|RD Congo|-4.3|15.3|c",
+  "Yamoussoukro|Côte d'Ivoire|6.8|-5.3|c",
+  "Djibouti|Djibouti|11.6|43.1|c",
+  "Le Caire|Égypte|30.0|31.2|c",
+  "Malabo|Guinée équatoriale|3.8|8.8|c",
+  "Asmara|Érythrée|15.3|38.9|c",
+  "Addis-Abeba|Éthiopie|9.0|38.7|c",
+  "Libreville|Gabon|0.4|9.5|c",
+  "Banjul|Gambie|13.5|-16.6|c",
+  "Accra|Ghana|5.6|-0.2|c",
+  "Conakry|Guinée|9.5|-13.7|c",
+  "Bissau|Guinée-Bissau|11.9|-15.6|c",
+  "Nairobi|Kenya|-1.3|36.8|c",
+  "Maseru|Lesotho|-29.3|27.5|c",
+  "Monrovia|Libéria|6.3|-10.8|c",
+  "Tripoli|Libye|32.9|13.2|c",
+  "Antananarivo|Madagascar|-18.9|47.5|c",
+  "Lilongwe|Malawi|-14.0|33.8|c",
+  "Bamako|Mali|12.6|-8.0|c",
+  "Nouakchott|Mauritanie|18.1|-15.9|c",
+  "Port-Louis|Maurice|-20.2|57.5|c",
+  "Rabat|Maroc|34.0|-6.8|c",
+  "Maputo|Mozambique|-26.0|32.6|c",
+  "Windhoek|Namibie|-22.6|17.1|c",
+  "Niamey|Niger|13.5|2.1|c",
+  "Abuja|Nigeria|9.1|7.4|c",
+  "Kigali|Rwanda|-1.9|30.1|c",
+  "Dakar|Sénégal|14.7|-17.5|c",
+  "Freetown|Sierra Leone|8.5|-13.2|c",
+  "Mogadiscio|Somalie|2.0|45.3|c",
+  "Pretoria|Afrique du Sud|-25.7|28.2|c",
+  "Khartoum|Soudan|15.5|32.5|c",
+  "Juba|Soudan du Sud|4.9|31.6|c",
+  "Mbabane|Eswatini|-26.3|31.1|c",
+  "Dodoma|Tanzanie|-6.2|35.7|c",
+  "Lomé|Togo|6.1|1.2|c",
+  "Tunis|Tunisie|36.8|10.2|c",
+  "Kampala|Ouganda|0.3|32.6|c",
+  "Lusaka|Zambie|-15.4|28.3|c",
+  "Harare|Zimbabwe|-17.8|31.0|c",
+  "São Tomé|Sao Tomé-et-Principe|0.3|6.7|c",
+  "Victoria|Seychelles|-4.6|55.5|c",
+  "Douala|Cameroun|4.1|9.7",
+  "Maroua|Cameroun|10.6|14.3",
+  "Garoua|Cameroun|9.3|13.4",
+  "Sarh|Tchad|9.1|18.4",
+  "Pointe-Noire|Congo|-4.8|11.9",
+  "Lubumbashi|RD Congo|-11.7|27.5",
+  "Kisangani|RD Congo|0.5|25.2",
+  "Kananga|RD Congo|-5.9|22.4",
+  "Matadi|RD Congo|-5.8|13.5",
+  "Abidjan|Côte d'Ivoire|5.3|-4.0",
+  "Bouaké|Côte d'Ivoire|7.7|-5.0",
+  "Korhogo|Côte d'Ivoire|9.5|-5.6",
+  "Alexandrie|Égypte|31.2|29.9",
+  "Assouan|Égypte|24.1|32.9",
+  "Louxor|Égypte|25.7|32.6",
+  "Dire Dawa|Éthiopie|9.6|41.9",
+  "Bahir Dar|Éthiopie|11.6|37.4",
+  "Port-Gentil|Gabon|-0.7|8.8",
+  "Kumasi|Ghana|6.7|-1.6",
+  "Tamale|Ghana|9.4|-0.8",
+  "Kankan|Guinée|10.4|-9.3",
+  "Mombasa|Kenya|-4.0|39.7",
+  "Kisumu|Kenya|-0.1|34.8",
+  "Toamasina|Madagascar|-18.1|49.4",
+  "Mahajanga|Madagascar|-15.7|46.3",
+  "Blantyre|Malawi|-15.8|35.0",
+  "Tombouctou|Mali|16.8|-3.0",
+  "Kayes|Mali|14.4|-11.4",
+  "Nouadhibou|Mauritanie|21.0|-17.0",
+  "Casablanca|Maroc|33.6|-7.6",
+  "Marrakech|Maroc|31.6|-8.0",
+  "Fès|Maroc|34.0|-5.0",
+  "Tanger|Maroc|35.8|-5.8",
+  "Agadir|Maroc|30.4|-9.6",
+  "Beira|Mozambique|-19.8|34.8",
+  "Nampula|Mozambique|-15.1|39.3",
+  "Zinder|Niger|13.8|9.0",
+  "Agadez|Niger|17.0|8.0",
+  "Lagos|Nigeria|6.5|3.4",
+  "Kano|Nigeria|12.0|8.5",
+  "Ibadan|Nigeria|7.4|3.9",
+  "Port Harcourt|Nigeria|4.8|7.0",
+  "Saint-Louis|Sénégal|16.0|-16.5",
+  "Touba|Sénégal|14.9|-15.9",
+  "Johannesburg|Afrique du Sud|-26.2|28.0",
+  "Le Cap|Afrique du Sud|-33.9|18.4",
+  "Durban|Afrique du Sud|-29.9|31.0",
+  "Bloemfontein|Afrique du Sud|-29.1|26.2",
+  "Port-Soudan|Soudan|19.6|37.2",
+  "Dar es Salaam|Tanzanie|-6.8|39.3",
+  "Arusha|Tanzanie|-3.4|36.7",
+  "Mwanza|Tanzanie|-2.5|32.9",
+  "Zanzibar|Tanzanie|-6.2|39.2",
+  "Sfax|Tunisie|34.7|10.8",
+  "Sousse|Tunisie|35.8|10.6",
+  "Entebbe|Ouganda|0.1|32.5",
+  "Gulu|Ouganda|2.8|32.3",
+  "Ndola|Zambie|-13.0|28.6",
+  "Livingstone|Zambie|-17.8|25.9",
+  "Bulawayo|Zimbabwe|-20.2|28.6",
+  "Cotonou|Bénin|6.4|2.4",
+  "Parakou|Bénin|9.3|2.6",
+  "Bobo-Dioulasso|Burkina Faso|11.2|-4.3",
+  "Oran|Algérie|35.7|-0.6",
+  "Constantine|Algérie|36.4|6.6",
+  "Tamanrasset|Algérie|22.8|5.5",
+  "Ghardaïa|Algérie|32.5|3.7",
+  "Lobito|Angola|-12.4|13.5",
+  "Huambo|Angola|-12.8|15.7",
+  "Bujumbura|Burundi|-3.4|29.4"
+];
+var TARGETS = [23,38,14,0,11,34,35,28,82,91,98,53,102,65,71,58,83,99,115,76];
+/*DATA:END*/
+
+// "name|country|lat|lon[|c]" -> object
+CITIES = CITIES.map(function (s) {
+  var p = s.split('|');
+  return { n: p[0], c: p[1], lat: +p[2], lon: +p[3], cap: p[4] === 'c', k: norm(p[0]), k2: norm(p[0]).replace(/ /g, '') };
+});
+var N = TARGETS.length, PER = 20;
+
+// ---- text helpers ---------------------------------------------------------------
+// Case, accents, hyphens and apostrophes are ignored when typing.
+function norm(s) {
+  return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    .replace(/[’'`\-_.]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+var NBSP = ' ';
+function fmt(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, NBSP); }
+function cityByKey(k) {   // exact name, spaces ignored ("ndjamena" = "N'Djamena")
+  k = k.replace(/ /g, '');
+  for (var i = 0; i < CITIES.length; i++) if (CITIES[i].k2 === k) return i;
+  return -1;
+}
+
+// ---- geography: haversine distance and 8-way direction ----------------------------
+var RAD = Math.PI / 180;
+function haversine(a, b) {
+  var dLat = (b.lat - a.lat) * RAD, dLon = (b.lon - a.lon) * RAD;
+  var h = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(a.lat * RAD) * Math.cos(b.lat * RAD) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+function bearing(a, b) {   // from a to b, degrees clockwise from north
+  var p1 = a.lat * RAD, p2 = b.lat * RAD, dl = (b.lon - a.lon) * RAD;
+  var y = Math.sin(dl) * Math.cos(p2);
+  var x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl);
+  return (Math.atan2(y, x) / RAD + 360) % 360;
+}
+var DIRS = ['nord', 'nord-est', 'est', 'sud-est', 'sud', 'sud-ouest', 'ouest', 'nord-ouest'];
+var ARROWS = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
+function judge(g, t) {   // g, t: city indices
+  var a = CITIES[g], b = CITIES[t], km = Math.round(haversine(a, b)), hit = g === t;
+  var pct = hit ? 100 : Math.max(0, Math.min(99, Math.round(100 * (1 - km / SCALE_KM))));
+  return { i: g, km: km, dir: hit ? -1 : Math.round(bearing(a, b) / 45) % 8, pct: pct, hit: hit };
+}
+
+// ---- seeded random (cosmetic only: confetti) -------------------------------------
+var rngState = 20241124;
+function rnd() {   // mulberry32
+  rngState = (rngState + 0x6D2B79F5) | 0;
+  var t = Math.imul(rngState ^ (rngState >>> 15), 1 | rngState);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+var $ = function (id) { return document.getElementById(id); };
+var reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+// ---- host page (only the events listed in the game sheet, no personal data) ------------
+function emit(msg) {
+  msg.source = 'mini-jeu'; msg.game = GAME;
+  try { window.parent.postMessage(msg, '*'); } catch (e) { /* ignore */ }
+}
+
+// ---- persistence (always guarded: the game works without storage) ------------------
+var save = { level: 1, max: 1, stars: [], best: [], cur: null, chalGame: null };
+function totalStars() {
+  var t = 0;
+  for (var i = 0; i < save.stars.length; i++) t += save.stars[i] || 0;
+  return t;
+}
+function validGuesses(arr, target) {   // distinct valid cities, none of them the answer, at most 5
+  if (!Array.isArray(arr) || arr.length >= MAX_TRIES) return null;
+  var seen = {}, out = [];
+  for (var i = 0; i < arr.length; i++) {
+    var g = arr[i];
+    if (typeof g !== 'number' || g !== (g | 0) || g < 0 || g >= CITIES.length || g === target || seen[g]) return null;
+    seen[g] = 1; out.push(g);
+  }
+  return out;
+}
+function loadSave() {
+  var i;
+  save.stars = []; save.best = [];
+  for (i = 0; i < N; i++) { save.stars.push(0); save.best.push(0); }
+  try {
+    var s = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (s && typeof s === 'object') {
+      var clamp = function (v, hi) { v = v | 0; return v < 1 ? 1 : v > hi ? hi : v; };
+      var nat = function (v, hi) { v = v | 0; return v < 0 ? 0 : v > hi ? hi : v; };
+      save.max = clamp(s.max, N);
+      save.level = Math.min(clamp(s.level, N), save.max);
+      if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = nat(s.stars[i], 3);
+      if (Array.isArray(s.best)) for (i = 0; i < N && i < s.best.length; i++) save.best[i] = nat(s.best[i], MAX_TRIES);
+      if (s.cur && typeof s.cur === 'object') {
+        var n = s.cur.level | 0, gs = n >= 1 && n <= N ? validGuesses(s.cur.guesses, TARGETS[n - 1]) : null;
+        if (gs && gs.length) save.cur = { level: n, guesses: gs };
+      }
+      if (s.chalGame && typeof s.chalGame === 'object') {
+        var cn = s.chalGame.n | 0, ct = s.chalGame.target | 0;
+        var cg = cn >= 1 && cn <= N ? validGuesses(s.chalGame.guesses, TARGETS[cn - 1]) : null;
+        if (cg && ct >= 1 && ct <= MAX_TRIES) save.chalGame = { n: cn, target: ct, guesses: cg };
+      }
+    }
+  } catch (e) { /* no storage: play without it */ }
+}
+function store() {
+  try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) { /* ignore */ }
+}
+
+// ---- game state --------------------------------------------------------------------
+var level = 1;          // 1-based level being played
+var target = 0;         // index of the city to find
+var guesses = [];       // judged guesses, in order
+var found = false, over = false;
+var chal = null;        // {target, level} while a friend's challenge is on
+var picked = -1;        // city chosen in the input (suggestion tapped or exact name typed)
+var screen = 'home';
+var winTimer = 0, msgTimer = 0;
+var lastInfo = null;
+
+function attempts() { return guesses.length; }
+function starsFor(n) { return n <= 3 ? 3 : n <= 5 ? 2 : 1; }
+function guessedIdx() { return guesses.map(function (g) { return g.i; }); }
+
+function persist() {
+  if (chal) {
+    save.chalGame = over ? null : { n: level, target: chal.target, guesses: guessedIdx() };
+  } else {
+    save.cur = guesses.length && !over ? { level: level, guesses: guessedIdx() } : null;
+  }
+  store();
+}
+
+// ---- rendering -----------------------------------------------------------------------
+function starSvg(on) { return '<svg viewBox="0 0 24 24"' + (on ? ' class="on"' : '') + '><use href="#star"/></svg>'; }
+function arrowSvg(d) {
+  return '<svg viewBox="0 0 24 24" style="transform:rotate(' + d * 45 + 'deg)"><path d="M12 3l7 8h-4.500v10h-5V11H5z"/></svg>';
+}
+function rowHtml(g, fresh) {
+  var c = CITIES[g.i], cls = g.pct >= 80 ? ' hot' : g.pct >= 50 ? ' mid' : '';
+  var ar = g.hit ? '<svg viewBox="0 0 24 24"><path d="M4 12.500l5 5L20 6.500" fill="none" stroke="#04211D" stroke-width="3.200" stroke-linecap="round" stroke-linejoin="round"/></svg>' : arrowSvg(g.dir);
+  return '<div class="row' + (g.hit ? ' hit' : '') + (fresh ? ' new' : '') + '" data-city="' + g.i + '"><div class="nm"><b>' + c.n + '</b><span>' + c.c +
+    '</span></div><div class="ds">' + fmt(g.km) + ' km</div><div class="ar" role="img" aria-label="' + (g.hit ? 'trouvé' : DIRS[g.dir]) + '">' + ar +
+    '</div><div class="pc"><b>' + g.pct + ' %</b><u><i class="' + cls.trim() + '" style="width:' + g.pct + '%"></i></u></div></div>';
+}
+function renderList(fresh) {
+  var html = '', i;
+  for (i = 0; i < MAX_TRIES; i++) {
+    html += i < guesses.length ? rowHtml(guesses[i], fresh && i === guesses.length - 1) :
+      '<div class="row empty" aria-hidden="true">' + (i + 1) + '</div>';
+  }
+  var l = $('list');
+  l.innerHTML = html;
+  scrollList();
+}
+function scrollList() {   // keep the latest guess in view when the list is squeezed (keyboard, suggestions)
+  var l = $('list'), r = guesses.length ? l.children[guesses.length - 1] : null;
+  l.scrollTop = r ? Math.max(0, r.offsetTop + r.offsetHeight + 4 - l.clientHeight) : 0;
+}
+function refresh(fresh) {
+  $('lvl').textContent = 'Niveau ' + level;
+  $('gAtt').innerHTML = 'Essai <b>' + Math.min(attempts() + 1, MAX_TRIES) + '/' + MAX_TRIES + '</b>';
+  $('gStars').textContent = chal ? '' : '★★★ en 3 · ★★ en 5';
+  $('bReset').disabled = !attempts();
+  $('inp').disabled = over;
+  renderList(fresh);
+  updateOk();
+}
+function say(text, cls, ms) {
+  var m = $('msg');
+  clearTimeout(msgTimer);
+  m.textContent = text; m.className = cls || '';
+  if (text && ms !== 0) msgTimer = setTimeout(function () { m.textContent = ''; m.className = ''; }, ms || 2200);
+}
+
+// ---- input and suggestions ----------------------------------------------------------
+var sugList = [];
+function maxSugg() {
+  var h = $('app').clientHeight;
+  return h < 380 ? 3 : h < 470 ? 4 : 5;
+}
+function matches(q) {
+  var k = norm(q), k2 = k.replace(/ /g, ''), out = [], tried = {};
+  if (!k2) return out;
+  guesses.forEach(function (g) { tried[g.i] = 1; });
+  CITIES.forEach(function (c, i) {
+    if (tried[i]) return;
+    var at = c.k.indexOf(k), at2 = c.k2.indexOf(k2);
+    if (at < 0 && at2 < 0) return;
+    out.push({ i: i, r: at === 0 || at2 === 0 ? 0 : at > 0 && c.k.charAt(at - 1) === ' ' ? 1 : 2 });
+  });
+  out.sort(function (a, b) { return a.r - b.r || CITIES[a.i].k.localeCompare(CITIES[b.i].k); });
+  return out.map(function (x) { return x.i; });
+}
+function renderSugg() {
+  var inp = $('inp'), box = $('sugg'), q = inp.value;
+  sugList = picked >= 0 ? [] : matches(q);
+  var show = sugList.slice(0, 8), html = '';
+  show.forEach(function (i) {
+    html += '<button class="sg" role="option" data-pick="' + i + '"><b>' + CITIES[i].n + '</b><span>' + CITIES[i].c + '</span></button>';
+  });
+  if (!show.length && picked < 0 && norm(q)) {
+    var k = cityByKey(norm(q));
+    html = '<div class="sn">' + (k >= 0 ? 'Déjà essayé.' : 'Aucune ville de ce nom dans la liste.') + '</div>';
+  }
+  box.innerHTML = html;
+  box.style.maxHeight = (maxSugg() * 45) + 'px';
+  document.body.classList.toggle('sg-on', !!html);
+  scrollList();
+}
+function updateOk() { $('bOk').disabled = over || picked < 0; }
+function onInput() {
+  var k = cityByKey(norm($('inp').value));
+  picked = -1;
+  if (k >= 0 && !guesses.some(function (g) { return g.i === k; })) picked = k;
+  renderSugg();
+  updateOk();
+}
+function pick(i) {
+  picked = i;
+  $('inp').value = CITIES[i].n;
+  renderSugg();
+  updateOk();
+}
+
+// ---- playing -------------------------------------------------------------------------
+function submitGuess(i, quiet) {
+  if (over || i < 0 || i >= CITIES.length) return false;
+  if (guesses.some(function (g) { return g.i === i; })) { say('Déjà essayé.', 'warn'); return false; }
+  var j = judge(i, target);
+  guesses.push(j);
+  picked = -1;
+  var inp = $('inp');
+  inp.value = '';
+  if (j.hit) { found = true; over = true; }
+  else if (guesses.length >= MAX_TRIES) over = true;
+  say('');
+  persist();
+  refresh(!quiet);
+  renderSugg();
+  if (over) finish(quiet);
+  return true;
+}
+function finish() {
+  $('inp').blur();
+  var n = attempts(), s = found ? starsFor(n) : 0, events = [], info;
+  if (chal) {
+    var ok = found && n <= chal.target;
+    info = { n: n, stars: s, found: found, chal: { ok: ok, target: chal.target }, prevBest: 0 };
+    events.push({ event: 'challenge_result', level: level, score: n, target: chal.target, won: ok });
+  } else {
+    info = { n: n, stars: s, found: found, chal: null, prevBest: save.best[level - 1] || 0 };
+    if (found) {
+      if (s > (save.stars[level - 1] || 0)) save.stars[level - 1] = s;
+      if (!info.prevBest || n < info.prevBest) save.best[level - 1] = n;
+      if (level < N) { save.max = Math.max(save.max, level + 1); save.level = level + 1; }
+      events.push({ event: 'level_complete', level: level, score: n, stars: s });
+    }
+  }
+  lastInfo = info;
+  store();
+  events.forEach(emit);
+  clearTimeout(winTimer);
+  winTimer = setTimeout(function () { showWin(info); }, reduced ? 80 : 650);
+}
+function showWin(info) {
+  var s = info.stars, n = info.n, c = CITIES[target];
+  var last = !chal && level === N;
+  if (info.chal) $('wTitle').textContent = info.chal.ok ? 'Défi relevé !' : 'Défi manqué';
+  else $('wTitle').textContent = !info.found ? 'Pas cette fois' : s === 3 ? 'En plein dans le mille !' : s === 2 ? 'Bien joué !' : 'Trouvé !';
+  $('wSub').textContent = info.found ? c.n + ' · ' + c.c : 'C’était ' + c.n + ' (' + c.c + ')';
+  $('wStars').innerHTML = chal ? '' : starSvg(s >= 1) + starSvg(s >= 2) + starSvg(s >= 3);
+  $('wStars').hidden = !!chal || !info.found;
+  $('wBig').hidden = !info.found;
+  $('wStars').setAttribute('aria-label', s + ' étoile' + (s > 1 ? 's' : '') + ' sur 3');
+  $('wN').textContent = info.found ? n : '–';
+  $('wU').textContent = info.found && n === 1 ? 'essai' : 'essais';
+  var rec = '';
+  if (info.chal) rec = 'Objectif : ' + info.chal.target + ' essai' + (info.chal.target > 1 ? 's' : '') + ' ou moins';
+  else if (info.found) rec = info.prevBest ? (n < info.prevBest ? 'Nouveau record !' : 'Record : ' + info.prevBest + ' essai' + (info.prevBest > 1 ? 's' : '')) :
+    (s < 3 ? '3 étoiles en 3 essais ou moins' : '');
+  else rec = 'Un nouvel essai ?';
+  $('wRec').textContent = rec;
+  $('wChal').hidden = true;
+  $('bNext').textContent = chal ? 'Accueil' : !info.found ? 'Rejouer' : last ? 'Niveaux' : 'Suivant';
+  $('bAgain').hidden = !info.found && !chal ? true : false;
+  $('bAgain').textContent = 'Rejouer';
+  $('bShare').hidden = !info.found && !chal;
+  $('bShare').textContent = 'Partager';
+  $('bChal').hidden = !info.found;
+  $('bChal').textContent = chal ? 'Renvoyer le défi' : 'Défier un ami';
+  var w = $('win'), old = w.querySelectorAll('.bit'), i;
+  for (i = 0; i < old.length; i++) w.removeChild(old[i]);
+  w.hidden = false;
+  if (reduced || !info.found) return;
+  for (i = 0; i < 20; i++) {
+    var b = document.createElement('div');
+    b.className = 'bit';
+    b.style.cssText = 'left:' + Math.round(4 + rnd() * 92) + '%;animation-delay:' + Math.round(rnd() * 400) + 'ms;--dx:' +
+      Math.round(rnd() * 80 - 40) + 'px;--rot:' + Math.round(rnd() * 540 - 270) + 'deg';
+    b.innerHTML = '<svg viewBox="0 0 24 24" fill="' + (i % 2 ? '#34D6BE' : '#FFD24D') + '"><path d="M12 3l7 8h-4.500v10h-5V11H5z"/></svg>';
+    w.appendChild(b);
+  }
+}
+
+// o = {chal, replay: [indices]}
+function begin(n, o) {
+  clearTimeout(winTimer);
+  o = o || {};
+  level = n; target = TARGETS[n - 1]; chal = o.chal || null;
+  guesses = []; found = false; over = false; picked = -1;
+  (o.replay || []).forEach(function (i) { guesses.push(judge(i, target)); });
+  $('win').hidden = true;
+  $('inp').value = '';
+  $('chal').hidden = !chal;
+  $('goal').hidden = false;
+  if (chal) $('chalT').textContent = 'Objectif : en ' + chal.target + ' essai' + (chal.target > 1 ? 's' : '') + ' ou moins';
+  if (!chal) {
+    save.chalGame = null;
+    save.level = n;
+    if (n > save.max) save.max = n;
+    save.cur = guesses.length ? { level: n, guesses: guessedIdx() } : null;
+  }
+  say(n === 1 && !guesses.length ? 'Chaque essai donne la distance et la direction.' : '', '', 0);
+  refresh(false);
+  renderSugg();
+  if (chal) persist(); else store();
+}
+function startLevel(n, replay, chalObj) { begin(n, { replay: replay, chal: chalObj }); }
+function restart() {
+  if (chal) begin(level, { chal: chal }); else begin(level);
+}
+
+// ---- sharing ---------------------------------------------------------------------------
+function starsText(s) { var st = ''; while (s--) st += '⭐'; return st; }
+function shareText() {
+  var seq = guesses.map(function (g) { return g.hit ? '✅' : ARROWS[g.dir] + g.pct + '%'; }).join(' ');
+  return NAME + ' · Niveau ' + level + ' · ' + (found ? starsText(starsFor(attempts())) : '✖') + ' ' + seq;
+}
+function shareBase() {
+  var b = window.MJ_CONFIG && window.MJ_CONFIG.shareBaseUrl;
+  if (typeof b !== 'string' || !b) b = /^https?:/i.test(String(location.href)) ? String(location.href) : '';
+  return b.split('#')[0];
+}
+function challengeText() {
+  var base = shareBase(), link = base ? base + '#defi-' + level + '-' + attempts() : '';
+  return NAME + ' · Niveau ' + level + ' en ' + attempts() + ' essai' + (attempts() > 1 ? 's' : '') + '. À toi de faire mieux !' + (link ? ' ' + link : '');
+}
+function sendText(text, kind, btn) {
+  var done = function () { emit({ event: 'share', kind: kind }); };
+  var copied = function () { btn.textContent = 'Copié !'; done(); };
+  var legacy = function () {
+    var ok = false;
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;left:0;top:0;opacity:0';
+      document.body.appendChild(ta);
+      ta.select(); ta.setSelectionRange(0, text.length);
+      ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (e) { ok = false; }
+    btn.textContent = ok ? 'Copié !' : 'Copie impossible';
+    if (ok) done();
+  };
+  var clip = function () {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(copied, legacy);
+    } catch (e) { /* fall through */ }
+    legacy();
+  };
+  try {
+    if (navigator.share) {
+      return navigator.share({ text: text }).then(done, function (e) { if (!e || e.name !== 'AbortError') clip(); });
+    }
+  } catch (e) { /* fall through */ }
+  clip();
+}
+
+// ---- challenges (#defi-<level>-<tries>) ---------------------------------------------------
+// Opening one never touches the progress nor the run in progress (separate save slot).
+function openChallenge() {
+  var h = String(location.hash || ''), m;
+  try { if (h) history.replaceState(null, '', String(location.href).split('#')[0]); } catch (e) { /* ignore */ }
+  m = /^#defi-(\d{1,2})-(\d{1,2})$/.exec(h);
+  if (!m) return false;
+  var n = +m[1], t = +m[2];
+  if (n < 1 || n > N || t < 1 || t > MAX_TRIES) return false;
+  begin(n, { chal: { target: t, level: n } });
+  emit({ event: 'challenge_open', level: n, target: t });
+  show('game');
+  return true;
+}
+
+// ---- screens ------------------------------------------------------------------------------
+var SCREENS = ['home', 'levels'];
+function show(name) {
+  clearTimeout(winTimer);
+  screen = name;
+  SCREENS.forEach(function (s) { $(s).hidden = s !== name; });
+  if (name !== 'game') $('win').hidden = true;
+  if (name === 'home') renderHome();
+  else if (name === 'levels') renderLevels();
+}
+var LOCK = '<svg viewBox="0 0 24 24"><path d="M7 10V8a5 5 0 0 1 10 0v2h1.500v10h-13V10zm2.500 0h5V8a2.500 2.500 0 0 0-5 0z"/></svg>';
+function renderHome() {
+  var t = totalStars();
+  $('hStars').textContent = t + ' / ' + (N * 3);
+  $('hBar').style.width = Math.round(100 * t / (N * 3)) + '%';
+  $('bGo').textContent = 'Continuer · Niveau ' + save.level;
+}
+function renderLevels() {
+  var html = '';
+  for (var i = 0; i < N; i++) {
+    var n = i + 1, s = save.stars[i] || 0, open = n <= save.max, isCur = n === save.level;
+    html += '<button class="cell' + (isCur ? ' cur' : '') + (s ? ' ok' : '') + '" data-level="' + n + '"' + (open ? '' : ' disabled') +
+      ' aria-label="Niveau ' + n + (open ? ', ' + s + ' étoile' + (s > 1 ? 's' : '') : ', verrouillé') + '">' +
+      '<span class="n">' + (open ? n : LOCK) + '</span><span class="s">' + starSvg(s >= 1) + starSvg(s >= 2) + starSvg(s >= 3) + '</span></button>';
+  }
+  $('grid').innerHTML = html;
+  $('lTotal').textContent = totalStars() + '/' + (N * 3);
+}
+function inGame(n) { return !chal && level === n && !over; }
+function goContinue() {
+  var n = save.level;
+  if (inGame(n)) { show('game'); return; }
+  startLevel(n, save.cur && save.cur.level === n ? save.cur.guesses : null);
+  show('game');
+}
+function pickLevel(n) {
+  if (inGame(n)) { show('game'); return; }
+  startLevel(n, save.cur && save.cur.level === n ? save.cur.guesses : null);
+  show('game');
+}
+
+// ---- input events: pointer events, with a click fallback for keyboards and assistive tech ----
+var pressing = false, lastUp = 0;
+function stray() { return pressing || Date.now() - lastUp < 700; }
+document.addEventListener('pointerdown', function () { pressing = true; }, true);
+['pointerup', 'pointercancel'].forEach(function (ev) {
+  document.addEventListener(ev, function () { pressing = false; lastUp = Date.now(); }, true);
+});
+function onTap(el, fn) {
+  var down = false;
+  el.addEventListener('pointerdown', function () { down = true; });
+  el.addEventListener('pointerleave', function () { down = false; });
+  el.addEventListener('pointercancel', function () { down = false; });
+  el.addEventListener('pointerup', function (e) {
+    if (!down) return;
+    down = false; fn(e);
+  });
+  el.addEventListener('click', function (e) { if (!stray()) fn(e); });
+}
+function closestAttr(node, attr) {
+  while (node && node !== document.body) {
+    if (node.getAttribute && node.getAttribute(attr) !== null) return node;
+    node = node.parentNode;
+  }
+  return null;
+}
+// Tapping a suggestion or the OK button must not take the focus away from the input (the keyboard stays up).
+['sugg', 'bOk'].forEach(function (id) {
+  $(id).addEventListener('mousedown', function (e) { e.preventDefault(); });
+});
+onTap($('sugg'), function (e) {
+  var c = closestAttr(e.target, 'data-pick');
+  if (c) pick(+c.getAttribute('data-pick'));
+});
+onTap($('bOk'), function () { if (picked >= 0) submitGuess(picked); });
+$('inp').addEventListener('input', onInput);
+$('inp').addEventListener('keydown', function (e) {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  if (picked < 0 && sugList.length === 1) pick(sugList[0]);
+  if (picked >= 0) submitGuess(picked);
+});
+onTap($('grid'), function (e) {
+  var c = closestAttr(e.target, 'data-level');
+  if (c && !c.disabled) pickLevel(+c.getAttribute('data-level'));
+});
+onTap($('bMap'), function () { renderLevels(); show('levels'); });
+onTap($('bBack'), goContinue);
+onTap($('bLBack'), function () { show('home'); });
+onTap($('bGo'), goContinue);
+onTap($('bLevels'), function () { show('levels'); });
+onTap($('bReset'), restart);
+onTap($('bNext'), function () {
+  if (chal) show('home');
+  else if (!found) restart();
+  else if (level < N) { startLevel(level + 1); show('game'); }
+  else show('levels');
+});
+onTap($('bAgain'), restart);
+onTap($('bShare'), function () { sendText(shareText(), 'result', $('bShare')); });
+onTap($('bChal'), function () { sendText(challengeText(), 'challenge', $('bChal')); });
+document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+window.addEventListener('hashchange', function () { if (/^#defi-/.test(location.hash)) openChallenge(); });
+
+// ---- on-screen keyboard: follow the visible viewport, compact the layout ----------------------
+function fit() {
+  var vv = window.visualViewport, app = $('app');
+  if (vv && vv.scale <= 1.01 && (vv.height < window.innerHeight - 2 || vv.offsetTop > 2)) {
+    app.style.top = vv.offsetTop + 'px'; app.style.height = vv.height + 'px'; app.style.bottom = 'auto';
+  } else { app.style.top = app.style.height = app.style.bottom = ''; }
+  document.body.classList.toggle('tight', app.clientHeight < 440);
+  $('sugg').style.maxHeight = (maxSugg() * 45) + 'px';
+  scrollList();
+}
+window.addEventListener('resize', fit);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', fit);
+  window.visualViewport.addEventListener('scroll', fit);
+}
+
+// ---- boot ----------------------------------------------------------------------------------------
+loadSave();
+var cg = save.chalGame;   // a challenge in progress is resumed where it was
+if (cg) {
+  startLevel(cg.n, cg.guesses, { target: cg.target, level: cg.n });
+  show('game');
+} else {
+  startLevel(save.level, save.cur && save.cur.level === save.level ? save.cur.guesses : null);
+  show('home');
+}
+fit();
+if (/^#defi-/.test(location.hash)) openChallenge();
+
+// Test hooks. The levels expose no answer; the list of cities is public anyway.
+window.__game = {
+  state: function () {
+    return {
+      screen: screen,
+      level: level,
+      attempts: attempts(),
+      guesses: guesses.map(function (g) {
+        return { name: CITIES[g.i].n, country: CITIES[g.i].c, km: g.km, dir: g.dir, arrow: g.dir < 0 ? '' : ARROWS[g.dir], pct: g.pct, hit: g.hit };
+      }),
+      found: found, over: over,
+      stars: over && found && !chal ? starsFor(attempts()) : 0,
+      input: $('inp').value,
+      picked: picked >= 0 ? CITIES[picked].n : null,
+      suggestions: sugList.map(function (i) { return CITIES[i].n; }),
+      total: totalStars(),
+      max: save.max,
+      saveLevel: save.level,
+      challenge: chal ? { target: chal.target, level: chal.level } : null
+    };
+  },
+  levels: TARGETS.map(function (t, i) { return { n: i + 1, kind: CITIES[t].cap ? 'capitale' : 'ville' }; }),
+  cities: CITIES.map(function (c) { return { name: c.n, country: c.c, lat: c.lat, lon: c.lon, capital: c.cap }; }),
+  loadLevel: function (n) {
+    n = n | 0;
+    if (n < 1 || n > N) throw new Error('level must be 1..' + N);
+    startLevel(n);
+    show('game');
+    return this.state();
+  },
+  // Plays a guess by city name, without animation (same code path as the Valider button).
+  guess: function (name) {
+    var i = cityByKey(norm(name));
+    return i >= 0 && submitGuess(i, true);
+  },
+  seed: function (n) { rngState = n | 0; }
+};
+})();
+</script>
+</body>
+</html>

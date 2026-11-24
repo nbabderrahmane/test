@@ -1,0 +1,148 @@
+# Mot Tapi - source list of admitted words (common nouns, singular; verbs, infinitive).
+# Free format: words separated by spaces/newlines, accents allowed (stripped by build.js).
+# Only 4 to 7 letters are kept. Lines starting with # are ignored.
+# --- 4 letters
+abri acte aide aile aire ange anse arme aube auto avis agir axes
+bain banc bave bile bise bleu bois bond bord bouc bout bras brin buse boue bête
+cafe cage cale cane cape cave cerf chat chef chou cire cité clef clou coco coin cour coup cube cure cuve cuir code côte
+dame dent dire dose dune dôme daim dard
+écho  élan épée être étui exil
+face fait fête fils film flan flot foie foin fois fond four fuir faim fard faux fève file fort
+gare gant goal golf goût grue gage geai
+haie hall halo hâte
+idée iris
+joie joue jour juge jupe jury
+kilo
+lait lame lard lien lieu lion lire loge loup lune lier
+main mais mâle mare mars mère mets mine mode mont mort mule mite moto maïs
+nage nain nerf noce nord note nuée nuit nier
+ogre onde once orge ours œuf oser
+page paix pain pape parc part pâte peau père pied pile pion pipe plan plat pôle pont port pose prix puce pull peur
+quai
+race raie rame rang rein rêve rire riz robe rôle rose rond ruse rail ride rive rite rime
+sang sein sens site soie soif soin soir sort seau
+taie télé tête tige toit tome tour trou trac tuer tuba thon thym taxi
+urne user
+vase veau vent vers vert vide voie voir voix vote vœu
+zéro zone
+bête bidon cage
+# --- 5 letters
+abîme acier agent aider aigle aimer album algue allée aller amant amour ancre angle appel arbre armée arrêt asile atout avion avoir avril
+bague balai balle bande barbe barre bébé bijou blague blanc boire boîte bombe borne botte boule bruit brume bulle
+cacao cadre canal canif canne carte cause céder cèdre chair champ chant chêne chien chose cidre ciel cible citer clown cacher calme chaos chute cœur colle corde corps coton coude cours crème créer crier croix cuire cycle
+danse début dégât délai dette devoir digue doigt doute drame durer
+école écran écrit effet encre envie épice épine époux essai étage étape étang étude évier excès
+fable façon faire farce ferme fiche fille filet fleur foire folie forêt forge forme fosse foule frein frère frite froid fruit fumée fusée
+gaffe gamin garde gazon genou genre geste glace globe gorge grain grève guide guêpe
+hache haine halte harpe herbe héros heure hibou hiver homme honte hôtel huile hymne
+image index issue
+jambe jouer jouet juger
+koala
+lacet laine lance lapin larme lever ligne liste litre livre loger louer lueur lundi lutte lycée
+magie maire malle marge marin masse match melon mener merci métal métro miel moine monde motif moule moyen musée
+nager neige niche nœud noyau nuage nuque
+objet océan odeur offre ombre ongle opéra orage ordre outil
+paire palme panne paume pêche peine pelle perle phare piano pièce piège pince piste place plage plaie plume plomb pluie poche poème poids poing point poire poule prise proie puits
+quart queue
+radio rampe rayon récit règle reine repas reste rhume rêver robot roche roman route ruban rugby ruine
+sable sabot salle salon sauce saule savon scène score signe singe sirop sœur soupe stage sucre sujet sueur suite sport
+tabac table tâche talon tapis tarte tasse temps tente terme terre texte thème tigre titre toile tonne torse trace train trait tribu trône truc tuyau
+union usine usage
+vache vague valse veine vélo vente verre veste vidéo vigne ville vivre vitre voile voler volet
+wagon
+zèbre
+# --- 6 letters
+accent accord acteur adulte agenda alarme alerte amande ananas animal anneau argent armure artiste aspect auteur avenir avenue avocat
+bagage balcon ballon banane banque barque bateau battre beurre blouse bocal boucle bougie bouton brique brosse brûler buffet bureau
+cabane cabine cadeau cahier caisse calcul camion canard carnet carton casque cendre cerise chaise chaîne chapeau charme chasse chaton chemin cheval cheveu cirque citron classe climat cloche cochon colère combat compte copain copier cordon cornet coucou couche coudre couler couloir cousin crayon cuisse cuivre
+danger dessin destin détail diable docteur dollar domino dormir dossier douche dragon
+éclair écrire emploi enfant ennemi entrée épaule époque espace esprit étoile étude éviter examen
+fermer figure flamme flaque flèche flocon fourmi foyer frigo
+gagner garage garçon gâteau girafe glaçon gourde goûter grange griffe grotte groupe guerre
+hasard hurler
+indice
+jambon jardin joueur jungle
+lâcher lancer langue laurier légume lettre limite livrer loyer lutter
+mairie maison maître malade manche manger marais marron masque membre menace métier meuble minuit miroir moment montre mordre moteur moulin mouton muscle
+nature navire niveau nombre
+oncle orange orteil ouvrir
+paille palais panier papier parade parent parfum parole patron paysan pêcher pendre penser perdre permis pigeon pincer pirate plaine plante poison poivre police poudre poumon prince prison projet puzzle
+racine raison ranger regard région regret requin réseau retard retour rideau rivage rocher rouler
+saison salade saluer sauter savoir secret siècle signal soleil sommet source sourire souris statue studio
+talent tendre tenter tissu tomate tordre tortue tricot trésor troupe tunnel
+valise vallée vendre verger vérité viande violon visage visite voyage volcan voleur
+# --- 7 letters
+abricot accueil acheter adresse aiguille ailleurs alcool amitié ampoule anniversaire aquarium arrière atelier attacher attendre autobus avancer
+bagarre balance bataille bibliothèque biscuit boisson bonheur bouquet branche brouillard brouette bulletin
+cabinet  cailloux calendrier campagne capitale caravane carotte cascade casserole cavalier ceinture cerveau chaleur chambre chandail chanson chanter chapeau chariot chasser château chauffer chiffre cinéma clavier collier commerce concert conseil conduire confiture continent corbeau costume couloir couteau couvrir crochet cuisine
+dauphin décider décor dentiste dessert dessiner dimanche dispute docteur dossier douleur drapeau
+éclairer écureuil écouter élève émotion enquête envoyer épicerie escargot étudier évasion exemple
+fabrique facteur famille fatigue fenêtre festival feuille ficelle fillette fixer flèche fontaine forêt fortune fraise frapper frisson fromage
+galerie gardien gazelle général  gigantesque girafe glissade grandir grenier guitare
+habiter hauteur herbier histoire horizon hôpital horloge huître
+ incendie insecte instant invité
+jacinthe jonction jongler journal juillet
+kiosque
+laisser lanterne laurier lecture lessive libellule lumière lunette
+machine magasin magicien marcher mariage marteau matelas mélange message  mission moineau monnaie montagne moustique musique mystère
+naviguer neuvième nourrir 
+obtenir océan opinion oranger ouvrier
+palmier panneau pantalon papillon parking passage passion pastèque patience pêcheur peinture pelouse perdrix perroquet personne piscine plafond planche plonger poignet pommier pompier portrait poussin pouvoir prairie prénom présent printemps promesse
+quartier quitter
+raisin rapport recette réponse rentrer réussir rivière robinet rocher roulade
+saucisse  savonner semaine sentier serpent service silence sirène soirée sorcier soucier sourire spectacle
+tableau tablier tailleur tambour taureau tempête terrain théâtre tonneau tonnerre tournoi tourner tracteur traîneau travail trottoir trouver tulipe
+univers
+ valeur vendeur ventre verrou vestiaire village visiter vitesse voisin voyager
+zodiaque
+# --- extra common nouns and verbs, all lengths
+chien chiot poney lapin renard loup tigre lion zèbre singe panda koala morse phoque requin dauphin baleine poisson oiseau hibou aigle cygne canard poule coq oie dinde
+pomme poire mangue banane orange fraise cerise datte figue noix raisin ananas melon citron tomate carotte oignon ail riz maïs manioc igname mil sorgho haricot lentille pois
+cuisiner goûter boire manger dormir rêver courir marcher sauter nager voler chanter danser jouer lire écrire dessiner peindre compter parler écouter regarder toucher sentir
+rouge bleu vert jaune noir blanc gris rose violet marron
+lundi mardi jeudi samedi dimanche janvier février mars avril juin juillet août septembre octobre novembre décembre
+père mère frère sœur oncle tante cousin cousine neveu nièce enfant bébé ami amie voisin voisine
+table chaise lit porte fenêtre mur toit sol cuisine salon chambre jardin cour rue route pont ville village marché boutique école classe cahier stylo crayon livre sac cartable
+soleil lune étoile nuage pluie vent orage neige glace feu eau terre sable rocher colline montagne vallée fleuve rivière lac mer océan île plage forêt savane désert
+tambour guitare flûte piano violon trompette chorale chanson musique rythme danse
+football ballon but arbitre équipe stade maillot gardien match joueur
+voiture camion vélo moto bus train avion bateau pirogue taxi gare port route
+bonjour merci salut cadeau fête gâteau bougie sourire rire joie bonheur courage amitié
+médecin maçon tailleur pêcheur berger cuisinier forgeron chauffeur facteur infirmier boulanger boucher marchand fermier
+chapeau robe jupe veste manteau pagne sandale soulier chaussure chaussette gant écharpe ceinture
+tasse assiette cuillère fourchette couteau verre bol pot casserole panier seau balai savon
+# --- batch 2: more common nouns and infinitives
+baie blog buis clip cran duel drap étau gain gnou gong gîte gilet jean lave luxe mari mètre moue poil pois rhum rôti scie soja taxe trio tube zèle zinc
+agneau 
+abeille abri accident achat acheter acier acteur ajouter alcool algue allumer amener amuser  appeler apporter apprendre arracher arrêter arroser asseoir assiette attacher attraper avaler avancer
+bagage baigner baiser baisser bâtir battre bavarder bidon bière bilan billet blesser bloquer boucher bouger bouillir bouquet bourse bricoler briller brise broder brouillard bruler bûche
+cabri cacher cadet cafard cailloux caillou calepin camarade camper canapé carnaval casser cerceau cercle  chagrin chaleur champion changer charbon charger charrue chasseur chauffeur chemise chèque chercher chiffon chocolat cible  cigogne cinéma citerne clairon clignoter clocher coffre coiffer coller colonne commander compter conduire confier conter copine coquille corbeille cordonnier corriger coucher couper courir couvert couvercle cracher craie cravate creuser crevette crise cuillère cuisinier cultiver
+dallage dauphin déchirer décoller découvrir défendre déjeuner demander dentelle dépenser déranger dessiner détester devenir deviner diamant dîner discuter distance  donner dorer douane doubler dresser durée
+échelle écharpe éclat écorce écraser éditeur élever embrasser émission emporter enlever ennui enterrer entendre entrer envoyer éplucher épuiser équipe erreur escalade essayer essuyer étendre étincelle étirer éventail exister
+fabriquer facture fagot faucille fauve fermier feuille fève fiançailles  fixer flatter fleurir flotter foncer fossile fouiller fouet fourchette fournir fracasser frotter fuite fumer fusil
+galette gambade gaspiller gémir gencive gendarme gibier gifler gingembre glisser gommer gonfler gouffre goutte gouverner graine graisse gratter grimper griller gronder grossir guérir guetter
+habiller hameçon hanche hangar haricot hérisson hésiter heurter hirondelle hisser honneur horaire humeur
+idée imiter imposer indiquer inquiéter inscrire installer interdire inventer inviter irriter
+jalousie jeter joindre jumelle jurer  justice
+kimono
+labour lacer lainage lampion lancer lapin larcin lasso laver lecteur lézard libérer licorne lisière lisser livrer logement loutre lutteur 
+maçon magnet maigrir malice manette mannequin manquer maquette marchand marier marmite marquer massage mâcher mécanicien médaille médecin méfier mêler mendier mentir merveille meunier miette  mijoter  minuter mitaine mixer moisson monter moquer morceau mouche mouiller mourir moustache mouvement muraille murmure
+nacelle nager nappe narine natte naufrage nettoyer  nicher noircir nommer nourriture noyer  numéro
+obéir obliger observer occuper offrir oignon oiseau ombrelle opérer ordonner orgueil orner oser oublier ourson outil ouvrage
+pagaie paillasse  palette panache pansement parapluie parcourir pardon parier parler partager parvenir passage pastille patauger pâtisserie pavage paysage pédale peigner peluche pencher pépin perche percer perroquet peser pétale pétrir peuple pharmacie pinceau pincée pioche piquer pique-nique placard plaindre plaisir plancher planter plaisanter plier ployer plumeau pluie poignée poinçon pointer polir pommade pondre porche poser posséder poster pousser poutre  prêter prévenir prier prison priver procès profiter promener prouver puiser punir
+quenotte question queue quête
+rabot raconter radeau rafale rafraîchir ramasser ramer rancune rappeler rapporter raser rassurer rater ravin rayer réagir réciter recevoir réchauffer récolte réfléchir refuser régaler régner rejoindre relever remarquer remercier remettre remplir remuer rencontre rendre renoncer renverser réparer repasser répéter répondre reposer reprendre résoudre respirer ressort rester retenir retirer réveiller revenir rêver ricaner rincer risquer rizière rôder rôtir rouille rouspéter rucher
+sabler saisir salir sanglier sangle  sécher secouer semer sembler serrer servir siffler sillon soigner solitude sonner sortir souffler souhaiter soulever soupçon soupirer sourcil souvenir spirale squelette suivre supplier surprise survivre
+tailler tamiser tapoter tarder tasser tâter teindre tendre tenir terminer tirer tisser tomber tondre tordre toucher tourbillon tousser tracer traduire traîner trancher travers tremper tresser tricher tricoter tromper tronc troupeau tuyau
+usage usine ustensile
+vagabond vaincre valoir vaisselle vanille vanter veiller vendange venir verser vêtir viser visser vivre  voiture voler vomir voyelle
+yaourt
+zigzag zéro
+cour cours cœur corps temps champ doigt poing pouce paume talon cheville genou cuisse épaule coude poignet ventre dos nuque gorge menton joue front sourcil cil paupière dent langue lèvre nez oreille cheveu crâne visage
+moustique fourmi abeille mouche papillon araignée escargot grenouille crapaud serpent lézard tortue crocodile éléphant girafe lion léopard hyène zèbre gazelle antilope buffle hippopotame rhinocéros chimpanzé gorille singe perroquet autruche flamant pélican
+mil manioc igname banane mangue papaye goyave ananas arachide patate gombo piment aubergine concombre salade chou épinard courge pastèque avocat citron oignon ail
+tabouret natte calebasse pirogue filet hameçon canne hutte case village puits marché tamtam balafon djembé kora masque pagne boubou
+lire écrire compter calculer dessiner colorier découper coller plier ranger nettoyer laver essuyer balayer cuisiner préparer servir partager prêter emprunter donner recevoir offrir
+ordinateur clavier souris écran téléphone message courrier lettre timbre enveloppe colis
+tableau règle gomme cartable cahier trousse stylo crayon feutre ciseaux colle compas équerre
+printemps été automne hiver saison semaine mois année heure minute seconde matin midi soir nuit

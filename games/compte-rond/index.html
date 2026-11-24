@@ -1,0 +1,808 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#131A2E">
+<title>Chiffrons</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#131A2E;--panel:#1D2742;--panel2:#26325A;--line:#4A5880;
+  --ink:#F4F1E8;--dim:#A9B4D0;--acc:#3DDBC0;--acc-ink:#042F29;--gold:#FFC53D;--off:#3A4567;--bad:#FFB4BC;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);overscroll-behavior:none}
+body{
+  position:fixed;top:0;right:0;bottom:0;left:0;color:var(--ink);
+  font:16px/1.25 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif;
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-text-size-adjust:100%;
+}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;touch-action:manipulation}
+button:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+svg{display:block}
+
+#app{
+  position:absolute;top:0;right:0;bottom:0;left:0;display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+header{display:flex;align-items:center;gap:8px;padding:8px 12px 4px;flex:none}
+.icon{width:48px;height:48px;border-radius:14px;background:var(--panel);display:flex;align-items:center;justify-content:center;flex:none}
+.icon svg{width:24px;height:24px;fill:var(--ink)}
+.icon svg.st{fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.ttl{flex:1;min-width:0;text-align:center}
+.brand{display:block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#lvl{display:block;font-size:20px;font-weight:800;white-space:nowrap}
+.moves{width:48px;height:48px;border-radius:14px;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none}
+.moves b{font-size:19px;line-height:1;font-weight:800;font-variant-numeric:tabular-nums}
+.moves small{font-size:10px;color:var(--dim);margin-top:2px}
+
+#goal{flex:none;display:flex;justify-content:center;gap:6px;margin:2px 10px 0}
+.gc{display:flex;align-items:center;gap:5px;height:26px;padding:0 8px;border-radius:13px;background:var(--panel);font-size:12px;font-weight:700;color:var(--dim);white-space:nowrap}
+.gc b{color:var(--gold);letter-spacing:-.02em;font-size:12px}
+#chal{display:flex;align-items:center;justify-content:center;height:26px;width:100%;border-radius:13px;background:rgba(255,197,61,.14);color:var(--gold);font-size:13px;font-weight:700}
+
+#play{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center}
+#mid{flex:0 1 170px;min-height:104px;display:flex;align-items:center;gap:12px;padding:6px 12px 0}
+.ring{flex:none;width:104px;height:104px;border-radius:50%;background:var(--panel);box-shadow:inset 0 0 0 4px var(--acc);
+  display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring small{font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--acc)}
+.ring b{font-size:38px;line-height:1.05;font-weight:800;font-variant-numeric:tabular-nums}
+.ring b.l4{font-size:32px}
+#hist{flex:1;min-width:0;align-self:stretch;max-height:150px;margin:auto 0;background:var(--panel);border-radius:16px;padding:6px 10px;
+  display:flex;flex-direction:column;justify-content:center;overflow:hidden}
+#hist ol{list-style:none}
+#hist li{display:flex;align-items:baseline;gap:6px;font-size:18px;line-height:24px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--dim)}
+#hist li i{font-style:normal;font-size:11px;width:14px;text-align:right;color:#7380A8;flex:none}
+#hist li b{color:var(--ink);font-weight:800}
+#hist li:last-child b{color:var(--acc)}
+#hist li:last-child{color:var(--ink)}
+#hist .none{font-size:13px;color:#7380A8;text-align:center;line-height:1.3}
+
+#msg{flex:none;height:30px;margin:2px 12px 0;display:flex;align-items:center;justify-content:center;text-align:center;
+  font-size:14px;line-height:1.1;font-weight:700;color:var(--dim);border-radius:10px;padding:0 8px;overflow:hidden}
+#msg.warn{color:#FFD9A0;background:rgba(255,138,61,.14)}
+#msg.expr{color:var(--ink);font-size:17px}
+#msg.stuck{background:#4A2530;color:#FFE1E4}
+#msg.hint{color:var(--ink);font-size:13px}
+#bValid{flex:none;margin:4px 12px 0;min-height:46px}
+
+#tiles{flex:0 1 250px;min-height:108px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:8px;padding:6px 12px 0;
+  max-width:460px;width:100%;align-self:center}
+.tile{min-height:52px;border-radius:16px;background:var(--panel2);font-weight:800;font-size:30px;font-variant-numeric:tabular-nums;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:inset 0 -3px 0 rgba(0,0,0,.25);transition:transform .1s,background-color .15s}
+.tile.s5{font-size:24px}.tile.s7{font-size:18px}
+.tile.made{box-shadow:inset 0 0 0 2px var(--line),inset 0 -3px 0 rgba(0,0,0,.25)}
+.tile.sel{background:var(--acc);color:var(--acc-ink);transform:translateY(-3px);box-shadow:0 4px 0 rgba(0,0,0,.3)}
+.tile.empty{background:none;box-shadow:inset 0 0 0 2px #2A3558;border-radius:16px;pointer-events:none;color:transparent}
+.tile.pop{animation:pop .28s cubic-bezier(.2,1.6,.4,1)}
+.tile.no{animation:no .28s}
+.nudge .tile:not(.empty){animation:nud 1.4s ease-in-out infinite}
+@keyframes pop{from{transform:scale(.6)}}
+@keyframes no{25%{transform:translateX(-5px)}50%{transform:translateX(5px)}75%{transform:translateX(-3px)}}
+@keyframes nud{50%{transform:translateY(-2px);background:#30407A}}
+#ops{flex:none;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:8px 12px 0;max-width:460px;width:100%;align-self:center}
+.op{min-height:52px;border-radius:16px;background:var(--panel);font-size:32px;font-weight:700;line-height:1;color:var(--acc);box-shadow:inset 0 0 0 2px var(--line)}
+.op.sel{background:var(--acc);color:var(--acc-ink);box-shadow:none}
+.op:active{transform:scale(.96)}
+footer{flex:none;display:flex;gap:10px;padding:8px 12px 12px;max-width:460px;width:100%;align-self:center}
+.btn{
+  flex:1;min-height:50px;border-radius:14px;background:var(--panel);font-weight:700;font-size:15px;
+  display:flex;align-items:center;justify-content:center;gap:8px;padding:0 10px;
+}
+.btn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.btn:active{transform:scale(.97)}
+.btn[disabled]{color:#66739A;cursor:default}
+.btn.acc{background:var(--acc);color:var(--acc-ink)}
+.btn.line{background:none;box-shadow:inset 0 0 0 2px var(--line)}
+.btn.need{box-shadow:inset 0 0 0 2px var(--acc);color:var(--acc)}
+
+.over{position:absolute;top:0;right:0;bottom:0;left:0;z-index:5;display:flex;align-items:center;justify-content:center;
+  background:rgba(12,17,32,.92);padding:12px 16px;overflow:hidden;animation:fade .2s}
+@keyframes fade{from{opacity:0}}
+.card{position:relative;z-index:1;width:100%;max-width:330px;background:var(--panel);border-radius:22px;padding:18px 18px 14px;text-align:center;animation:cardin .28s cubic-bezier(.2,1.3,.5,1)}
+@keyframes cardin{from{transform:translateY(24px) scale(.94);opacity:0}}
+.card h2{font-size:26px;font-weight:800}
+.card p{color:var(--dim);margin-top:4px;font-size:15px}
+.stars{display:flex;justify-content:center;align-items:flex-end;gap:6px;margin:10px 0 4px}
+.stars svg{width:50px;height:50px;fill:var(--off)}
+.stars svg:nth-child(2){width:62px;height:62px}
+.stars svg.on{fill:var(--gold);animation:star .4s cubic-bezier(.2,1.6,.4,1) backwards}
+.stars svg.on:nth-child(2){animation-delay:.14s}
+.stars svg.on:nth-child(3){animation-delay:.28s}
+@keyframes star{from{transform:scale(.2) rotate(-40deg);opacity:0}}
+.big{font-size:40px;font-weight:800;line-height:1;margin-top:6px;font-variant-numeric:tabular-nums}
+.big small{font-size:16px;font-weight:600;color:var(--dim);margin-left:6px}
+.card p.rec{min-height:20px}
+.card p.cres{margin-top:6px;font-weight:800;font-size:16px;color:var(--acc)}
+.card p.cres.lost{color:var(--bad)}
+.acts{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.acts .row{display:flex;gap:8px}
+.acts .btn{min-height:48px}
+
+.scr{position:absolute;top:0;right:0;bottom:0;left:0;z-index:4;background:var(--bg);display:flex;flex-direction:column;
+  padding:calc(env(safe-area-inset-top) + 10px) calc(env(safe-area-inset-right) + 14px) calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 14px)}
+.top{flex:none;display:flex;align-items:center;gap:10px}
+.top .tt{flex:1;min-width:0}
+.top h1{font-size:24px;font-weight:800;color:var(--acc);letter-spacing:.01em;white-space:nowrap}
+.top .sub{font-size:12px;color:var(--dim);margin-top:2px;line-height:1.2}
+.total{display:flex;align-items:center;gap:6px;background:var(--panel);border-radius:14px;height:44px;padding:0 12px;font-weight:800;font-variant-numeric:tabular-nums;flex:none}
+.total svg{width:18px;height:18px;fill:var(--gold)}
+
+#home{justify-content:center;gap:12px}
+.hbrand{text-align:center;margin-bottom:4px}
+.hring{width:92px;height:92px;margin:0 auto 10px;border-radius:50%;box-shadow:inset 0 0 0 5px var(--acc);background:var(--panel);display:flex;align-items:center;justify-content:center;
+  font-size:38px;font-weight:800;color:var(--acc)}
+.hbrand h1{font-size:36px;font-weight:800;color:var(--acc);letter-spacing:.01em;line-height:1.1}
+.hbrand .sub{color:var(--dim);font-size:14px;margin-top:4px}
+.stat{background:var(--panel);border-radius:16px;padding:12px 14px;display:flex;align-items:center;gap:12px;min-height:66px}
+.stat svg{width:30px;height:30px;fill:var(--gold);flex:none}
+.stat .tx{flex:1;min-width:0}
+.stat b{display:block;font-size:24px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.stat small{display:block;font-size:12px;color:var(--dim);margin-top:3px}
+.pbar{height:6px;border-radius:3px;background:var(--off);margin-top:6px;overflow:hidden}
+.pbar u{display:block;height:100%;background:var(--acc);text-decoration:none}
+#home .btn{flex:none}
+#bGo{min-height:58px;font-size:17px}
+
+#grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,1fr));gap:8px;margin:12px 0}
+.cell{position:relative;min-height:48px;border-radius:14px;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;overflow:hidden}
+.cell .n{font-weight:800;font-size:19px;line-height:1;font-variant-numeric:tabular-nums}
+.cell .n svg{width:18px;height:18px;fill:#66739A}
+.cell .s{display:flex;gap:1px}
+.cell .s svg{width:14px;height:14px;fill:var(--off)}
+.cell .s svg.on{fill:var(--gold)}
+.cell.cur{box-shadow:inset 0 0 0 2px var(--acc)}
+.cell.ok{background:#1F4A44}
+.cell[disabled]{background:#182036;cursor:default}
+.cell:not([disabled]):active{transform:scale(.96)}
+
+@media (max-height:600px){
+  header{padding-top:4px;padding-bottom:0}
+  #mid{min-height:104px;padding-top:4px}
+  .ring{width:96px;height:96px}.ring b{font-size:34px}.ring b.l4{font-size:28px}
+  #hist li{font-size:17px;line-height:22px}
+  #msg{height:28px}
+  #bValid{min-height:44px;margin-top:2px}
+  #tiles{min-height:108px;padding-top:4px}
+  #ops{padding-top:6px}
+  .op{min-height:48px}
+  footer{padding-bottom:8px;padding-top:6px}
+  .btn{min-height:46px}
+  .stars svg{width:40px;height:40px}.stars svg:nth-child(2){width:50px;height:50px}
+  .card{padding:14px 16px 12px}.card h2{font-size:22px}
+  .big{font-size:34px}
+  .acts{gap:6px;margin-top:8px}.acts .btn{min-height:46px}
+  .hbrand h1{font-size:30px}.hring{width:76px;height:76px;font-size:32px;margin-bottom:6px}
+  #home{gap:9px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*:before,*:after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button class="icon" id="bMap" aria-label="Niveaux">
+      <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
+    </button>
+    <div class="ttl"><span class="brand" id="brand">Chiffrons</span><span id="lvl">Niveau 1</span></div>
+    <div class="moves" aria-label="Opérations faites"><b id="mv">0</b><small>op.</small></div>
+  </header>
+  <div id="goal"></div>
+  <div id="play">
+  <div id="mid">
+    <div class="ring" aria-label="Cible"><small>CIBLE</small><b id="tgt">0</b></div>
+    <div id="hist" aria-label="Opérations faites"></div>
+  </div>
+  <div id="msg" role="status" aria-live="polite"></div>
+  <button class="btn acc" id="bValid" hidden></button>
+  <main id="tiles"></main>
+  <div id="ops">
+    <button class="op" data-op="0" aria-label="plus">+</button>
+    <button class="op" data-op="1" aria-label="moins">−</button>
+    <button class="op" data-op="2" aria-label="fois">×</button>
+    <button class="op" data-op="3" aria-label="divisé par">÷</button>
+  </div>
+  <footer>
+    <button class="btn" id="bUndo"><svg viewBox="0 0 24 24"><path d="M9 7 4 12l5 5M4 12h10a6 6 0 0 1 0 12" transform="translate(0 -3)"/></svg>Annuler</button>
+    <button class="btn" id="bReset"><svg viewBox="0 0 24 24"><path d="M4 5v6h6M5 11a8 8 0 1 1 2 7"/></svg>Recommencer</button>
+  </footer>
+  </div>
+
+  <section class="over" id="win" hidden aria-live="polite">
+    <div class="card">
+      <h2 id="wTitle">Rond !</h2>
+      <p id="wSub">Niveau 1 terminé</p>
+      <div class="stars" id="wStars"></div>
+      <div class="big"><span id="wMoves">0</span><small id="wUnit">opérations</small></div>
+      <p class="rec" id="wRec"></p>
+      <p class="cres" id="wChal" hidden></p>
+      <div class="acts">
+        <button class="btn acc" id="bNext">Suivant</button>
+        <div class="row">
+          <button class="btn line" id="bAgain">Rejouer</button>
+          <button class="btn line" id="bShare">Partager</button>
+        </div>
+        <button class="btn line" id="bChal">Défier un ami</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="scr" id="home" hidden>
+    <div class="hbrand"><div class="hring">=</div><h1>Chiffrons</h1><div class="sub">Six nombres, une cible : fais le compte.</div></div>
+    <div class="stat" aria-label="Étoiles">
+      <svg viewBox="0 0 24 24"><use href="#star"/></svg>
+      <div class="tx"><b id="hStarsN">0 / 60</b><small>étoiles</small><div class="pbar"><u id="hBar"></u></div></div>
+    </div>
+    <button class="btn acc" id="bGo">Continuer · Niveau 1</button>
+    <button class="btn" id="bLevels">Les 20 niveaux</button>
+  </section>
+
+  <section class="scr" id="levels" hidden>
+    <div class="top">
+      <button class="icon" id="bGBack" aria-label="Accueil"><svg class="st" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="tt"><h1>Niveaux</h1><div class="sub">Déblocage dans l’ordre</div></div>
+      <div class="total" aria-label="Étoiles gagnées"><svg viewBox="0 0 24 24"><use href="#star"/></svg><span id="gTotal">0/60</span></div>
+    </div>
+    <div id="grid"></div>
+    <button class="btn acc" id="bBack" style="flex:none">Reprendre</button>
+  </section>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <path id="star" d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/>
+</defs></svg>
+
+<script>
+(function () {
+'use strict';
+
+var GAME = 'compte-rond';
+var NAME = 'Chiffrons';
+var KEY = 'mj:' + GAME + ':v1';
+var OPS = ['+', '−', '×', '÷'];
+
+/*LEVELS:BEGIN (generated by tools/compte-rond/generate.js, do not edit by hand)*/
+var LEVELS=[
+  {n:[1,3,4,5,8,9],t:16,p:2},
+  {n:[1,2,5,6,7,9],t:21,p:2},
+  {n:[4,5,6,7,8,9],t:21,p:2},
+  {n:[1,2,5,7,8,9],t:29,p:3},
+  {n:[1,2,3,4,7,8],t:20,p:2},
+  {n:[3,4,5,7,8,9],t:54,p:3},
+  {n:[1,3,8,9,10,25],t:41,p:3},
+  {n:[3,5,7,9,10,12],t:54,p:3},
+  {n:[2,3,5,9,10,20],t:104,p:4},
+  {n:[3,5,7,9,10,75],t:99,p:3},
+  {n:[1,6,7,9,10,50],t:179,p:4},
+  {n:[3,5,7,8,10,75],t:299,p:4},
+  {n:[1,2,3,8,50,100],t:288,p:3},
+  {n:[1,5,6,8,25,100],t:428,p:4},
+  {n:[1,2,6,9,10,100],t:346,p:5},
+  {n:[1,2,7,10,50,100],t:404,p:4},
+  {n:[4,6,8,10,50,100],t:707,p:5},
+  {n:[1,2,6,15,50,75],t:472,p:4},
+  {n:[3,7,8,10,25,75],t:929,p:5},
+  {n:[1,4,6,25,25,75],t:832,p:5}
+];
+/*LEVELS:END*/
+var N = LEVELS.length;
+var $ = function (id) { return document.getElementById(id); };
+var reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+// ---- host page (only the events listed in the game sheet, no personal data) ----
+function emit(msg) {
+  msg.source = 'mini-jeu'; msg.game = GAME;
+  try { window.parent.postMessage(msg, '*'); } catch (e) { /* ignore */ }
+}
+
+// ---- persistence (always guarded: the game works without storage) ------------
+var save = { level: 1, max: 1, stars: [], cur: null };
+function totalStars() {
+  var t = 0;
+  for (var i = 0; i < save.stars.length; i++) t += save.stars[i] || 0;
+  return t;
+}
+function loadSave() {
+  var i;
+  save.stars = [];
+  for (i = 0; i < N; i++) save.stars.push(0);
+  try {
+    var s = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (s && typeof s === 'object') {
+      var nat = function (v, lo, hi) { v = v | 0; return v < lo ? lo : v > hi ? hi : v; };
+      save.max = nat(s.max, 1, N);
+      save.level = Math.min(nat(s.level, 1, N), save.max);
+      if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = nat(s.stars[i], 0, 3);
+      if (s.cur && typeof s.cur === 'object' && Array.isArray(s.cur.hist)) {
+        var h = [];
+        s.cur.hist.slice(0, 5).forEach(function (m) {
+          if (Array.isArray(m) && m.length === 3) h.push([nat(m[0], 0, 5), nat(m[1], 0, 3), nat(m[2], 0, 5)]);
+        });
+        save.cur = { level: nat(s.cur.level, 1, N), hist: h };
+      }
+      // a finished level always opens the next one
+      for (i = 0; i < N - 1; i++) if (save.stars[i] > 0 && save.max < i + 2) save.max = i + 2;
+      save.level = Math.min(save.level, save.max);
+    }
+  } catch (e) { /* no storage: play without it */ }
+}
+function store() {
+  try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) { /* ignore */ }
+}
+
+// ---- game state --------------------------------------------------------------
+var level = 0;        // zero-based index of the level on screen
+var L = LEVELS[0];
+var vals = [];        // value on each of the 6 tiles, null = used
+var made = [];        // tile holds a result
+var hist = [];        // [slotA, op, slotB] ; unlimited undo
+var selA = -1, selOp = -1;
+var won = false;
+var chal = null;      // {target, level} while a friend's challenge is on
+var stuck = false;
+var screen = 'home';
+var winTimer = 0, msgTimer = 0;
+var tileEls = [];
+var seedValue = 0;    // no randomness in this game ; kept for the shared test hook
+
+function calc(a, o, b) {
+  if (o === 0) return { ok: true, r: a + b };
+  if (o === 1) {
+    if (a > b) return { ok: true, r: a - b };
+    return { ok: false, why: a + ' − ' + b + (a === b ? ' donnerait zéro.' : ' donnerait un nombre négatif.') };
+  }
+  if (o === 2) return { ok: true, r: a * b };
+  if (b !== 0 && a % b === 0) return { ok: true, r: a / b };
+  return { ok: false, why: a + ' ÷ ' + b + ' ne tombe pas juste.' };
+}
+function alive() {
+  var n = 0;
+  for (var i = 0; i < 6; i++) if (vals[i] !== null) n++;
+  return n;
+}
+function closest() {
+  var best = 1e9;
+  for (var i = 0; i < 6; i++) if (vals[i] !== null) best = Math.min(best, Math.abs(vals[i] - L.t));
+  return best;
+}
+function exact() {
+  for (var i = 0; i < 6; i++) if (vals[i] === L.t) return true;
+  return false;
+}
+
+// Applies a move to the board. Returns {ok, r, why}.
+function doOp(a, o, b) {
+  if (won || a === b || a < 0 || b < 0 || a > 5 || b > 5 || o < 0 || o > 3 || vals[a] === null || vals[b] === null) return { ok: false, why: '' };
+  var c = calc(vals[a], o, vals[b]);
+  if (!c.ok) return c;
+  vals[a] = c.r; vals[b] = null; made[a] = true; made[b] = false;
+  hist.push([a, o, b]);
+  return c;
+}
+
+function begin(n, replay, ch) {
+  clearTimeout(winTimer); clearTimeout(msgTimer);
+  level = n - 1; L = LEVELS[level]; chal = ch || null;
+  vals = L.n.slice(); made = [0, 0, 0, 0, 0, 0]; hist = []; selA = -1; selOp = -1; won = false; stuck = false;
+  if (replay) {
+    for (var i = 0; i < replay.length; i++) {
+      var m = replay[i];
+      if (!doOp(m[0], m[1], m[2]).ok) break;
+    }
+    if (exact() || (replay.length && hist.length !== replay.length)) { vals = L.n.slice(); made = [0, 0, 0, 0, 0, 0]; hist = []; }
+  }
+  $('win').hidden = true;
+  buildTiles();
+  refresh();
+  if (!replay || !hist.length) hintFirst();
+}
+function startLevel(n, replay) {
+  save.level = n;
+  begin(n, replay, null);
+  persist();
+}
+function persist() {
+  if (chal) return;
+  save.cur = hist.length && !won ? { level: level + 1, hist: hist.map(function (m) { return m.slice(); }) } : null;
+  store();
+}
+
+// ---- rendering ---------------------------------------------------------------
+function buildTiles() {
+  var t = $('tiles'), h = '';
+  for (var i = 0; i < 6; i++) h += '<button class="tile" data-slot="' + i + '"></button>';
+  t.innerHTML = h;
+  tileEls = [].slice.call(t.children);
+}
+function lenClass(v) { var l = String(v).length; return l >= 7 ? ' s7' : l >= 5 ? ' s5' : ''; }
+function refresh(popSlot) {
+  var i;
+  for (i = 0; i < 6; i++) {
+    var el = tileEls[i], v = vals[i];
+    el.className = 'tile' + (v === null ? ' empty' : lenClass(v)) + (made[i] && v !== null ? ' made' : '') + (selA === i ? ' sel' : '') +
+      (popSlot === i && !reduced ? ' pop' : '');
+    el.textContent = v === null ? '' : v;
+    el.disabled = v === null || won;
+    el.setAttribute('aria-label', v === null ? 'case vide' : v + (selA === i ? ', choisi' : '') + (made[i] ? ', résultat' : ''));
+    el.setAttribute('data-value', v === null ? '' : v);
+    el.style.order = v === null ? 10 + i : i;
+  }
+  var ops = document.querySelectorAll('.op');
+  for (i = 0; i < ops.length; i++) ops[i].className = 'op' + (selOp === i ? ' sel' : '');
+  $('lvl').textContent = 'Niveau ' + (level + 1);
+  $('mv').textContent = hist.length;
+  var tg = $('tgt');
+  tg.textContent = L.t; tg.className = String(L.t).length >= 4 ? 'l4' : '';
+  var g = $('goal');
+  if (chal) g.innerHTML = '<div id="chal">Défi : cible en ' + chal.target + ' op. ou moins</div>';
+  else g.innerHTML = '<span class="gc"><b>★★★</b>≤ ' + L.p + ' op.</span><span class="gc"><b>★★</b>cible exacte</span><span class="gc"><b>★</b>à 5 près</span>';
+  g.setAttribute('aria-label', chal ? 'Défi' : '3 étoiles en ' + L.p + ' opérations ou moins, 2 étoiles cible exacte, 1 étoile à 5 près');
+  // history: rebuilt by replaying the moves on the start numbers
+  var h = '', v2 = L.n.slice(), k;
+  for (k = 0; k < hist.length; k++) {
+    var m = hist[k], c = calc(v2[m[0]], m[1], v2[m[2]]);
+    h += '<li><i>' + (k + 1) + '</i><span>' + v2[m[0]] + ' ' + OPS[m[1]] + ' ' + v2[m[2]] + ' =</span> <b>' + c.r + '</b></li>';
+    v2[m[0]] = c.r; v2[m[2]] = null;
+  }
+  $('hist').innerHTML = h ? '<ol>' + h + '</ol>' : '<div class="none">Tes opérations s’afficheront ici</div>';
+  // approximate finish
+  var d = closest(), vb = $('bValid');
+  var canValid = !won && !chal && hist.length > 0 && d >= 1 && d <= 5;
+  vb.hidden = !canValid;
+  if (canValid) vb.textContent = 'Valider · à ' + d + ' près';
+  stuck = !won && alive() === 1 && !exact();
+  $('bUndo').className = 'btn' + (stuck ? ' need' : '');
+  $('app').classList.toggle('nudge', level === 0 && !chal && !hist.length && selA < 0 && save.stars[0] === 0);
+  showMsg();
+}
+// message line: a temporary warning wins, then the stuck notice, then the expression being built
+var warn = '';
+function showMsg() {
+  var m = $('msg');
+  if (warn) { m.textContent = warn; m.className = 'warn'; return; }
+  if (stuck) { m.textContent = 'Plus qu’un nombre : annule un coup.'; m.className = 'stuck'; return; }
+  if (selA >= 0) {
+    m.textContent = vals[selA] + (selOp >= 0 ? ' ' + OPS[selOp] : '') + ' …';
+    m.className = 'expr'; return;
+  }
+  m.textContent = ''; m.className = '';
+}
+function say(text, ms) {
+  clearTimeout(msgTimer);
+  warn = text; showMsg();
+  msgTimer = setTimeout(function () { warn = ''; showMsg(); }, ms || 2600);
+}
+function hintFirst() {
+  if (level === 0 && !chal && save.stars[0] === 0) {
+    clearTimeout(msgTimer);
+    warn = 'Touche un nombre, une opération, puis un autre nombre.';
+    showMsg();
+    $('msg').className = 'hint';
+  } else warn = '';
+}
+function clearSel() { selA = -1; selOp = -1; }
+
+// ---- input -------------------------------------------------------------------
+function tapTile(i) {
+  if (won || vals[i] === null) return;
+  if (warn) { clearTimeout(msgTimer); warn = ''; }
+  if (selA < 0) { selA = i; }
+  else if (selOp < 0) { selA = selA === i ? -1 : i; }
+  else if (i === selA) { clearSel(); }
+  else {
+    var a = selA, o = selOp;
+    var r = doOp(a, o, i);
+    clearSel();
+    if (!r.ok) {
+      refresh();
+      if (r.why) {
+        say(r.why);
+        var el = tileEls[i];
+        if (!reduced) { el.classList.remove('no'); void el.offsetWidth; el.classList.add('no'); }
+      }
+      return;
+    }
+    afterMove(a);
+    return;
+  }
+  refresh();
+}
+function tapOp(o) {
+  if (won) return;
+  if (selA < 0) { say('Choisis d’abord un nombre.'); return; }
+  if (warn) { clearTimeout(msgTimer); warn = ''; }
+  selOp = selOp === o ? -1 : o;
+  refresh();
+}
+function afterMove(slot) {
+  persist();
+  refresh(slot);
+  if (exact()) win(true);
+}
+function undo() {
+  if (won || !hist.length) return;
+  var h = hist.slice(0, -1);
+  hist = []; vals = L.n.slice(); made = [0, 0, 0, 0, 0, 0]; clearSel(); warn = ''; clearTimeout(msgTimer);
+  h.forEach(function (m) { doOp(m[0], m[1], m[2]); });
+  persist(); refresh();
+}
+function restart() {
+  clearTimeout(winTimer);
+  if (chal) { begin(level + 1, null, chal); return; }
+  startLevel(level + 1, null);
+}
+function validate() {
+  if (won || chal || !hist.length) return;
+  var d = closest();
+  if (d >= 1 && d <= 5) win(false);
+}
+
+// ---- win ---------------------------------------------------------------------
+var info = null;
+function win(isExact) {
+  won = true; clearSel(); warn = '';
+  var ops = hist.length, n = level + 1;
+  var s = isExact ? (ops <= L.p ? 3 : 2) : 1;
+  info = { ops: ops, stars: s, exact: isExact, prev: save.stars[level] || 0, chal: null };
+  if (chal) {
+    var ok = isExact && ops <= chal.target;
+    info.chal = { ok: ok, target: chal.target };
+    emit({ event: 'challenge_result', level: n, score: ops, target: chal.target, won: ok });
+  } else {
+    if (s > save.stars[level]) save.stars[level] = s;
+    if (n < N) save.max = Math.max(save.max, n + 1);
+    save.level = n < N ? n + 1 : N;
+    save.cur = null;
+    store();
+    emit({ event: 'level_complete', level: n, score: ops, stars: s });
+  }
+  refresh();
+  winTimer = setTimeout(showWin, reduced ? 60 : 450);
+}
+function starSvg(on) { return '<svg viewBox="0 0 24 24"' + (on ? ' class="on"' : '') + '><use href="#star"/></svg>'; }
+function plural(n, w) { return n + ' ' + w + (n > 1 ? 's' : ''); }
+function showWin() {
+  if (!won || screen !== 'game') return;
+  var s = info.stars, c = info.chal, last = !chal && level + 1 === N;
+  $('wTitle').textContent = c ? (c.ok ? 'Défi relevé !' : 'Pas cette fois') : last && s > 1 ? 'Tout est rond !' : s === 3 ? 'Rond !' : s === 2 ? 'Bien joué !' : 'Presque !';
+  $('wSub').textContent = 'Niveau ' + (level + 1) + (c ? '' : ' terminé');
+  $('wStars').innerHTML = c ? '' : starSvg(s >= 1) + starSvg(s >= 2) + starSvg(s >= 3);
+  $('wStars').hidden = !!c;
+  $('wStars').setAttribute('aria-label', s + ' étoile' + (s > 1 ? 's' : '') + ' sur 3');
+  $('wMoves').textContent = info.ops;
+  $('wUnit').textContent = info.ops > 1 ? 'opérations' : 'opération';
+  var rec = '';
+  if (c) rec = info.exact ? '' : 'Cible manquée';
+  else if (!info.exact) rec = 'À ' + closest() + ' de la cible. Mieux : la cible exacte.';
+  else if (s < 3) rec = '3 étoiles en ' + L.p + ' opérations ou moins';
+  $('wRec').textContent = rec;
+  var cr = $('wChal');
+  cr.hidden = !c;
+  if (c) {
+    cr.textContent = c.ok ? 'Tu as égalé ou battu ' + c.target + ' op.' : 'Il fallait ' + c.target + ' opération' + (c.target > 1 ? 's' : '') + ' ou moins';
+    cr.className = 'cres' + (c.ok ? '' : ' lost');
+  }
+  $('bNext').textContent = c ? 'Accueil' : last ? 'Niveaux' : 'Suivant';
+  $('bShare').textContent = 'Partager';
+  $('bShare').hidden = !!c;
+  $('bChal').textContent = c ? 'Renvoyer le défi' : 'Défier un ami';
+  $('bChal').hidden = !info.exact;
+  $('win').hidden = false;
+}
+
+// ---- sharing -----------------------------------------------------------------
+function starsText(s) { var st = ''; while (s--) st += '⭐'; return st; }
+function shareText() {
+  return NAME + ' · Niveau ' + (level + 1) + ' · ' + starsText(info.stars) + ' en ' + plural(info.ops, 'opération');
+}
+// The link base: MJ_CONFIG.shareBaseUrl, else the current address if it is http(s); otherwise no link.
+function shareBase() {
+  var b = window.MJ_CONFIG && window.MJ_CONFIG.shareBaseUrl;
+  if (typeof b !== 'string' || !b) b = /^https?:/i.test(String(location.href)) ? String(location.href) : '';
+  return b.split('#')[0];
+}
+function challengeText() {
+  var base = shareBase(), link = base ? base + '#defi-' + (level + 1) + '-' + info.ops : '';
+  return NAME + ' · Niveau ' + (level + 1) + ' en ' + plural(info.ops, 'opération') + '. À toi de faire mieux !' + (link ? ' ' + link : '');
+}
+function sendText(text, kind, btn) {
+  var done = function () { emit({ event: 'share', kind: kind }); };
+  var copied = function () { btn.textContent = 'Copié !'; done(); };
+  var legacy = function () {   // last resort: hidden textarea + execCommand
+    var ok = false;
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;left:0;top:0;opacity:0';
+      document.body.appendChild(ta);
+      ta.select(); ta.setSelectionRange(0, text.length);
+      ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (e) { ok = false; }
+    btn.textContent = ok ? 'Copié !' : 'Copie impossible';
+    if (ok) done();
+  };
+  var clip = function () {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(copied, legacy);
+    } catch (e) { /* fall through */ }
+    legacy();
+  };
+  try {
+    if (navigator.share) {
+      return navigator.share({ text: text }).then(done, function (e) { if (!e || e.name !== 'AbortError') clip(); });
+    }
+  } catch (e) { /* fall through */ }
+  clip();
+}
+
+// ---- challenges (#defi-<level>-<operations>) -------------------------------------
+// Opening one never touches the saved progress nor the game in progress (nothing is stored while it is on).
+function openChallenge() {
+  var h = String(location.hash || ''), m;
+  try { if (h) history.replaceState(null, '', String(location.href).split('#')[0]); } catch (e) { /* ignore */ }
+  if (!(m = /^#defi-(\d{1,2})-(\d{1,2})$/.exec(h))) return false;
+  var n = +m[1], target = +m[2];
+  if (n < 1 || n > N || target < 1 || target > 5) return false;
+  begin(n, null, { target: target });
+  emit({ event: 'challenge_open', level: n, target: target });
+  show('game');
+  return true;
+}
+
+// ---- screens -------------------------------------------------------------------
+var SCREENS = ['home', 'levels'];
+function show(name) {
+  clearTimeout(winTimer);
+  if (chal && name !== 'game') {   // leaving a challenge: the real game in progress comes back as it was saved
+    chal = null;
+    begin(save.level, save.cur && save.cur.level === save.level ? save.cur.hist : null, null);
+  }
+  screen = name;
+  SCREENS.forEach(function (s) { $(s).hidden = s !== name; });
+  if (name !== 'game') $('win').hidden = true;
+  if (name === 'home') renderHome();
+  else if (name === 'levels') renderGrid();
+}
+var LOCK = '<svg viewBox="0 0 24 24"><path d="M7 10V8a5 5 0 0 1 10 0v2h1.500v10h-13V10zm2.500 0h5V8a2.500 2.500 0 0 0-5 0z"/></svg>';
+function renderHome() {
+  var t = totalStars();
+  $('hStarsN').textContent = t + ' / ' + (N * 3);
+  $('hBar').style.width = Math.round(100 * t / (N * 3)) + '%';
+  $('bGo').textContent = 'Continuer · Niveau ' + save.level;
+}
+function renderGrid() {
+  var html = '';
+  for (var i = 0; i < N; i++) {
+    var n = i + 1, s = save.stars[i] || 0, open = n <= save.max;
+    html += '<button class="cell' + (n === save.level ? ' cur' : '') + (s ? ' ok' : '') + '" data-level="' + n + '"' + (open ? '' : ' disabled') +
+      ' aria-label="Niveau ' + n + (open ? ', ' + s + ' étoile' + (s > 1 ? 's' : '') : ', verrouillé') + '">' +
+      '<span class="n">' + (open ? n : LOCK) + '</span><span class="s">' + starSvg(s >= 1) + starSvg(s >= 2) + starSvg(s >= 3) + '</span></button>';
+  }
+  $('grid').innerHTML = html;
+  $('gTotal').textContent = totalStars() + '/' + (N * 3);
+}
+function goContinue() {
+  var n = save.level;
+  if (!chal && level + 1 === n && !won) { show('game'); return; }
+  startLevel(n, save.cur && save.cur.level === n ? save.cur.hist : null);
+  show('game');
+}
+function pickLevel(n) {
+  if (!chal && n === level + 1 && !won) { save.level = n; show('game'); return; }
+  startLevel(n, save.cur && save.cur.level === n ? save.cur.hist : null);
+  show('game');
+}
+function openGrid() { show('levels'); }
+
+// ---- input: pointer events, with a click fallback for keyboards and assistive tech ----
+var pressing = false, lastUp = 0;
+function stray() { return pressing || Date.now() - lastUp < 700; }
+document.addEventListener('pointerdown', function () { pressing = true; }, true);
+['pointerup', 'pointercancel'].forEach(function (ev) {
+  document.addEventListener(ev, function () { pressing = false; lastUp = Date.now(); }, true);
+});
+function onTap(el, fn) {
+  var down = false;
+  el.addEventListener('pointerdown', function () { down = true; });
+  el.addEventListener('pointerleave', function () { down = false; });
+  el.addEventListener('pointercancel', function () { down = false; });
+  el.addEventListener('pointerup', function (e) {
+    if (!down) return;
+    down = false; fn(e);
+  });
+  el.addEventListener('click', function (e) { if (!stray()) fn(e); });
+}
+function closestAttr(node, attr) {
+  while (node && node !== document.body) {
+    if (node.getAttribute && node.getAttribute(attr) !== null) return node;
+    node = node.parentNode;
+  }
+  return null;
+}
+onTap($('tiles'), function (e) {
+  var t = closestAttr(e.target, 'data-slot');
+  if (t) tapTile(+t.getAttribute('data-slot'));
+});
+onTap($('ops'), function (e) {
+  var t = closestAttr(e.target, 'data-op');
+  if (t) tapOp(+t.getAttribute('data-op'));
+});
+onTap($('grid'), function (e) {
+  var c = closestAttr(e.target, 'data-level');
+  if (c && !c.disabled) pickLevel(+c.getAttribute('data-level'));
+});
+onTap($('bUndo'), undo);
+onTap($('bReset'), restart);
+onTap($('bValid'), validate);
+onTap($('bMap'), openGrid);
+onTap($('bBack'), goContinue);
+onTap($('bGBack'), function () { show('home'); });
+onTap($('bGo'), goContinue);
+onTap($('bLevels'), function () { show('levels'); });
+onTap($('bNext'), function () {
+  if (chal) { chal = null; show('home'); }
+  else if (level + 1 < N) { startLevel(level + 2, null); show('game'); }
+  else show('levels');
+});
+onTap($('bAgain'), restart);
+onTap($('bShare'), function () { sendText(shareText(), 'result', $('bShare')); });
+onTap($('bChal'), function () { sendText(challengeText(), 'challenge', $('bChal')); });
+document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+window.addEventListener('hashchange', function () { if (/^#defi-/.test(location.hash)) openChallenge(); });
+
+// ---- boot --------------------------------------------------------------------
+loadSave();
+startLevel(save.level, save.cur && save.cur.level === save.level ? save.cur.hist : null);
+show('home');
+if (/^#defi-/.test(location.hash)) openChallenge();
+
+// Test hooks. Solutions are never embedded: they live in tools/compte-rond/solutions.json.
+window.__game = {
+  state: function () {
+    return {
+      screen: screen,
+      level: level + 1,
+      numbers: vals.slice(),
+      target: L.t,
+      par: L.p,
+      ops: hist.length,
+      history: hist.map(function (m) { return m.slice(); }),
+      selected: { a: selA, op: selOp },
+      won: won,
+      stars: won && info ? info.stars : 0,
+      stuck: stuck,
+      closest: closest(),
+      canValidate: !$('bValid').hidden,
+      challenge: chal ? { target: chal.target, level: level + 1 } : null,
+      total: totalStars(),
+      max: save.max,
+      saved: save.level
+    };
+  },
+  levels: LEVELS.map(function (l) { return { numbers: l.n.slice(), target: l.t, par: l.p }; }),
+  loadLevel: function (n) {
+    n = n | 0;
+    if (n < 1 || n > N) throw new Error('level must be 1..' + N);
+    startLevel(n, null);
+    show('game');
+    return this.state();
+  },
+  // slots are 0..5 (tile positions), op is 0..3 (+ - x /) ; no animation, same rules as taps
+  apply: function (a, o, b) {
+    var r = doOp(a, o, b);
+    if (!r.ok) return false;
+    clearSel();
+    afterMove(a);
+    return true;
+  },
+  seed: function (n) { seedValue = n | 0; return seedValue; }
+};
+})();
+</script>
+</body>
+</html>

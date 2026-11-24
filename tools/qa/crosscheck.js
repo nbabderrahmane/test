@@ -22,7 +22,9 @@ function reach(tubes, caps, limit) {
 }
 const sim = require(L.SCRATCH + '/sim.json');
 let agree = 0, disagree = 0, unknown = 0; const bad = [];
-for (const id of ['N61', 'N63', 'N64', 'N65', 'N67', 'N71', 'N75', 'N124', 'N131', 'N136', 'N162', 'N165', 'N172', 'N180', 'N5', 'N22']) {
+const ids = process.argv.includes('--all') ? D.levels.map((l, i) => 'N' + (i + 1)) : ['N61', 'N63', 'N64', 'N65', 'N67', 'N71', 'N75', 'N124', 'N131', 'N136', 'N162', 'N165', 'N172', 'N180', 'N5', 'N22'];
+const t0 = Date.now(); const maxFatal = {};
+for (const id of ids) {
   const lvl = id[0] === 'N' ? D.levels[+id.slice(1) - 1] : D.daily[+id.slice(1)];
   let fatal = 0, unk = 0;
   L.legalMoves(lvl.tubes, lvl.caps).forEach(([a, b]) => {
@@ -32,7 +34,8 @@ for (const id of ['N61', 'N63', 'N64', 'N65', 'N67', 'N71', 'N75', 'N124', 'N131
   });
   const s = sim.find(x => x.id === id).first;
   const ok = fatal === s.fatal && unk === 0;
-  console.log(id, 'independent fatal', fatal, 'unknown', unk, '| sim.js fatal', s.fatal, '/', s.legal, ok ? 'AGREE' : 'DIFFER');
+  if (!process.argv.includes('--all')) console.log(id, 'independent fatal', fatal, 'unknown', unk, '| sim.js fatal', s.fatal, '/', s.legal, ok ? 'AGREE' : 'DIFFER');
+  if (!ok) console.log(id, 'DIFFERENT', fatal, unk, s.fatal);
   if (ok) agree++; else if (unk) unknown++; else { disagree++; bad.push(id); }
 }
-console.log({ agree, disagree, unknown, bad });
+console.log(JSON.stringify({ agree, disagree, unknown, bad, seconds: Math.round((Date.now() - t0) / 1000) }));

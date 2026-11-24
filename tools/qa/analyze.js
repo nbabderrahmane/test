@@ -10,11 +10,11 @@ D.levels.forEach((l, i) => all.push({ id: 'N' + (i + 1), kind: 'level', n: i + 1
 D.daily.forEach((l, i) => all.push({ id: 'J' + i, kind: 'daily', n: i, l, sol: D.sol.daily[i] }));
 
 // ---- A. per-level facts
-const WORLD_SPEC = [ // cap, empties(full-height), short, mystery, colours [min,max], par [min,max], first, last
-  [4, 2, 0, false, [2, 9], [3, 35], 3, 35], [4, 2, 0, false, [6, 10], [19, 41], 20, 41], [5, 2, 0, false, [4, 8], [17, 46], 17, 46],
-  [4, 1, 0, false, [4, 8], [16, 42], 16, 42], [4, 1, 1, false, [4, 8], [13, 37], 13, 37], [4, 2, 0, true, [4, 8], [13, 34], 13, 34],
-  [5, 1, 0, false, [4, 8], [21, 70], 23, 70], [4, 1, 1, true, [5, 9], [18, 39], 18, 39], [4, 1, 0, true, [5, 9], [19, 53], 21, 53],
-  [5, 1, 1, true, [7, 10], [39, 72], 40, 72]];
+const WORLD_SPEC = [ // cap, empties(full-height), short, mystery, colours [min,max], par [min,max]  (lot A table after the QA decisions)
+  [4, 2, 0, false, [2, 6], [5, 23]], [5, 2, 0, false, [4, 6], [18, 27]], [4, 2, 0, true, [5, 8], [18, 30]],
+  [4, 1, 1, false, [5, 8], [18, 32]], [4, 2, 0, false, [7, 10], [24, 41]], [4, 1, 0, false, [4, 7], [16, 36]],
+  [4, 1, 1, true, [7, 9], [25, 39]], [4, 1, 0, true, [6, 8], [24, 42]], [5, 1, 0, false, [5, 8], [33, 60]],
+  [5, 1, 1, true, [7, 10], [42, 66]]];
 all.forEach(o => {
   const l = o.l, cnt = {};
   l.tubes.forEach(t => t.forEach(c => { cnt[c] = (cnt[c] || 0) + 1; }));
@@ -44,18 +44,18 @@ all.forEach(o => {
   if (o.kind === 'level') {
     const sp = WORLD_SPEC[o.world - 1];
     const sc = o.l.cap, se = o.empties, ss = o.shorts;
-    const lowLevel = o.n <= 2; // spec: world 1 levels 1-2 use cap 3
+    const lowLevel = o.n <= 4; // spec: world 1 levels 1-4 use height 3
     if (!lowLevel && sc !== sp[0]) o.problems.push(`cap ${sc} != spec ${sp[0]}`);
     if (!lowLevel && o.empties !== sp[1]) o.problems.push(`${o.empties} empty full tubes != spec ${sp[1]}`);
     if (o.shorts !== sp[2]) o.problems.push(`${o.shorts} short tubes != spec ${sp[2]}`);
     if (l.mystery !== sp[3]) o.problems.push(`mystery ${l.mystery} != spec ${sp[3]}`);
-    if (o.colors < sp[4][0] && o.n > 10) o.problems.push(`colours ${o.colors} < spec min ${sp[4][0]}`);
+    if (o.colors < sp[4][0]) o.problems.push(`colours ${o.colors} < spec min ${sp[4][0]}`);
     if (o.colors > sp[4][1]) o.problems.push(`colours ${o.colors} > spec max ${sp[4][1]}`);
     if (o.par < sp[5][0] || o.par > sp[5][1]) o.problems.push(`par ${o.par} outside spec range ${sp[5]}`);
   } else {
     if (l.cap !== 4 || o.empties !== 2 || o.shorts !== 0 || l.mystery) o.problems.push('daily is not plain 4-high / 2 empty / no mechanic');
-    if (o.colors < 7 || o.colors > 9) o.problems.push(`daily colours ${o.colors} outside 7-9`);
-    if (o.par < 24 || o.par > 37) o.problems.push(`daily par ${o.par} outside 24-37`);
+    if (o.colors < 6 || o.colors > 8) o.problems.push(`daily colours ${o.colors} outside 6-8`);
+    if (o.par < 17 || o.par > 33) o.problems.push(`daily par ${o.par} outside 17-33`);
   }
 });
 

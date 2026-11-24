@@ -127,16 +127,16 @@ async function screens(browser) {
     await ctx.close();
     // (b) 1 star: play a few useless moves first on level 3 (replay solution after detour)
     ({ ctx, page } = await open(browser, w, h, null));
-    await page.evaluate(() => window.__game.loadLevel(3));
+    await page.evaluate(() => window.__game.loadLevel(5));
     await page.evaluate(sol => {
       const g = window.__game;
       g.applyMove(sol[0][0], sol[0][1]);                       // ball goes into an empty tube (4)
       for (let i = 0; i < 10; i++) { g.applyMove(4, 5); g.applyMove(5, 4); }   // useless shuffle between empty tubes
       sol.slice(1).forEach(([f, t]) => g.applyMove(f, t));
-    }, D.sol.levels[2]);
+    }, D.sol.levels[4]);
     await page.waitForSelector('#win:not([hidden])'); await page.waitForTimeout(900);
     const s1 = await st(page);
-    rec(`victoire à 1 étoile : ${s1.moves} coups -> ${s1.stars} étoile(s) (par 13, limites 3★≤${13 + 2}, 2★≤${13 + 6})`, s1.stars === 1);
+    rec(`victoire à 1 étoile : ${s1.moves} coups -> ${s1.stars} étoile(s) (par ${D.levels[4].par}, limites 3★≤${D.levels[4].par + 2}, 2★≤${D.levels[4].par + 6})`, s1.stars === 1);
     await dumpScreen(page, 'victoire 1 étoile', sz); await shot(page, `${sz}-win-1star`);
     await ctx.close();
     // (c) worst-case news chips: world finished, perfect world, rank up, 100 stars, challenge relevé
@@ -206,7 +206,7 @@ async function mechanics(browser) {
   // short tube (world 5, level 81+): find a state where short tube holds 2 same-colour balls and another tube top is that colour
   ({ ctx, page } = await open(browser, w, h, null));
   let found = null;
-  for (const n of [81, 83, 85, 90, 100, 161, 170, 190, 195]) {
+  for (const n of [61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 125, 130, 190, 195]) {
     await page.evaluate(k => window.__game.loadLevel(k), n);
     const lvl = D.levels[n - 1];
     // search with the reference solution: play it, and watch for the moment a 3rd ball would be refused
@@ -236,7 +236,7 @@ async function mechanics(browser) {
   // ---- stuck: random walk until no legal move
   ({ ctx, page } = await open(browser, w, h, null));
   const stuckInfo = [];
-  for (const n of [4, 22, 63, 85]) {
+  for (const n of [105, 110, 115, 120]) {
     const res = await page.evaluate(k => {
       window.__game.loadLevel(k);
       let seed = 12345 + k;
@@ -303,7 +303,7 @@ async function mechanics(browser) {
   await ctx.close();
 
   // ---- mystery reveal on levels of worlds 6, 8, 9, 10
-  for (const n of [101, 150, 165, 185]) {
+  for (const n of [45, 130, 145, 185]) {
     ({ ctx, page } = await open(browser, w, h, null));
     await page.evaluate(k => window.__game.loadLevel(k), n);
     const lvl = D.levels[n - 1], sol = D.sol.levels[n - 1];

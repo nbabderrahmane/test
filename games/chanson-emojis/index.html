@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#131A2E">
+<title>Fredonne</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#131A2E;--panel:#1D2742;--line:#4A5880;--ink:#F4F1E8;--dim:#A9B4D0;--off:#3A4567;
+  --acc:#FF5C93;--acc-ink:#2B0716;--gold:#FFC53D;--good:#2F9E6E;--goodbg:#173F39;--bad:#E5646E;--badbg:#4A2530;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);overscroll-behavior:none}
+body{
+  position:fixed;top:0;right:0;bottom:0;left:0;color:var(--ink);
+  font:16px/1.25 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif;
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-text-size-adjust:100%;
+}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;touch-action:manipulation}
+button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+svg{display:block}
+.emo,.emo span{font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Android Emoji",sans-serif}
+
+#app{
+  position:absolute;top:0;right:0;bottom:0;left:0;display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+header{display:flex;align-items:center;gap:8px;padding:8px 12px 4px;flex:none}
+.icon{width:48px;height:48px;border-radius:14px;background:var(--panel);display:flex;align-items:center;justify-content:center;flex:none}
+.icon svg{width:24px;height:24px;fill:var(--ink)}
+.icon svg.st{fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.ttl{flex:1;min-width:0;text-align:center}
+.brand{display:block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#lvl{display:block;font-size:20px;font-weight:800;white-space:nowrap}
+.pts{width:48px;height:48px;border-radius:14px;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none}
+.pts b{font-size:18px;line-height:1;font-weight:800;font-variant-numeric:tabular-nums}
+.pts small{font-size:10px;color:var(--dim);margin-top:2px}
+
+#prog{flex:none;display:flex;justify-content:center;gap:8px;height:28px;align-items:center}
+#prog i{width:46px;height:24px;border-radius:12px;background:var(--panel);box-shadow:inset 0 0 0 2px var(--off);display:flex;align-items:center;justify-content:center;font-style:normal;font-weight:800;font-size:13px;color:var(--dim)}
+#prog i.cur{box-shadow:inset 0 0 0 2px var(--acc);color:var(--ink)}
+#prog i.ok{background:var(--good);box-shadow:none;color:#fff}
+#prog i.ko{background:var(--bad);box-shadow:none;color:#2B0A0E}
+#chal{flex:none;display:flex;align-items:center;justify-content:center;gap:6px;height:26px;margin:2px 12px 0;border-radius:13px;background:rgba(255,92,147,.16);color:var(--acc);font-size:13px;font-weight:700}
+#chal svg{width:14px;height:14px;fill:var(--acc)}
+#goal{flex:none;display:flex;align-items:center;justify-content:center;gap:5px;min-height:24px;margin:0 12px;font-size:12px;color:var(--dim);text-align:center;line-height:1.15}
+#goal svg{width:13px;height:13px;fill:var(--gold);flex:none}
+
+#card{flex:1;min-height:96px;margin:2px 12px 0;border-radius:20px;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 8px 6px;gap:4px;overflow:hidden}
+#emo{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:2px 10px;line-height:1}
+#emo span{font-size:46px;line-height:1.1;display:block}
+#hint{min-height:20px;font-size:13px;font-weight:700;color:var(--gold);text-align:center;line-height:1.2}
+#msg{flex:none;height:30px;margin:2px 12px 0;display:flex;align-items:center;justify-content:center;text-align:center;font-size:14px;font-weight:700;color:var(--dim);overflow:hidden;line-height:1.1}
+#msg.good{color:#8FE3B8}
+#msg.bad{color:#FFB4BC}
+#choices{flex:none;display:flex;flex-direction:column;gap:7px;margin:0 12px}
+.opt{display:flex;align-items:center;gap:10px;min-height:52px;border-radius:14px;background:var(--panel);box-shadow:inset 0 0 0 2px var(--off);padding:4px 10px 4px 8px;text-align:left}
+.opt .k{width:30px;height:30px;border-radius:50%;background:var(--off);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex:none}
+.opt .t{flex:1;min-width:0;font-weight:700;font-size:16px;line-height:1.15}
+.opt .m{width:24px;flex:none;font-weight:800;font-size:20px;text-align:center}
+.opt:not(.lock):active{transform:scale(.98)}
+.opt.lock{cursor:default}
+.opt.good{background:var(--goodbg);box-shadow:inset 0 0 0 3px var(--good)}
+.opt.good .k{background:var(--good);color:#fff}
+.opt.good .m{color:#8FE3B8}
+.opt.bad{background:var(--badbg);box-shadow:inset 0 0 0 3px var(--bad)}
+.opt.bad .k{background:var(--bad);color:#2B0A0E}
+.opt.bad .m{color:#FFB4BC}
+.opt.dim{opacity:.55}
+footer{flex:none;display:flex;gap:10px;padding:8px 12px 12px}
+.btn{
+  flex:1;min-height:50px;border-radius:14px;background:var(--panel);font-weight:700;font-size:15px;
+  display:flex;align-items:center;justify-content:center;gap:8px;padding:0 10px;
+}
+.btn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.btn:active{transform:scale(.97)}
+.btn[disabled]{color:#66739A;cursor:default}
+.btn.hot{background:var(--acc);color:var(--acc-ink)}
+.btn.line{background:none;box-shadow:inset 0 0 0 2px var(--line)}
+.btn.need{box-shadow:inset 0 0 0 2px var(--gold);color:var(--gold)}
+
+.over{position:absolute;top:0;right:0;bottom:0;left:0;z-index:5;display:flex;align-items:center;justify-content:center;
+  background:rgba(12,17,32,.92);padding:12px 16px;overflow:hidden;animation:fade .2s}
+@keyframes fade{from{opacity:0}}
+.card{position:relative;z-index:1;width:100%;max-width:330px;background:var(--panel);border-radius:22px;padding:18px 18px 14px;text-align:center;animation:pop .28s cubic-bezier(.2,1.3,.5,1)}
+@keyframes pop{from{transform:translateY(24px) scale(.94);opacity:0}}
+.card h2{font-size:26px;font-weight:800}
+.card p{color:var(--dim);margin-top:4px;font-size:15px}
+.stars{display:flex;justify-content:center;align-items:flex-end;gap:6px;margin:10px 0 4px}
+.stars svg{width:50px;height:50px;fill:var(--off)}
+.stars svg:nth-child(2){width:62px;height:62px}
+.stars svg.on{fill:var(--gold);animation:star .4s cubic-bezier(.2,1.6,.4,1) backwards}
+.stars svg.on:nth-child(2){animation-delay:.14s}
+.stars svg.on:nth-child(3){animation-delay:.28s}
+@keyframes star{from{transform:scale(.2) rotate(-40deg);opacity:0}}
+.big{font-size:40px;font-weight:800;line-height:1;margin-top:6px;font-variant-numeric:tabular-nums}
+.big small{font-size:16px;font-weight:600;color:var(--dim);margin-left:6px}
+.marks{display:flex;justify-content:center;gap:6px;margin-top:8px}
+.marks i{width:34px;height:26px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-style:normal;font-weight:800;font-size:14px}
+.marks i.ok{background:var(--good);color:#fff}
+.marks i.ko{background:var(--bad);color:#2B0A0E}
+.card p.rec{min-height:20px}
+.card p.cres{margin-top:6px;font-weight:800;font-size:16px;color:var(--acc)}
+.card p.cres.lost{color:#FFB4BC}
+.acts{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.acts .row{display:flex;gap:8px}
+.acts .btn{min-height:48px}
+.bit{position:absolute;top:-24px;font-size:20px;animation:fall 1.5s cubic-bezier(.3,.2,.6,1) forwards}
+@keyframes fall{to{transform:translate(var(--dx),105vh) rotate(var(--rot));opacity:.9}}
+
+.scr{position:absolute;top:0;right:0;bottom:0;left:0;z-index:4;background:var(--bg);display:flex;flex-direction:column;
+  padding:calc(env(safe-area-inset-top) + 10px) calc(env(safe-area-inset-right) + 14px) calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 14px)}
+.top{flex:none;display:flex;align-items:center;gap:10px}
+.top .tt{flex:1;min-width:0}
+.top h1{font-size:24px;font-weight:800;color:var(--acc);letter-spacing:.01em;white-space:nowrap}
+.top .sub{font-size:12px;color:var(--dim);margin-top:2px;line-height:1.2}
+.total{display:flex;align-items:center;gap:6px;background:var(--panel);border-radius:14px;height:44px;padding:0 12px;font-weight:800;font-variant-numeric:tabular-nums;flex:none}
+.total svg{width:18px;height:18px;fill:var(--gold)}
+
+#home{justify-content:center;gap:14px}
+.hbrand{text-align:center;margin-bottom:2px}
+.hbrand .deco{display:flex;justify-content:center;gap:12px;font-size:38px;line-height:1.1;margin-bottom:6px}
+.hbrand h1{font-size:40px;font-weight:800;color:var(--acc);letter-spacing:.01em;line-height:1.1}
+.hbrand .sub{color:var(--dim);font-size:14px;margin-top:4px}
+.hstat{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--panel);border-radius:16px;padding:10px 12px;min-height:56px}
+.hstat svg{width:30px;height:30px;fill:var(--gold);flex:none}
+.hstat b{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+.hstat span{color:var(--dim);font-size:14px}
+#home .btn{flex:none}
+#bGo{min-height:58px;font-size:17px}
+
+#grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,1fr));gap:8px;margin:12px 0}
+.cell{position:relative;min-height:48px;border-radius:14px;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;overflow:hidden}
+.cell .n{font-weight:800;font-size:19px;line-height:1;font-variant-numeric:tabular-nums}
+.cell .n svg{width:18px;height:18px;fill:#66739A}
+.cell .s{display:flex;gap:1px}
+.cell .s svg{width:14px;height:14px;fill:var(--off)}
+.cell .s svg.on{fill:var(--gold)}
+.cell.cur{box-shadow:inset 0 0 0 2px var(--acc)}
+.cell.ok{background:#1F3A56}
+.cell[disabled]{background:#182036;cursor:default}
+.cell:not([disabled]):active{transform:scale(.96)}
+
+@media (max-height:600px){
+  header{padding-top:4px}
+  #emo span{font-size:40px}
+  #msg{height:26px}
+  #choices{gap:6px}
+  .opt{min-height:50px}
+  footer{padding:6px 12px 8px}
+  .btn{min-height:46px}
+  .stars svg{width:40px;height:40px}.stars svg:nth-child(2){width:50px;height:50px}
+  .card{padding:14px 16px 12px}.card h2{font-size:22px}
+  .big{font-size:34px}
+  .acts{gap:6px;margin-top:8px}.acts .btn{min-height:46px}
+  .hbrand h1{font-size:34px}
+  #home{gap:10px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*:before,*:after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button class="icon" id="bMap" aria-label="Niveaux">
+      <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
+    </button>
+    <div class="ttl"><span class="brand">Fredonne</span><span id="lvl">Niveau 1</span></div>
+    <div class="pts" aria-label="Points"><b id="pts">0</b><small>pts</small></div>
+  </header>
+  <div id="prog" role="img"></div>
+  <div id="chal" hidden><svg viewBox="0 0 24 24"><path d="M5 3h2v18H5zM8 4h11l-3 4.500 3 4.500H8z"/></svg><span id="chalT"></span></div>
+  <div id="goal"></div>
+  <main id="card"><div id="emo" class="emo"></div><div id="hint"></div></main>
+  <div id="msg" role="status" aria-live="polite"></div>
+  <div id="choices"></div>
+  <footer>
+    <div id="fq" style="display:flex;gap:10px;flex:1">
+      <button class="btn need" id="bHint">Indice · −1 ★</button>
+      <button class="btn" id="bReset"><svg viewBox="0 0 24 24"><path d="M4 5v6h6M5 11a8 8 0 1 1 2 7"/></svg>Recommencer</button>
+    </div>
+    <button class="btn hot" id="bNextQ" hidden>Suivant</button>
+  </footer>
+
+  <section class="over" id="win" hidden aria-live="polite">
+    <div class="card">
+      <h2 id="wTitle">Bravo !</h2>
+      <p id="wSub">Niveau 1</p>
+      <div class="stars" id="wStars"></div>
+      <div class="big"><span id="wPts">0</span><small>points</small></div>
+      <div class="marks" id="wMarks"></div>
+      <p class="rec" id="wRec"></p>
+      <p class="cres" id="wChal" hidden></p>
+      <div class="acts">
+        <button class="btn hot" id="bNext">Suivant</button>
+        <div class="row">
+          <button class="btn line" id="bAgain">Rejouer</button>
+          <button class="btn line" id="bShare">Partager</button>
+        </div>
+        <button class="btn line" id="bChal">Défier un ami</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="scr" id="home" hidden>
+    <div class="hbrand">
+      <div class="deco emo" aria-hidden="true"><span>🎤</span><span>🎶</span><span>🎧</span></div>
+      <h1>Fredonne</h1><div class="sub">Devine la chanson en emojis.</div>
+    </div>
+    <div class="hstat" aria-label="Étoiles obtenues"><svg viewBox="0 0 24 24"><use href="#star"/></svg><b id="hStars">0</b><span>/ 60 étoiles</span></div>
+    <button class="btn hot" id="bGo">Continuer · Niveau 1</button>
+    <button class="btn" id="bLevels">Niveaux</button>
+  </section>
+
+  <section class="scr" id="levels" hidden>
+    <div class="top">
+      <button class="icon" id="bLBack" aria-label="Accueil"><svg class="st" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="tt"><h1>Niveaux</h1><div class="sub">3 devinettes, 2 bonnes pour passer</div></div>
+      <div class="total" aria-label="Étoiles gagnées"><svg viewBox="0 0 24 24"><use href="#star"/></svg><span id="lTotal">0/60</span></div>
+    </div>
+    <div id="grid"></div>
+    <button class="btn hot" id="bBack" style="flex:none">Reprendre</button>
+  </section>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <path id="star" d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/>
+</defs></svg>
+
+<script>
+(function () {
+'use strict';
+
+var GAME = 'chanson-emojis';
+var NAME = 'Fredonne';
+var KEY = 'mj:' + GAME + ':v1';
+var N = 20, PER = 3, NEED = 2, MAXPTS = 300;
+
+/*DATA:BEGIN (generated by tools/chanson-emojis/build.js, do not edit by hand)*/
+var DATA=[["💃 💃 🎶","Alors on danse","Stromae",2000,"A"],
+["👨 ❓ 👶","Papaoutai","Stromae",2010,"A"],
+["🚶 🚶 ⚽ 🌍","Waka Waka","Shakira",2010,"A"],
+["🎩 ✨ 💨","Magic in the Air","Magic System",2010,"A"],
+["1️⃣ 👨 😵","Premier Gaou","Magic System",2000,"A"],
+["🔚 💃","Dernière danse","Indila",2010,"A"],
+["🌳 🚶 🗼","Les Champs-Élysées","Joe Dassin",1960,"A"],
+["🙋 🎁","Je veux","Zaz",2010,"A"],
+["🐾 🐾 🎶","Pata Pata","Miriam Makeba",1960,"A"],
+["🌹 👓","La Vie en rose","Édith Piaf",1940,"A"],
+["🚗 ➡️ 🌄","Sur ma route","Black M",2010,"A"],
+["🍂 ⬇️","Fall","Davido",2010,"A"],
+["🙅 😌","Non, je ne regrette rien","Édith Piaf",1960,"A"],
+["👩 🌹","Aïcha","Khaled",1990,"A"],
+["🌴 🌴 🌊","Coconut Tree","Mohombi",2010,"A"],
+["🚫 🚶 😢","Ne me quitte pas","Jacques Brel",1950,"A"],
+["❤️ 🎷 💃","Soul Makossa","Manu Dibango",1970,"A"],
+["👔 👞 ✨","Sapés comme jamais","Maître Gims",2010,"A"],
+["🔁 ⏰ 📅","Comme d'habitude","Claude François",1960,"A"],
+["7️⃣ ⏳","7 Seconds","Youssou N'Dour et Neneh Cherry",1990,"A"],
+["💬 💬","Paroles, paroles","Dalida et Alain Delon",1970,"A"],
+["📚 🌍","Saga Africa","Yannick Noah",1990,"A"],
+["😢 💭 🌊 ⛵","Sodade","Cesária Évora",1990,"A"],
+["☀️ 📅 🌆","Dimanche à Bamako","Amadou et Mariam",2000,"A"],
+["😊 🎉","Happy","Pharrell Williams",2010,"M"],
+["👋 📞","Hello","Adele",2010,"M"],
+["☔ 🌂","Umbrella","Rihanna",2000,"M"],
+["❄️ 👸 🎶","Let It Go","Idina Menzel",2010,"M"],
+["🎆 🎇","Firework","Katy Perry",2010,"M"],
+["😱 🌙 🎃","Thriller","Michael Jackson",1980,"M"],
+["💃 👑","Dancing Queen","ABBA",1970,"M"],
+["💛 🌻","Yellow","Coldplay",2000,"M"],
+["🃏 😐","Poker Face","Lady Gaga",2000,"M"],
+["🐴 💃 😎","Gangnam Style","PSY",2010,"M"],
+["💃 🙌","Macarena","Los del Río",1990,"M"],
+["🌀 ⬇️ 🌊","Rolling in the Deep","Adele",2010,"M"],
+["📳 💃","Shake It Off","Taylor Swift",2010,"M"],
+["⏪ 📅 😢","Yesterday","The Beatles",1960,"M"],
+["🌍 🐘 🌅","Africa","Toto",1980,"M"],
+["⬆️ 🌆 🎺","Uptown Funk","Mark Ronson et Bruno Mars",2010,"M"],
+["🚶 ☀️ 😄","Walking on Sunshine","Katrina and the Waves",1980,"M"],
+["👧 👧 🎉 🎶","Girls Just Want to Have Fun","Cyndi Lauper",1980,"M"],
+["🏨 🌴 ☀️","Hotel California","Eagles",1970,"M"],
+["❤️ 🚢 ➡️","My Heart Will Go On","Céline Dion",1990,"M"],
+["✏️ 🙋 👉","Take On Me","a-ha",1980,"M"],
+["🌍 💊 💖","Heal the World","Michael Jackson",1990,"M"],
+["🔵 👽 🎶","Blue (Da Ba Dee)","Eiffel 65",1990,"M"],
+["👨 😎 ❄️","Daddy Cool","Boney M.",1970,"M"],
+["👥 🏆 🎉","We Are the Champions","Queen",1970,"M"],
+["👀 🐯 🎶","Eye of the Tiger","Survivor",1980,"M"],
+["💛 🚢 🌊","Yellow Submarine","The Beatles",1960,"M"],
+["💓 💃","Stayin' Alive","Bee Gees",1970,"M"],
+["💜 ☔","Purple Rain","Prince",1980,"M"],
+["🚀 👨","Rocket Man","Elton John",1970,"M"],
+["🌍 🌈 😍","What a Wonderful World","Louis Armstrong",1960,"M"],
+["🎈 ☁️ ⬆️","Levitating","Dua Lipa",2020,"M"],
+["💐 🌷 🌸","Flowers","Miley Cyrus",2020,"M"],
+["💪 🔥","I Will Survive","Gloria Gaynor",1970,"M"],
+["👫 🤝","Stand by Me","Ben E. King",1960,"M"],
+["🐶 🎸","Hound Dog","Elvis Presley",1950,"M"]];
+/*DATA:END*/
+// DATA[i] = [emoji tokens, title, artist, decade, group]; level n holds DATA[3(n-1)..3(n-1)+2].
+
+var $ = function (id) { return document.getElementById(id); };
+var reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+// ---- host page (only the events listed in the game sheet, no personal data) ----
+function emit(msg) {
+  msg.source = 'mini-jeu'; msg.game = GAME;
+  try { window.parent.postMessage(msg, '*'); } catch (e) { /* ignore */ }
+}
+
+// ---- seeded randomness (the only source of chance) ----
+var SEED = 20241124;
+function rng(s) {
+  return function () {
+    s = (s + 0x6D2B79F5) | 0;
+    var t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function mix(seed, a, b, c) {
+  var h = seed | 0;
+  [a, b, c].forEach(function (v) { h = Math.imul(h ^ (v | 0), 2654435761) + 0x9E3779B9 | 0; h ^= h >>> 15; });
+  return h;
+}
+function shuffle(arr, r) {
+  for (var i = arr.length - 1; i > 0; i--) {
+    var j = Math.floor(r() * (i + 1)), t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+  }
+  return arr;
+}
+function related(a, b) { a = a.toLowerCase(); b = b.toLowerCase(); return a.indexOf(b) >= 0 || b.indexOf(a) >= 0; }
+
+// Four titles for one riddle: the right one plus three from the same family, never a title of the same level.
+function choicesFor(level, r, seed, salt) {
+  var base = (level - 1) * PER, right = DATA[base + r], used = [];
+  for (var i = 0; i < PER; i++) used.push(DATA[base + i][1]);
+  var pool = DATA.filter(function (d) { return d[4] === right[4] && used.indexOf(d[1]) < 0 && !related(d[1], right[1]); })
+    .map(function (d) { return d[1]; });
+  var g = rng(mix(seed, level, r, salt));
+  var opts = shuffle(pool, g).slice(0, 3);
+  opts.push(right[1]);
+  shuffle(opts, g);
+  return { opts: opts, right: opts.indexOf(right[1]) };
+}
+function decadeText(y) { return 'années ' + (y >= 2000 ? y : y % 100); }
+
+// ---- persistence (always guarded: the game works without storage) ----
+var save = { level: 1, max: 1, stars: [], best: [], cur: null, chal: null, plays: 0 };
+function totalStars() {
+  var t = 0;
+  for (var i = 0; i < save.stars.length; i++) t += save.stars[i] || 0;
+  return t;
+}
+function int(v, lo, hi, d) { v = Math.floor(Number(v)); return isFinite(v) ? (v < lo ? lo : v > hi ? hi : v) : d; }
+function cleanGame(g, chal) {
+  if (!g || typeof g !== 'object' || !Array.isArray(g.ans) || !Array.isArray(g.hint)) return null;
+  var o = { level: int(g.level, 1, N, 0), pos: int(g.pos, 0, PER - 1, 0), ans: [], hint: [],
+    salt: int(g.salt, 0, 99999, 0), seed: int(g.seed, -2147483648, 2147483647, SEED), target: 0 };
+  if (!o.level) return null;
+  for (var i = 0; i < PER; i++) { o.ans.push(int(g.ans[i], -1, 3, -1)); o.hint.push(g.hint[i] ? 1 : 0); }
+  if (chal) { o.target = int(g.target, 1, MAXPTS, 0); if (!o.target) return null; }
+  return o;
+}
+function loadSave() {
+  var i;
+  save.stars = []; save.best = [];
+  for (i = 0; i < N; i++) { save.stars.push(0); save.best.push(0); }
+  try {
+    var s = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (s && typeof s === 'object') {
+      if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = int(s.stars[i], 0, 3, 0);
+      if (Array.isArray(s.best)) for (i = 0; i < N && i < s.best.length; i++) save.best[i] = int(s.best[i], 0, MAXPTS, 0);
+      save.max = int(s.max, 1, N, 1);
+      for (i = 0; i < N - 1; i++) if (save.stars[i] > 0 && save.max < i + 2) save.max = i + 2;
+      save.level = Math.min(int(s.level, 1, N, 1), save.max);
+      save.plays = int(s.plays, 0, 99999, 0);
+      save.cur = cleanGame(s.cur, false);
+      save.chal = cleanGame(s.chal, true);
+    }
+  } catch (e) { /* no storage, or damaged save: start clean */ }
+}
+function store() {
+  try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) { /* ignore */ }
+}
+
+// ---- game state ----
+var G = null;        // {mode:'level'|'chal', level, pos, ans[3], hint[3], salt, seed, target, over}
+var last = null;     // result of the finished game
+var ch = null;       // choices of the riddle on screen
+var screen = 'home';
+var nextAct = null, againAct = null;
+
+function newGame(mode, n, from, target) {
+  if (from) {
+    G = { mode: mode, level: from.level, pos: from.pos, ans: from.ans.slice(), hint: from.hint.slice(), salt: from.salt, seed: from.seed, target: from.target || 0, over: false };
+  } else {
+    var salt = 0;
+    if (mode === 'level') { salt = save.plays; save.plays = (save.plays + 1) % 100000; }
+    G = { mode: mode, level: n, pos: 0, ans: [-1, -1, -1], hint: [0, 0, 0], salt: salt, seed: SEED, target: target | 0, over: false };
+  }
+}
+function persist() {
+  var o = { level: G.level, pos: G.pos, ans: G.ans.slice(), hint: G.hint.slice(), salt: G.salt, seed: G.seed };
+  if (G.mode === 'level') save.cur = o; else { o.target = G.target; save.chal = o; }
+  store();
+}
+function right(i) { return G.ans[i] >= 0 && G.ans[i] === choicesFor(G.level, i, G.seed, G.salt).right; }
+function riddlePts(i) { return right(i) ? (G.hint[i] ? 50 : 100) : 0; }
+function runPts() { var t = 0; for (var i = 0; i < PER; i++) t += riddlePts(i); return t; }
+function answered() { return G.ans[G.pos] >= 0; }
+
+// ---- rendering ----
+var LETTERS = ['A', 'B', 'C', 'D'];
+function starSvg(on) { return '<svg viewBox="0 0 24 24"' + (on ? ' class="on"' : '') + '><use href="#star"/></svg>'; }
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+function render() {
+  var d = DATA[(G.level - 1) * PER + G.pos], done = answered(), i;
+  ch = choicesFor(G.level, G.pos, G.seed, G.salt);
+  var chal = G.mode === 'chal';
+  $('lvl').textContent = (chal ? 'Défi · ' : '') + 'Niveau ' + G.level;
+  $('pts').textContent = runPts();
+  var pr = '';
+  for (i = 0; i < PER; i++) {
+    var a = G.ans[i] >= 0, cls = a ? (right(i) ? 'ok' : 'ko') : (i === G.pos ? 'cur' : '');
+    pr += '<i class="' + cls + '">' + (a ? (right(i) ? '✓' : '✗') : i + 1) + '</i>';
+  }
+  $('prog').innerHTML = pr;
+  $('prog').setAttribute('aria-label', 'Devinette ' + (G.pos + 1) + ' sur ' + PER);
+  $('chal').hidden = !chal;
+  $('goal').hidden = chal;
+  if (chal) $('chalT').textContent = 'Fais ' + G.target + ' points ou plus';
+  else $('goal').innerHTML = '<svg viewBox="0 0 24 24"><use href="#star"/></svg>2 bonnes sur 3 pour passer · 1 étoile par bonne réponse sans indice';
+  $('emo').innerHTML = d[0].split(' ').map(function (t) { return '<span>' + t + '</span>'; }).join('');
+  $('hint').textContent = G.hint[G.pos] ? 'Indice : ' + d[2] + ' · ' + decadeText(d[3]) : '';
+  var html = '';
+  for (i = 0; i < 4; i++) {
+    var c = '', m = '';
+    if (done) {
+      if (i === ch.right) { c = ' good'; m = '✓'; }
+      else if (i === G.ans[G.pos]) { c = ' bad'; m = '✗'; }
+      else c = ' dim';
+      c += ' lock';
+    }
+    html += '<button class="opt' + c + '" data-opt="' + i + '"><span class="k">' + LETTERS[i] + '</span><span class="t">' + esc(ch.opts[i]) +
+      '</span><span class="m" aria-hidden="true">' + m + '</span></button>';
+  }
+  $('choices').innerHTML = html;
+  var msg = $('msg');
+  if (!done) { msg.textContent = 'Quel est ce titre ?'; msg.className = ''; }
+  else if (G.ans[G.pos] === ch.right) { msg.textContent = G.hint[G.pos] ? 'Bravo ! (50 points)' : 'Bravo ! (100 points)'; msg.className = 'good'; }
+  else { msg.textContent = 'Raté : c’était « ' + d[1] + ' »'; msg.className = 'bad'; }
+  $('fq').hidden = done;
+  $('bNextQ').hidden = !done;
+  $('bNextQ').textContent = G.pos < PER - 1 ? 'Suivant' : 'Résultat';
+  $('bHint').disabled = !!G.hint[G.pos];
+  $('bHint').classList.toggle('need', !G.hint[G.pos]);
+}
+
+// ---- play ----
+function answer(i) {
+  if (screen !== 'game' || G.over || answered() || i < 0 || i > 3) return false;
+  G.ans[G.pos] = i;
+  persist();
+  render();
+  return true;
+}
+function useHint() {
+  if (screen !== 'game' || G.over || answered() || G.hint[G.pos]) return false;
+  G.hint[G.pos] = 1;
+  persist();
+  render();
+  return true;
+}
+function next() {
+  if (screen !== 'game' || G.over || !answered()) return false;
+  if (G.pos < PER - 1) { G.pos++; persist(); render(); }
+  else finish();
+  return true;
+}
+function restart() {
+  var m = G.mode, n = G.level, t = G.target;
+  $('win').hidden = true;
+  newGame(m, n, null, t);
+  persist();
+  render();
+}
+function startLevel(n, from) {
+  newGame('level', n, from);
+  persist();
+  render();
+}
+function finish() {
+  var c = 0, h = 0, i, marks = [];
+  for (i = 0; i < PER; i++) {
+    var ok = right(i);
+    marks.push(ok);
+    if (ok) { c++; if (!G.hint[i]) h++; }
+  }
+  var pts = runPts(), won = c >= NEED, stars = won ? Math.max(1, h) : 0;
+  var info = { won: won, stars: stars, pts: pts, correct: c, marks: marks, level: G.level, mode: G.mode, rec: '', chal: null };
+  G.over = true;
+  if (G.mode === 'level') {
+    var l = G.level - 1, prev = save.best[l];
+    if (won) {
+      if (stars > save.stars[l]) save.stars[l] = stars;
+      if (G.level < N) { save.max = Math.max(save.max, G.level + 1); save.level = G.level + 1; }
+      else save.level = N;
+    }
+    if (pts > prev) { save.best[l] = pts; info.rec = prev ? 'Nouveau record !' : ''; }
+    else if (prev) info.rec = 'Record : ' + prev + ' points';
+    save.cur = null;
+    store();
+    if (won) emit({ event: 'level_complete', level: G.level, score: pts, stars: stars });
+  } else {
+    var cw = pts >= G.target;
+    info.chal = { ok: cw, target: G.target, diff: G.target - pts };
+    save.chal = null;
+    store();
+    emit({ event: 'challenge_result', level: G.level, score: pts, target: G.target, won: cw });
+  }
+  last = info;
+  showResult(info);
+}
+function showResult(info) {
+  var chal = info.mode === 'chal', win = info.won, s = info.stars;
+  $('wTitle').textContent = chal ? (info.chal.ok ? 'Défi relevé !' : 'Presque !') :
+    !win ? 'Raté !' : info.level === N ? 'Tout est trouvé !' : s === 3 ? 'Bravo !' : s === 2 ? 'Bien joué !' : 'Gagné !';
+  $('wSub').textContent = 'Niveau ' + info.level + ' · ' + info.correct + ' sur 3' + (!win && !chal ? ' (il en faut 2)' : '');
+  $('wStars').innerHTML = chal ? '' : starSvg(s >= 1) + starSvg(s >= 2) + starSvg(s >= 3);
+  $('wStars').hidden = chal;
+  $('wStars').setAttribute('aria-label', s + ' étoile' + (s > 1 ? 's' : '') + ' sur 3');
+  $('wPts').textContent = info.pts;
+  $('wMarks').innerHTML = info.marks.map(function (m) { return '<i class="' + (m ? 'ok' : 'ko') + '">' + (m ? '✓' : '✗') + '</i>'; }).join('');
+  $('wRec').textContent = info.rec;
+  var c = $('wChal');
+  c.hidden = !chal;
+  if (chal) {
+    c.textContent = info.chal.ok ? 'Tu égales ou bats ' + info.chal.target + ' points' : 'Il manquait ' + info.chal.diff + ' point' + (info.chal.diff > 1 ? 's' : '');
+    c.className = 'cres' + (info.chal.ok ? '' : ' lost');
+  }
+  var N1 = $('bNext'), A1 = $('bAgain');
+  if (chal) { N1.textContent = 'Accueil'; nextAct = function () { show('home'); }; }
+  else if (!win) { N1.textContent = 'Rejouer'; nextAct = restart; }
+  else if (info.level < N) { N1.textContent = 'Suivant'; nextAct = function () { startLevel(info.level + 1); show('game'); }; }
+  else { N1.textContent = 'Niveaux'; nextAct = openLevels; }
+  A1.textContent = !chal && !win ? 'Niveaux' : 'Rejouer';
+  againAct = !chal && !win ? openLevels : restart;
+  $('bShare').hidden = $('bChal').hidden = !win && !chal;
+  $('bShare').textContent = 'Partager';
+  $('bChal').textContent = chal ? 'Renvoyer le défi' : 'Défier un ami';
+  var w = $('win'), old = w.querySelectorAll('.bit'), i;
+  for (i = 0; i < old.length; i++) w.removeChild(old[i]);
+  w.hidden = false;
+  if (reduced || !win) return;
+  var conf = ['🎵', '🎶', '⭐', '🎤'];
+  for (i = 0; i < 16; i++) {
+    var b = document.createElement('div');
+    b.className = 'bit emo';
+    b.textContent = conf[i % conf.length];
+    b.style.cssText = 'left:' + (4 + (i * 37) % 92) + '%;animation-delay:' + ((i * 53) % 400) + 'ms;--dx:' +
+      (((i * 29) % 80) - 40) + 'px;--rot:' + (((i * 97) % 540) - 270) + 'deg';
+    w.appendChild(b);
+  }
+}
+
+// ---- sharing ----
+function starsText(s) { var t = ''; while (s-- > 0) t += '⭐'; return t; }
+function marksText() { return last.marks.map(function (m) { return m ? '✅' : '❌'; }).join(''); }
+function shareText() {
+  return NAME + ' · Niveau ' + last.level + ' · ' + (last.stars ? starsText(last.stars) + ' · ' : '') + last.pts + ' pts ' + marksText();
+}
+// The link base: MJ_CONFIG.shareBaseUrl, else the current address if it is http(s); otherwise no link.
+function shareBase() {
+  var b = window.MJ_CONFIG && window.MJ_CONFIG.shareBaseUrl;
+  if (typeof b !== 'string' || !b) b = /^https?:/i.test(String(location.href)) ? String(location.href) : '';
+  return b.split('#')[0];
+}
+function challengeText() {
+  var base = shareBase();
+  var link = base && last.pts > 0 ? base + '#defi-' + last.level + '-' + last.pts : '';
+  return NAME + ' · Niveau ' + last.level + ' · ' + last.pts + ' pts. À toi de faire mieux !' + (link ? ' ' + link : '');
+}
+function sendText(text, kind, btn) {
+  var done = function () { emit({ event: 'share', kind: kind }); };
+  var copied = function () { btn.textContent = 'Copié !'; done(); };
+  var legacy = function () {
+    var ok = false;
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;left:0;top:0;opacity:0';
+      document.body.appendChild(ta);
+      ta.select(); ta.setSelectionRange(0, text.length);
+      ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (e) { ok = false; }
+    btn.textContent = ok ? 'Copié !' : 'Copie impossible';
+    if (ok) done();
+  };
+  var clip = function () {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(copied, legacy);
+    } catch (e) { /* fall through */ }
+    legacy();
+  };
+  try {
+    if (navigator.share) {
+      return navigator.share({ text: text }).then(done, function (e) { if (!e || e.name !== 'AbortError') clip(); });
+    }
+  } catch (e) { /* fall through */ }
+  clip();
+}
+
+// ---- challenges (#defi-<level>-<score>): never touch the progress nor the game in progress ----
+function openChallenge() {
+  var h = String(location.hash || ''), m;
+  try { if (h) history.replaceState(null, '', String(location.href).split('#')[0]); } catch (e) { /* ignore */ }
+  if (!(m = /^#defi-(\d{1,2})-(\d{1,3})$/.exec(h))) return false;
+  var n = +m[1], target = +m[2];
+  if (n < 1 || n > N || target < 1 || target > MAXPTS) return false;
+  newGame('chal', n, null, target);
+  persist();
+  render();
+  show('game');
+  emit({ event: 'challenge_open', level: n, target: target });
+  return true;
+}
+
+// ---- screens ----
+var SCREENS = ['home', 'levels'];
+function show(name) {
+  screen = name;
+  SCREENS.forEach(function (s) { $(s).hidden = s !== name; });
+  if (name !== 'game') $('win').hidden = true;
+  if (name === 'home') renderHome();
+}
+var LOCK = '<svg viewBox="0 0 24 24"><path d="M7 10V8a5 5 0 0 1 10 0v2h1.500v10h-13V10zm2.500 0h5V8a2.500 2.500 0 0 0-5 0z"/></svg>';
+function renderHome() {
+  $('hStars').textContent = totalStars();
+  $('bGo').textContent = 'Continuer · Niveau ' + save.level;
+}
+function renderLevels() {
+  var html = '';
+  for (var i = 0; i < N; i++) {
+    var n = i + 1, s = save.stars[i] || 0, open = n <= save.max;
+    html += '<button class="cell' + (n === save.level ? ' cur' : '') + (s ? ' ok' : '') + '" data-level="' + n + '"' + (open ? '' : ' disabled') +
+      ' aria-label="Niveau ' + n + (open ? ', ' + s + ' étoile' + (s > 1 ? 's' : '') : ', verrouillé') + '">' +
+      '<span class="n">' + (open ? n : LOCK) + '</span><span class="s">' + starSvg(s >= 1) + starSvg(s >= 2) + starSvg(s >= 3) + '</span></button>';
+  }
+  $('grid').innerHTML = html;
+  $('lTotal').textContent = totalStars() + '/' + (N * 3);
+}
+function openLevels() {
+  if (G.mode === 'chal') return show('home');
+  renderLevels();
+  show('levels');
+}
+function goContinue() {
+  var n = save.level;
+  if (G.mode === 'level' && G.level === n && !G.over) { show('game'); return; }
+  startLevel(n, save.cur && save.cur.level === n ? save.cur : null);
+  show('game');
+}
+function pickLevel(n) {
+  if (n > save.max) return;
+  if (G.mode === 'level' && G.level === n && !G.over) { show('game'); return; }
+  startLevel(n, save.cur && save.cur.level === n ? save.cur : null);
+  show('game');
+}
+
+// ---- input: pointer events, with a click fallback for keyboards and assistive tech ----
+var pressing = false, lastUp = 0;
+function stray() { return pressing || Date.now() - lastUp < 700; }
+document.addEventListener('pointerdown', function () { pressing = true; }, true);
+['pointerup', 'pointercancel'].forEach(function (ev) {
+  document.addEventListener(ev, function () { pressing = false; lastUp = Date.now(); }, true);
+});
+function onTap(el, fn) {
+  var down = false;
+  el.addEventListener('pointerdown', function () { down = true; });
+  el.addEventListener('pointerleave', function () { down = false; });
+  el.addEventListener('pointercancel', function () { down = false; });
+  el.addEventListener('pointerup', function (e) {
+    if (!down) return;
+    down = false; fn(e);
+  });
+  el.addEventListener('click', function (e) { if (!stray()) fn(e); });
+}
+function closestAttr(node, attr) {
+  while (node && node !== document.body) {
+    if (node.getAttribute && node.getAttribute(attr) !== null) return node;
+    node = node.parentNode;
+  }
+  return null;
+}
+onTap($('choices'), function (e) {
+  var o = closestAttr(e.target, 'data-opt');
+  if (o) answer(+o.getAttribute('data-opt'));
+});
+onTap($('grid'), function (e) {
+  var c = closestAttr(e.target, 'data-level');
+  if (c && !c.disabled) pickLevel(+c.getAttribute('data-level'));
+});
+onTap($('bHint'), useHint);
+onTap($('bReset'), restart);
+onTap($('bNextQ'), next);
+onTap($('bMap'), openLevels);
+onTap($('bBack'), goContinue);
+onTap($('bLBack'), function () { show('home'); });
+onTap($('bGo'), goContinue);
+onTap($('bLevels'), function () { renderLevels(); show('levels'); });
+onTap($('bNext'), function () { if (nextAct) nextAct(); });
+onTap($('bAgain'), function () { if (againAct) againAct(); });
+onTap($('bShare'), function () { sendText(shareText(), 'result', $('bShare')); });
+onTap($('bChal'), function () { sendText(challengeText(), 'challenge', $('bChal')); });
+document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+window.addEventListener('hashchange', function () { if (/^#defi-/.test(location.hash)) openChallenge(); });
+
+// ---- boot ----
+loadSave();
+var cg = save.chal;   // a challenge in progress is resumed where it was
+if (cg) {
+  newGame('chal', cg.level, cg);
+  render();
+  show('game');
+} else {
+  startLevel(save.level, save.cur && save.cur.level === save.level ? save.cur : null);
+  show('home');
+}
+if (/^#defi-/.test(location.hash)) openChallenge();
+
+// Test hooks. The levels expose the emojis only; the titles to guess stay out of them.
+window.__game = {
+  levels: (function () {
+    var out = [];
+    for (var n = 0; n < N; n++) { var l = []; for (var i = 0; i < PER; i++) l.push(DATA[n * PER + i][0]); out.push(l); }
+    return out;
+  })(),
+  state: function () {
+    var pts = runPts();
+    return {
+      screen: screen, mode: G.mode, level: G.level, pos: G.pos, answers: G.ans.slice(), hints: G.hint.slice(),
+      emojis: DATA[(G.level - 1) * PER + G.pos][0], choices: ch ? ch.opts.slice() : [], answered: answered(),
+      points: pts, over: G.over, won: !!(G.over && last && last.won), stars: G.over && last ? last.stars : 0,
+      total: totalStars(), max: save.max, next: save.level, starsByLevel: save.stars.slice(),
+      challenge: G.mode === 'chal' ? { level: G.level, target: G.target } : null, seed: G.seed
+    };
+  },
+  loadLevel: function (n) {
+    n = n | 0;
+    if (n < 1 || n > N) throw new Error('level must be 1..' + N);
+    startLevel(n, null);
+    show('game');
+    return this.state();
+  },
+  answer: function (i) { return answer(i | 0); },
+  hint: function () { return useHint(); },
+  next: function () { return next(); },
+  restart: function () { restart(); return this.state(); },
+  seed: function (n) {
+    SEED = n | 0;
+    if (G && G.ans.every(function (a) { return a < 0; })) { G.seed = SEED; persist(); render(); }
+    return SEED;
+  }
+};
+})();
+</script>
+</body>
+</html>

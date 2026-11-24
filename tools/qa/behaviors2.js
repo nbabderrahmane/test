@@ -8,7 +8,7 @@ const D = L.loadAll();
 const URL = 'file://' + L.HTML;
 const log = [];
 const rec = (mech, level, check, ok, detail) => { log.push({ mech, level, check, ok: !!ok, detail: detail || '' }); console.log((ok ? ' ok   ' : ' FAIL ') + `[${mech}] N${level} ${check}${detail ? ' :: ' + detail : ''}`); };
-const MECH = { 'tube haut': [45, 50, 130], 'un seul tube vide': [70, 124], 'tube court': [83, 90, 146, 190], 'mystère': [101, 150, 165, 190] };
+const MECH = { 'tube haut': [25, 35, 170], 'un seul tube vide': [105, 110, 150], 'tube court': [65, 70, 125, 190], 'mystère': [45, 55, 130, 185] };
 
 (async () => {
   const b = await chromium.launch();

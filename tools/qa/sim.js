@@ -8,6 +8,7 @@ const L = require('./lib');
 
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? +args[i + 1] : d; };
+const SEEDOFF = opt('seedoff', 0);   // different offsets = independent runs of the same simulation
 
 function playGame(lvl, rand, policy, cap) {
   // returns {end:'won'|'stuck'|'cap', moves, trace:[tubes at move k] (only if wanted)}
@@ -119,12 +120,12 @@ if (isMainThread) {
   const queue = jobs.filter(j => !only || only.has(j.id));
   const threads = opt('threads', 4), games = opt('games', 200), probe = opt('probe', 40), nodes = opt('nodes', 4000);
   const results = []; let done = 0;
-  const outFile = path.join(L.SCRATCH, 'sim.json');
+  const outFile = path.join(L.SCRATCH, args.indexOf('--out') >= 0 ? args[args.indexOf('--out') + 1] : 'sim.json');
   let live = 0;
   const startWorker = () => {
     const w = new Worker(__filename, { workerData: {} });
     live++;
-    const next = () => { const j = queue.shift(); if (!j) { w.terminate(); if (--live === 0) finish(); return; } w.postMessage({ ...j, games, probe, nodes }); };
+    const next = () => { const j = queue.shift(); if (!j) { w.terminate(); if (--live === 0) finish(); return; } w.postMessage({ ...j, seed: j.seed + SEEDOFF, games, probe, nodes }); };
     w.on('message', r => { results.push(r); if (++done % 20 === 0) console.log(done + '/' + (done + queue.length)); next(); });
     w.on('error', e => { console.error('worker error', e); });
     next();

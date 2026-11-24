@@ -1,0 +1,265 @@
+{
+ "seed": 24112026,
+ "levels": [
+  {
+   "numbers": [
+    1,
+    3,
+    4,
+    5,
+    8,
+    9
+   ],
+   "target": 16,
+   "par": 2,
+   "solutions": 15
+  },
+  {
+   "numbers": [
+    1,
+    2,
+    5,
+    6,
+    7,
+    9
+   ],
+   "target": 21,
+   "par": 2,
+   "solutions": 10
+  },
+  {
+   "numbers": [
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "target": 21,
+   "par": 2,
+   "solutions": 12
+  },
+  {
+   "numbers": [
+    1,
+    2,
+    5,
+    7,
+    8,
+    9
+   ],
+   "target": 29,
+   "par": 3,
+   "solutions": 39
+  },
+  {
+   "numbers": [
+    1,
+    2,
+    3,
+    4,
+    7,
+    8
+   ],
+   "target": 20,
+   "par": 2,
+   "solutions": 9
+  },
+  {
+   "numbers": [
+    3,
+    4,
+    5,
+    7,
+    8,
+    9
+   ],
+   "target": 54,
+   "par": 3,
+   "solutions": 38
+  },
+  {
+   "numbers": [
+    1,
+    3,
+    8,
+    9,
+    10,
+    25
+   ],
+   "target": 41,
+   "par": 3,
+   "solutions": 37
+  },
+  {
+   "numbers": [
+    3,
+    5,
+    7,
+    9,
+    10,
+    12
+   ],
+   "target": 54,
+   "par": 3,
+   "solutions": 50
+  },
+  {
+   "numbers": [
+    2,
+    3,
+    5,
+    9,
+    10,
+    20
+   ],
+   "target": 104,
+   "par": 4,
+   "solutions": 110
+  },
+  {
+   "numbers": [
+    3,
+    5,
+    7,
+    9,
+    10,
+    75
+   ],
+   "target": 99,
+   "par": 3,
+   "solutions": 19
+  },
+  {
+   "numbers": [
+    1,
+    6,
+    7,
+    9,
+    10,
+    50
+   ],
+   "target": 179,
+   "par": 4,
+   "solutions": 8
+  },
+  {
+   "numbers": [
+    3,
+    5,
+    7,
+    8,
+    10,
+    75
+   ],
+   "target": 299,
+   "par": 4,
+   "solutions": 3
+  },
+  {
+   "numbers": [
+    1,
+    2,
+    3,
+    8,
+    50,
+    100
+   ],
+   "target": 288,
+   "par": 3,
+   "solutions": 1
+  },
+  {
+   "numbers": [
+    1,
+    5,
+    6,
+    8,
+    25,
+    100
+   ],
+   "target": 428,
+   "par": 4,
+   "solutions": 3
+  },
+  {
+   "numbers": [
+    1,
+    2,
+    6,
+    9,
+    10,
+    100
+   ],
+   "target": 346,
+   "par": 5,
+   "solutions": 8
+  },
+  {
+   "numbers": [
+    1,
+    2,
+    7,
+    10,
+    50,
+    100
+   ],
+   "target": 404,
+   "par": 4,
+   "solutions": 1
+  },
+  {
+   "numbers": [
+    4,
+    6,
+    8,
+    10,
+    50,
+    100
+   ],
+   "target": 707,
+   "par": 5,
+   "solutions": 1
+  },
+  {
+   "numbers": [
+    1,
+    2,
+    6,
+    15,
+    50,
+    75
+   ],
+   "target": 472,
+   "par": 4,
+   "solutions": 3
+  },
+  {
+   "numbers": [
+    3,
+    7,
+    8,
+    10,
+    25,
+    75
+   ],
+   "target": 929,
+   "par": 5,
+   "solutions": 4
+  },
+  {
+   "numbers": [
+    1,
+    4,
+    6,
+    25,
+    25,
+    75
+   ],
+   "target": 832,
+   "par": 5,
+   "solutions": 1
+  }
+ ]
+}

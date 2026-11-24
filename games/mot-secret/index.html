@@ -1,0 +1,866 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#131A2E">
+<title>Mot Tapi</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#131A2E;--panel:#1D2742;--line:#4A5880;--ink:#F4F1E8;--dim:#A9B4D0;--off:#3A4567;
+  --acc:#4FD1B5;--acc-ink:#07241D;--gold:#FFC53D;--gold-ink:#231A00;--abs:#2A3453;--abs-ink:#8D9AC0;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);overscroll-behavior:none}
+body{
+  position:fixed;top:0;right:0;bottom:0;left:0;color:var(--ink);
+  font:16px/1.25 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif;
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-text-size-adjust:100%;
+}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;touch-action:manipulation}
+button:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+svg{display:block}
+
+#app{
+  position:absolute;top:0;right:0;bottom:0;left:0;display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+header{display:flex;align-items:center;gap:8px;padding:6px 12px 2px;flex:none}
+.icon{width:48px;height:48px;border-radius:14px;background:var(--panel);display:flex;align-items:center;justify-content:center;flex:none}
+.icon svg{width:24px;height:24px;fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.ttl{flex:1;min-width:0;text-align:center}
+.brand{display:block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);white-space:nowrap}
+#lvl{display:block;font-size:17px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+#goal,#chal{flex:none;display:flex;align-items:center;justify-content:center;gap:10px;height:26px;margin:0 12px;font-size:13px;color:var(--dim);white-space:nowrap}
+#goal span{display:flex;align-items:center;gap:3px}
+#goal svg{width:13px;height:13px;fill:var(--gold)}
+#chal{border-radius:13px;background:rgba(79,209,181,.14);color:var(--acc);font-weight:700}
+#chal svg{width:14px;height:14px;fill:var(--acc);flex:none}
+
+#board{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;margin:0 8px;overflow:hidden}
+#rows{display:flex;flex-direction:column;gap:var(--gap,5px)}
+.row{display:grid;grid-template-columns:repeat(var(--n),var(--t));gap:var(--gap,5px)}
+.row.off{opacity:.3}
+.row.no{animation:no .3s}
+@keyframes no{25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-3px)}}
+.t{
+  position:relative;width:var(--t);height:var(--t);border-radius:calc(var(--t)*.2);background:var(--panel);
+  box-shadow:inset 0 0 0 2px var(--off);display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:calc(var(--t)*.55);line-height:1;padding-top:calc(var(--t)*.06);text-transform:uppercase;color:var(--ink);
+}
+.t.f{box-shadow:inset 0 0 0 2px var(--ink)}
+.t.g{box-shadow:inset 0 0 0 2px var(--acc);color:var(--acc)}
+.t.f.pop{animation:pop .12s}
+@keyframes pop{50%{transform:scale(1.1)}}
+.t.s0,.t.s1,.t.s2{box-shadow:none;animation:flip .42s var(--d,0s) backwards}
+.t.s0{background:var(--abs);color:var(--abs-ink)}
+.t.s1{background:var(--gold);color:var(--gold-ink)}
+.t.s2{background:var(--acc);color:var(--acc-ink)}
+@keyframes flip{
+  from{transform:scaleY(1);background:var(--panel);box-shadow:inset 0 0 0 2px var(--off);color:var(--ink)}
+  45%{transform:scaleY(0);background:var(--panel);box-shadow:inset 0 0 0 2px var(--off);color:var(--ink)}
+  55%{transform:scaleY(0)}
+}
+/* shape marks: filled square = right place, disc = elsewhere, empty square = absent */
+.t.s0:after,.t.s1:after,.t.s2:after,.k.s0:after,.k.s1:after,.k.s2:after{
+  content:"";position:absolute;left:10%;top:10%;width:calc(var(--m,.2)*100%);height:calc(var(--m,.2)*100%);
+  background:currentColor;
+}
+.t.s2:after,.k.s2:after{border-radius:2px}
+.t.s1:after,.k.s1:after{border-radius:50%}
+.t.s0:after,.k.s0:after{background:none;border:2px solid currentColor;border-radius:2px;opacity:.8}
+.t{--m:.2}
+.k{--m:.2}
+.k.s0:after,.t.s0:after{border-width:1.5px}
+
+#msg{
+  flex:none;height:30px;margin:0 12px;display:flex;align-items:center;justify-content:center;text-align:center;
+  font-size:14px;font-weight:700;color:var(--dim);
+}
+#msg.warn{color:#FFD9A0}
+#kb{flex:none;display:flex;flex-direction:column;gap:5px;padding:2px 4px 8px}
+.kr{display:flex;gap:4px;justify-content:center}
+.k{
+  position:relative;flex:1 1 0;min-width:0;height:46px;border-radius:9px;background:var(--panel);
+  font-weight:700;font-size:17px;display:flex;align-items:center;justify-content:center;text-transform:uppercase;
+}
+.k:active{transform:scale(.94)}
+.k.wide{flex:1.6 1 0;font-size:13px}
+.k.wide svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.k.go{background:var(--acc);color:var(--acc-ink)}
+.k.s0{background:var(--abs);color:var(--abs-ink)}
+.k.s1{background:var(--gold);color:var(--gold-ink)}
+.k.s2{background:var(--acc);color:var(--acc-ink)}
+.k.s0:after,.k.s1:after,.k.s2:after{width:6px;height:6px;left:3px;top:3px}
+.k.s0:after{border-width:1.5px}
+
+.btn{
+  flex:1;min-height:50px;border-radius:14px;background:var(--panel);font-weight:700;font-size:15px;
+  display:flex;align-items:center;justify-content:center;gap:8px;padding:0 10px;
+}
+.btn:active{transform:scale(.97)}
+.btn.gold{background:var(--acc);color:var(--acc-ink)}
+.btn.line{background:none;box-shadow:inset 0 0 0 2px var(--line)}
+
+.over{position:absolute;top:0;right:0;bottom:0;left:0;z-index:5;display:flex;align-items:center;justify-content:center;
+  background:rgba(12,17,32,.92);padding:12px 16px;overflow:hidden;animation:fade .2s}
+@keyframes fade{from{opacity:0}}
+.card{position:relative;z-index:1;width:100%;max-width:330px;background:var(--panel);border-radius:22px;padding:18px 18px 14px;text-align:center;animation:rise .28s cubic-bezier(.2,1.3,.5,1)}
+@keyframes rise{from{transform:translateY(24px) scale(.94);opacity:0}}
+.card h2{font-size:26px;font-weight:800}
+.card p{color:var(--dim);margin-top:4px;font-size:15px}
+.stars{display:flex;justify-content:center;align-items:flex-end;gap:6px;margin:10px 0 4px}
+.stars svg{width:50px;height:50px;fill:var(--off)}
+.stars svg:nth-child(2){width:62px;height:62px}
+.stars svg.on{fill:var(--gold);animation:star .4s cubic-bezier(.2,1.6,.4,1) backwards}
+.stars svg.on:nth-child(2){animation-delay:.14s}
+.stars svg.on:nth-child(3){animation-delay:.28s}
+@keyframes star{from{transform:scale(.2) rotate(-40deg);opacity:0}}
+.word{display:flex;justify-content:center;gap:4px;margin-top:10px}
+.word b{width:34px;height:40px;border-radius:8px;background:var(--acc);color:var(--acc-ink);font-size:22px;font-weight:800;display:flex;align-items:center;justify-content:center;text-transform:uppercase}
+.card p.rec{min-height:20px}
+.card p.cres{margin-top:6px;font-weight:800;font-size:16px;color:var(--acc)}
+.card p.cres.lost{color:#FFB4BC}
+.acts{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.acts .row2{display:flex;gap:8px}
+.acts .btn{min-height:48px}
+.bit{position:absolute;top:-24px;width:14px;height:14px;animation:fall 1.5s cubic-bezier(.3,.2,.6,1) forwards}
+@keyframes fall{to{transform:translate(var(--dx),105vh) rotate(var(--rot));opacity:.9}}
+
+.scr{position:absolute;top:0;right:0;bottom:0;left:0;z-index:4;background:var(--bg);display:flex;flex-direction:column;
+  padding:calc(env(safe-area-inset-top) + 10px) calc(env(safe-area-inset-right) + 14px) calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 14px)}
+.top{flex:none;display:flex;align-items:center;gap:10px}
+.top .tt{flex:1;min-width:0}
+.top h1{font-size:24px;font-weight:800;color:var(--acc)}
+.top .sub{font-size:12px;color:var(--dim);margin-top:2px}
+.total{display:flex;align-items:center;gap:6px;background:var(--panel);border-radius:14px;height:44px;padding:0 12px;font-weight:800;font-variant-numeric:tabular-nums;flex:none}
+.total svg{width:18px;height:18px;fill:var(--gold)}
+
+#home{justify-content:center;gap:14px}
+.hbrand{text-align:center}
+.hbrand .demo{display:flex;justify-content:center;gap:6px;margin-bottom:14px}
+.hbrand .demo i{width:40px;height:40px;border-radius:9px;position:relative;font-style:normal;font-weight:800;font-size:22px;display:flex;align-items:center;justify-content:center;padding:5px 0 0 5px}
+.hbrand .demo i:after{content:"";position:absolute;left:5px;top:5px;width:7px;height:7px;background:currentColor}
+.demo .a{background:var(--acc);color:var(--acc-ink)}.demo .a:after{border-radius:2px}
+.demo .b{background:var(--gold);color:var(--gold-ink)}.demo .b:after{border-radius:50%}
+.demo .c{background:var(--abs);color:var(--abs-ink)}.demo .c:after{background:none;border:1.5px solid currentColor;border-radius:2px}
+.demo .d{background:var(--acc);color:var(--acc-ink)}.demo .d:after{border-radius:2px}
+.hbrand h1{font-size:38px;font-weight:800;color:var(--acc);line-height:1.1}
+.hbrand .sub{color:var(--dim);font-size:14px;margin-top:4px}
+.stat{background:var(--panel);border-radius:16px;padding:10px 14px;display:flex;align-items:center;gap:12px;min-height:66px}
+.stat svg{width:30px;height:30px;fill:var(--gold);flex:none}
+.stat b{display:block;font-size:24px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.stat small{display:block;font-size:12px;color:var(--dim);margin-top:3px}
+.pbar{height:6px;border-radius:3px;background:var(--off);margin-top:6px;overflow:hidden;width:150px;max-width:100%}
+.pbar u{display:block;height:100%;background:var(--gold);text-decoration:none}
+#home .btn{flex:none}
+#bGo{min-height:58px;font-size:17px}
+
+#grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,1fr));gap:8px;margin:12px 0}
+.cell{position:relative;min-height:48px;border-radius:14px;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;overflow:hidden}
+.cell .n{font-weight:800;font-size:19px;line-height:1;font-variant-numeric:tabular-nums}
+.cell .n svg{width:18px;height:18px;fill:#66739A}
+.cell .s{display:flex;gap:1px}
+.cell .s svg{width:14px;height:14px;fill:var(--off)}
+.cell .s svg.on{fill:var(--gold)}
+.cell small{font-size:10px;color:var(--dim);line-height:1}
+.cell.cur{box-shadow:inset 0 0 0 2px var(--acc)}
+.cell.ok{background:#1F4A44}
+.cell[disabled]{background:#182036;cursor:default}
+.cell:not([disabled]):active{transform:scale(.96)}
+
+@media (max-height:600px){
+  header{padding-top:2px}
+  .stars svg{width:40px;height:40px}.stars svg:nth-child(2){width:50px;height:50px}
+  .card{padding:14px 16px 12px}.card h2{font-size:22px}
+  .acts{gap:6px;margin-top:8px}.acts .btn{min-height:46px}
+  .hbrand h1{font-size:32px}
+  #home{gap:10px}
+  .hbrand .demo{margin-bottom:8px}
+  #msg{height:26px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*:before,*:after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button class="icon" id="bMap" aria-label="Niveaux">
+      <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
+    </button>
+    <div class="ttl"><span class="brand">Mot Tapi</span><span id="lvl">Niveau 1</span></div>
+    <button class="icon" id="bReset" aria-label="Recommencer">
+      <svg viewBox="0 0 24 24"><path d="M4 5v6h6M5 11a8 8 0 1 1 2 7"/></svg>
+    </button>
+  </header>
+  <div id="chal" hidden><svg viewBox="0 0 24 24"><path d="M5 3h2v18H5zM8 4h11l-3 4.500 3 4.500H8z"/></svg><span id="chalT"></span></div>
+  <div id="goal"></div>
+  <main id="board"><div id="rows"></div></main>
+  <div id="msg" role="status" aria-live="polite"></div>
+  <div id="kb"></div>
+
+  <section class="over" id="win" hidden aria-live="polite">
+    <div class="card">
+      <h2 id="wTitle">Bravo !</h2>
+      <p id="wSub"></p>
+      <div class="stars" id="wStars"></div>
+      <div class="word" id="wWord"></div>
+      <p class="rec" id="wRec"></p>
+      <p class="cres" id="wChal" hidden></p>
+      <div class="acts">
+        <button class="btn gold" id="bNext">Suivant</button>
+        <div class="row2">
+          <button class="btn line" id="bAgain">Rejouer</button>
+          <button class="btn line" id="bShare">Partager</button>
+        </div>
+        <button class="btn line" id="bChal">Défier un ami</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="scr" id="home" hidden>
+    <div class="hbrand">
+      <div class="demo" aria-hidden="true"><i class="a">M</i><i class="b">O</i><i class="c">T</i><i class="d">S</i></div>
+      <h1>Mot Tapi</h1><div class="sub">Trouve le mot caché en 6 essais.</div>
+    </div>
+    <div class="stat" aria-label="Étoiles">
+      <svg viewBox="0 0 24 24"><use href="#star"/></svg>
+      <div><b id="hTot">0/60</b><small>étoiles</small><div class="pbar"><u id="hBar"></u></div></div>
+    </div>
+    <button class="btn gold" id="bGo">Continuer · Niveau 1</button>
+    <button class="btn" id="bLevels">Niveaux</button>
+  </section>
+
+  <section class="scr" id="levels" hidden>
+    <div class="top">
+      <button class="icon" id="bLBack" aria-label="Accueil"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="tt"><h1>Niveaux</h1><div class="sub">4 à 7 lettres</div></div>
+      <div class="total" aria-label="Étoiles gagnées"><svg viewBox="0 0 24 24"><use href="#star"/></svg><span id="lTot">0/60</span></div>
+    </div>
+    <div id="grid"></div>
+    <button class="btn gold" id="bResume" style="flex:none">Reprendre</button>
+  </section>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <path id="star" d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/>
+</defs></svg>
+
+<script>
+(function () {
+'use strict';
+
+var GAME = 'mot-secret';
+var NAME = 'Mot Tapi';
+var KEY = 'mj:' + GAME + ':v1';
+var N = 20, MAXTRY = 6;
+
+/*DATA:BEGIN (generated by tools/mot-secret/build.js, do not edit by hand)*/
+var ANS="jnrj uaes dvkw vvyz bvhl xboka xwnvw kkrvm xwneu xhobh zdndl qtugki jbtekq nbeest jbcrrj hxdaea djbivej twxfnrj dqjyfet dnxjfit";
+var DICT={4:"abriacteagiraideaileaireamieangeanseaoutarmeaubeautoavisaxesbaiebainbancbavebebebetebilebisebleublogboisbondbordboucboueboutbrasbrinbuisbusecafecagecalecanecapecasecavecerfchatchefchoucielcireciteclefclipcloucococodecoincotecoupcourcrancubecuircurecuvedaimdamedarddentdiredomedosedrapduelduneechoelanepeeetauetreetuiexilfacefaimfaitfardfauxfetefevefilefilmfilsflanflotfoiefoinfoisfondfortfourfuirgagegaingantgaregeaigitegnougoalgolfgonggoutgrisgruehaiehallhalohateideeirisjeanjoiejouejourjugejuinjupejurykilokoralaitlamelardlavelienlierlieulionlirelogeloupluneluxemainmaismalemaremarimarsmeremetsmidimielminemitemodemoismontmortmotomouemulenagenainnerfniernocenoirnoixnordnotenueenuitoeufogreonceondeorgeoserourspagepainpaixpapeparcpartpatepeauperepeurpiedpilepionpipeplanplatpoilpoispolepontportposeprixpucepullquairaceraierailramerangreinreverhumriderimerireriteriveroberolerondroserotirusesangscieseauseinsenssitesoiesoifsoinsoirsojasorttaietaxetaxiteletetethonthymtigetoittometourtractriotroutructubatubetuerurneuservaseveauveloventversvertvidevoeuvoievoirvoixvotezelezerozinczone",5:"abimeachatacieragentaideraigleaimeralbumalguealleealleramantamourancreangleanneeappelarbrearmeearretasileatoutavionavoiravrilbaguebalaiballebandebarbebarrebatirbidonbierebijoubilanblancbocalboireboitebombebornebotteboulebrisebruitbrumebuchebullecabricacaocadetcadrecalmecanalcanifcannecartecausecedercedrechairchampchantchaoschenechienchiotchosechuteciblecidreciterclowncoeurcoliscollecordecorpscotoncoudecourscraiecranecreercremecriercrisecroixcuirecyclecygnedansedattedebutdecordegatdelaidettediguedindedinerdoigtdorerdoutedramedureedurereclatecoleecranecriteffeteleveencreennuienvieepiceepineepouxessaietageetangetapeetudeevierexcesfablefaconfagotfairefarcefauvefermefichefiguefiletfillefixerfleurflutefoirefolieforetforgeformefossefouetfoulefoyerfreinfrerefrigofritefroidfrontfruitfuitefumeefumerfuseefusilgaffegamingardegazongemirgenougenregestegiletglaceglobegombogommegorgegraingreveguepeguidehachehainehalteharpeherbeherosheurehibouhiverhommehontehotelhuilehuttehyenehymneimageindexissuejambejaunejeterjeudijouerjouetjugerjurerkoalalacerlacetlainelancelapinlarmelassolaverleverlevrelignelistelitrelivrelogerlouerloyerlueurlundiluttelyceemaconmagiemairemallemardimargemarinmassematchmatinmelermelonmenermercimetalmetremetromixermoinemondemorsemotifmoulemoyenmuseenagernappenatteneigeneveunicheniecenoeudnoyaunoyernuagenuqueobeirobjetoceanodeuroffreombreoncleongleoperaorageordreorneroutilpagnepairepalmepandapannepaumepechepeinepellepepinperlepeserpharepianopiecepiegepincepisteplaceplageplaieplierplombpluieplumepochepoemepoidspoingpointpoirepolirpommeponeyporteposerpoucepouleprierpriseproiepuitspunirquartquetequeuerabotradioramerramperaserraterravinrayerrayonrecitreglereinerepasrestereverrhumerobotrocheroderromanrotirrougerouterubanrugbyruinesablesabotsalirsallesalonsalutsaucesaulesavonscenescoresemersignesingesiropsoeursoupesportstadestagestylosucresueursuitesujettabactabletachetalontantetapistartetassetatertempstenirtentetermeterretextethemetigretirertissutitretoiletonnetorsetracetraintraittributronctronetuyauunionusageusinevachevaguevalseveinevenirventeverrevestevetirvideovignevilleviservitrevivrevoilevolervoletvomirwagonzebre",6:"accentaccordacteuradulteagendaagneaualarmealcoolalerteamandeameneramitieamuserananasanimalanneauargentarmureaspectauteuravaleraveniravenueavocatbagagebaiserbalconballonbananebanquebarquebateaubattrebergerbeurrebilletblagueblousebouboubouclebougerbougiebourseboutonbriquebroderbrossebrulerbuffetbufflebureaucabanecabinecachercadeaucafardcahiercaissecalculcamioncampercanapecanardcarnetcartoncasquecassercendrecerclecerisechainechaisecharmechassechatoncheminchequechevalcheveucinemacirquecitronclasseclimatclochecochoncoffrecolerecollercombatcompascomptecontercopaincopiercopinecordoncornetcouchecoucoucoudrecoulercoupercourgecourircousincrayoncuissecuivredangerdanserdesertdessindestindetaildevoirdiabledjembedollardominodonnerdormirdouanedouchedragoneclairecorceecrireeleveremploienfantennemientreeentrerepauleepoqueequipeerreurespaceespritetireretoileeviterexamenfermerfeutrefigureflammeflaqueflechefleuvefloconfoncerfourmifraisegagnergaragegarcongateaugibiergiflergirafeglacongommergourdegoutergouttegoyavegrainegrangegriffegrottegroupeguerirguerrehanchehangarhasardhisserhuitrehumeurhurlerignameimiterindiceinvitejambonjardinjoueurjunglekimonolabourlacherlancerlanguelarcinlegumelettrelezardlimitelisserlivrerloutreluttermachermagnetmairiemaisonmaitremalademalicemanchemangermanguemaniocmaraismarchemariermarronmasquemefiermembremenacementirmentonmetiermeublemietteminuitminutemiroirmomentmontermontremoquermordremoteurmouchemoulinmourirmoutonmusclenarinenaturenavirenicherniveaunombrenommernumerooffriroignonoiseauopererorangeorteiloursonouvrirpagaiepaillepalaispanierpapayepapierparadepardonparentparfumparierparlerparolepatatepatronpavagepaysanpecherpedalependrepenserpercerpercheperdrepermispetalepetrirpeuplephoquepigeonpimentpinceepincerpiochepiquerpirateplaineplanteployerpoisonpoivrepolicepondreporcheposterpoudrepoumonpoutreprenompreterprinceprisonpriverprocesprojetpuiserpuzzleracineradeaurafaleraisinraisonrangerreagirregardregionregnerregretremuerrenardrendrerequinreseauresterretardretourrideaurincerrivagerocherroulerrucherrythmesablersaisirsaisonsaladesaluersamedisanglesautersavanesavoirsechersecretsentirserrerservirsieclesignalsillonsirenesoireesoleilsommetsonnersorghosortirsourcesourisstatuestudiosuivretalenttamtamtardertassertendretentertimbretissertomatetombertondretordretortuetracertresortricottroupetulipetunnelvaleurvalisevalleevaloirvantervendreventrevergerveriteverrouverserviandevioletviolonvisagevisitevisservoisinvolcanvoleurvoyageyaourtzigzag",7:"abeilleabricotaccueilacheteradresseajouterallumerampouleappelerarbitrearreterarrierearroserartisteasseoiratelierautobusautomneavancerbagarrebaignerbaisserbalafonbalancebalayerbaleinebiscuitblesserbloquerboissonbonheurbonjourboucherbouquetbranchebrillercabinetcailloucalepincarottecascadecerceaucerveauchagrinchaleurchambrechangerchansonchanterchapeaucharbonchargerchariotcharruechasserchateauchemisechiffonchiffrechoralecigogneciseauxciterneclaironclavierclochercoiffercolliercollinecolonnecompterconcertconfierconseilcorbeaucostumecouchercouloircouragecousinecouteaucouvertcouvrircrachercrapaudcravatecreusercrochetcuisinedallagedauphindeciderdessertdevenirdevinerdiamantdisputedocteurdossierdoublerdouleurdrapeaudresserecharpeechelleecouterecraserediteuremotionenleverenqueteenvoyerepinardepuiserequerreessayeressuyeretendreetudierevasionexempleexisterfacteurfacturefamillefatiguefenetrefermierfeuillefevrierficelleflamantflatterfleurirflotterfortunefossilefournirfrapperfrissonfromagefrottergaleriegalettegambadegardiengazellegencivegeneralglissergonflergorillegouffregraissegrandirgrattergreniergrillergrimpergrondergrossirguetterguitarehabiterhameconharicothauteurherbierhesiterheurterhonneurhopitalhorairehorizonhorlogeimposerinsecteinstantinviterirriterjanvierjoindrejonglerjournaljuilletjumellejusticekiosquelainagelaisserlampionlaurierlecteurlectureleopardlessivelibererlicornelisierelumierelunettelutteurmachinemagasinmaigrirmaillotmanettemanquermanteaumarchermariagemarmitemarquermarteaumassagematelasmedecinmelangemendiermessagemeuniermijoterminutermissionmitainemoineaumoissonmonnaiemorceaumurmuremusiquemysterenacellenoircirnourrirobligerobteniroccuperoctobreopinionorangeroreilleorgueiloublierouvrageouvrierpalettepalmierpanachepanneauparkingpassagepassionpaysagepecheurpeignerpeindrepelicanpelousepeluchepencherperdrixpinceaupiroguepiscineplacardplafondplaisirplancheplanterplongerplumeaupoigneepoignetpoinconpointerpoissonpommadepommierpompierpousserpoussinpouvoirprairiepresentprouverquitterrancunerapportrecettereciterrecolterefuserregalerreleverremplirrentrerreparerrepeterreponsereposerressortretenirretirerreussirrevenirricanerrisquerriviereriziererobinetrouillerouladesandalesecondesecouersemainesemblersentierserpentservicesifflersilencesoignersorciersouciersouliersoupconsourcilsourirespiraletableautabliertaillertambourtamisertapotertaureauteindretempeteterraintheatretonneautouchertournertournoitoussertrainertravailtraverstrempertressertrichertrompertroussetrouveruniversvaincrevanilleveillervendeurvillagevisitervitessevoisinevoiturevoyagervoyelle"};
+/*DATA:END*/
+
+var $ = function (id) { return document.getElementById(id); };
+var reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+// ---- data ---------------------------------------------------------------------
+function dec(s) {
+  var a = s.split('').reverse(), o = '';
+  for (var i = 0; i < a.length; i++) o += String.fromCharCode(((a[i].charCodeAt(0) - 97 - 7 - i * 3) % 26 + 26) % 26 + 97);
+  return o;
+}
+var WORDS = ANS.split(' ').map(dec);
+var LEVELS = WORDS.map(function (w, i) { return { n: i + 1, len: w.length, first: w.charAt(0).toUpperCase() }; });
+var ADMIT = {};
+[4, 5, 6, 7].forEach(function (n) {
+  var s = DICT[n];
+  for (var i = 0; i + n <= s.length; i += n) ADMIT[s.substr(i, n)] = 1;
+});
+
+// ---- seeded random (cosmetic only: confetti) ------------------------------------
+var seedV = 1;
+function rnd() {
+  seedV = (seedV + 0x6D2B79F5) | 0;
+  var t = Math.imul(seedV ^ (seedV >>> 15), 1 | seedV);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+// ---- host page (only the events listed in the game sheet, no personal data) ------
+function emit(msg) {
+  msg.source = 'mini-jeu'; msg.game = GAME;
+  try { window.parent.postMessage(msg, '*'); } catch (e) { /* ignore */ }
+}
+
+// ---- persistence (always guarded: the game works without storage) ------------------
+var save = { level: 1, max: 1, stars: [], best: [], cur: null, chal: null };
+function nat(v, hi) { v = v | 0; return v < 0 ? 0 : v > hi ? hi : v; }
+function totalStars() { var t = 0; for (var i = 0; i < N; i++) t += save.stars[i] || 0; return t; }
+// A saved game is only trusted if every guess is a possible one.
+function cleanGame(o, lvl, maxTry) {
+  if (!o || typeof o !== 'object' || !Array.isArray(o.guesses)) return null;
+  var L = LEVELS[lvl], word = WORDS[lvl].toUpperCase(), gs = [];
+  if (o.guesses.length > maxTry) return null;
+  for (var i = 0; i < o.guesses.length; i++) {
+    var g = o.guesses[i];
+    if (typeof g !== 'string' || g.length !== L.len || g.charAt(0) !== L.first || !ADMIT[g.toLowerCase()]) return null;
+    if (g === word) return null;
+    gs.push(g);
+  }
+  if (gs.length >= maxTry) return null;
+  var t = typeof o.typed === 'string' && /^[A-Z]*$/.test(o.typed) && o.typed.charAt(0) === L.first && o.typed.length < L.len ? o.typed : L.first;
+  return { guesses: gs, typed: t };
+}
+function loadSave() {
+  var i;
+  save.stars = []; save.best = [];
+  for (i = 0; i < N; i++) { save.stars.push(0); save.best.push(0); }
+  try {
+    var s = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (s && typeof s === 'object') {
+      save.max = Math.max(1, nat(s.max, N));
+      save.level = Math.min(Math.max(1, nat(s.level, N)), save.max);
+      if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = nat(s.stars[i], 3);
+      if (Array.isArray(s.best)) for (i = 0; i < N && i < s.best.length; i++) save.best[i] = nat(s.best[i], MAXTRY);
+      if (s.cur && typeof s.cur === 'object') {
+        var l = nat(s.cur.level, N) - 1;
+        var c = l >= 0 ? cleanGame(s.cur, l, MAXTRY) : null;
+        if (c) save.cur = { level: l + 1, guesses: c.guesses, typed: c.typed };
+      }
+      if (s.chal && typeof s.chal === 'object') {
+        var cl = nat(s.chal.level, N) - 1, tg = nat(s.chal.target, MAXTRY);
+        var cc = cl >= 0 && tg >= 1 ? cleanGame(s.chal, cl, tg) : null;
+        if (cc) save.chal = { level: cl + 1, target: tg, guesses: cc.guesses, typed: cc.typed };
+      }
+    }
+  } catch (e) { /* no storage: play without it */ }
+}
+function store() {
+  try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) { /* ignore */ }
+}
+
+// ---- game state ----------------------------------------------------------------
+var g = null;        // {lvl, word, len, first, guesses, typed, over, won, target(0=none), stars}
+var screen = 'home';
+var winTimer = 0;
+var lastMsg = '';
+
+function limit() { return g.target || MAXTRY; }
+// marks: 2 right place, 1 elsewhere, 0 absent (repeated letters are counted like in the usual rules)
+function evalGuess(guess, word) {
+  var n = word.length, r = [], used = [], i, j;
+  for (i = 0; i < n; i++) { r.push(0); used.push(false); }
+  for (i = 0; i < n; i++) if (guess.charAt(i) === word.charAt(i)) { r[i] = 2; used[i] = true; }
+  for (i = 0; i < n; i++) {
+    if (r[i]) continue;
+    for (j = 0; j < n; j++) {
+      if (!used[j] && guess.charAt(i) === word.charAt(j)) { r[i] = 1; used[j] = true; break; }
+    }
+  }
+  return r;
+}
+function starsFor(tries) { return tries <= 3 ? 3 : tries <= 5 ? 2 : 1; }
+
+function startGame(lvl, resume, target) {
+  clearTimeout(winTimer);
+  var L = LEVELS[lvl];
+  g = { lvl: lvl, word: WORDS[lvl].toUpperCase(), len: L.len, first: L.first, guesses: [], typed: L.first,
+    over: false, won: false, target: target || 0, stars: 0 };
+  if (resume) { g.guesses = resume.guesses.slice(); g.typed = resume.typed; }
+  $('win').hidden = true;
+  buildBoard();
+  renderAll();
+  say(lvl === 0 && !g.guesses.length && !target ? 'Écris un mot de ' + g.len + ' lettres.' : '');
+}
+function persist() {
+  if (!g || g.over) return;
+  var o = { level: g.lvl + 1, guesses: g.guesses.slice(), typed: g.typed };
+  if (g.target) { o.target = g.target; save.chal = o; } else save.cur = o;
+  store();
+}
+
+// ---- board -------------------------------------------------------------------
+var rowEls = [], tileEls = [];
+function buildBoard() {
+  var rows = $('rows'), i, j;
+  rows.innerHTML = ''; rowEls = []; tileEls = [];
+  for (i = 0; i < MAXTRY; i++) {
+    var r = document.createElement('div');
+    r.className = 'row' + (i >= limit() ? ' off' : '');
+    var ts = [];
+    for (j = 0; j < g.len; j++) {
+      var t = document.createElement('div');
+      t.className = 't';
+      r.appendChild(t); ts.push(t);
+    }
+    rows.appendChild(r); rowEls.push(r); tileEls.push(ts);
+  }
+  rows.style.setProperty('--n', g.len);
+  layout();
+}
+function layout() {
+  if (!g) return;
+  var b = $('board'), gap = 5;
+  var w = b.clientWidth, h = b.clientHeight;
+  var t = Math.floor(Math.min((w - (g.len - 1) * gap) / g.len, (h - (MAXTRY - 1) * gap) / MAXTRY, 62));
+  if (!(t > 10)) t = 10;
+  var rows = $('rows');
+  rows.style.setProperty('--t', t + 'px');
+  rows.style.setProperty('--gap', gap + 'px');
+}
+function paintRow(i, animate) {
+  var ts = tileEls[i], gs = g.guesses[i], k;
+  var typing = !gs && i === g.guesses.length && !g.over;
+  var marks = gs ? evalGuess(gs, g.word) : null;
+  for (k = 0; k < g.len; k++) {
+    var t = ts[k], ch = gs ? gs.charAt(k) : typing ? (g.typed.charAt(k) || '') : '';
+    var cls = 't';
+    if (marks) cls += ' s' + marks[k];
+    else if (typing && ch) cls += k === 0 ? ' g' : ' f';
+    else if (typing && k === g.typed.length) cls += '';
+    t.className = cls;
+    t.style.setProperty('--d', animate ? (k * 0.09) + 's' : '0s');
+    if (!animate && marks) t.style.animation = 'none'; else t.style.animation = '';
+    t.textContent = ch;
+  }
+}
+function paintAll() {
+  for (var i = 0; i < MAXTRY; i++) paintRow(i, false);
+}
+function keyStates() {
+  var st = {}, i, k;
+  for (i = 0; i < g.guesses.length; i++) {
+    var m = evalGuess(g.guesses[i], g.word);
+    for (k = 0; k < g.len; k++) {
+      var c = g.guesses[i].charAt(k);
+      if (st[c] === undefined || m[k] > st[c]) st[c] = m[k];
+    }
+  }
+  return st;
+}
+var ROWS = ['AZERTYUIOP', 'QSDFGHJKLM', 'WXCVBN'];
+var keyEls = {};
+function buildKeys() {
+  var kb = $('kb');
+  ROWS.forEach(function (row, ri) {
+    var d = document.createElement('div');
+    d.className = 'kr';
+    if (ri === 2) d.appendChild(mkKey('ENTER', 'Valider', 'k wide go', '<svg viewBox="0 0 24 24"><path d="M5 12.500l4.500 4.500L19 7.500"/></svg>'));
+    row.split('').forEach(function (c) { d.appendChild(mkKey(c, c, 'k', c)); });
+    if (ri === 2) d.appendChild(mkKey('BACK', 'Effacer', 'k wide', '<svg viewBox="0 0 24 24"><path d="M9 6h11v12H9l-5-6zM12.500 9.500l5 5M17.500 9.500l-5 5"/></svg>'));
+    kb.appendChild(d);
+  });
+}
+function mkKey(code, label, cls, html) {
+  var b = document.createElement('button');
+  b.className = cls; b.innerHTML = html; b.setAttribute('data-k', code); b.setAttribute('aria-label', label);
+  if (code.length === 1) keyEls[code] = b;
+  return b;
+}
+function paintKeys() {
+  var st = keyStates();
+  for (var c in keyEls) keyEls[c].className = 'k' + (st[c] !== undefined ? ' s' + st[c] : '');
+}
+function say(text, warn) {
+  lastMsg = text;
+  var m = $('msg');
+  m.textContent = text;
+  m.className = warn ? 'warn' : '';
+}
+function starIcon() { return '<svg viewBox="0 0 24 24"><use href="#star"/></svg>'; }
+function renderHead() {
+  $('lvl').textContent = 'Niveau ' + (g.lvl + 1) + ' · ' + g.len + ' lettres';
+  var chal = $('chal'), goal = $('goal');
+  if (g.target) {
+    chal.hidden = false; goal.hidden = true;
+    $('chalT').textContent = 'Défi : en ' + g.target + ' essai' + (g.target > 1 ? 's' : '') + ' ou moins';
+  } else {
+    chal.hidden = true; goal.hidden = false;
+    goal.innerHTML = '<span aria-label="3 étoiles en 3 essais ou moins">' + starIcon() + starIcon() + starIcon() + ' 3 essais</span>' +
+      '<span aria-label="2 étoiles en 4 ou 5 essais">' + starIcon() + starIcon() + ' 5</span>' +
+      '<span aria-label="1 étoile en 6 essais">' + starIcon() + ' 6</span>';
+  }
+}
+function renderAll() {
+  renderHead(); paintAll(); paintKeys();
+}
+
+// ---- input ---------------------------------------------------------------------
+function typeLetter(c) {
+  if (!g || g.over || screen !== 'game') return;
+  if (g.typed.length >= g.len) return;
+  g.typed += c;
+  paintRow(g.guesses.length, false);
+  var t = tileEls[g.guesses.length][g.typed.length - 1];
+  t.classList.add('pop');
+  say('');
+  persist();
+}
+function backspace() {
+  if (!g || g.over || screen !== 'game') return;
+  if (g.typed.length <= 1) return;
+  g.typed = g.typed.slice(0, -1);
+  paintRow(g.guesses.length, false);
+  say('');
+  persist();
+}
+function submit() {
+  if (!g || g.over || screen !== 'game') return;
+  var i = g.guesses.length;
+  if (g.typed.length < g.len) { shake(i); say('Trop court', true); return; }
+  if (!ADMIT[g.typed.toLowerCase()]) { shake(i); say('Mot inconnu', true); return; }
+  g.guesses.push(g.typed);
+  g.typed = g.first;
+  say('');
+  paintRow(i, true);
+  paintKeys();
+  var guess = g.guesses[i];
+  if (guess === g.word) finish(true);
+  else if (g.guesses.length >= limit()) finish(false);
+  else {
+    persist();
+    if (g.guesses.length === limit() - 1) say('Dernier essai !', true);
+  }
+}
+function shake(i) {
+  var r = rowEls[i];
+  r.classList.remove('no');
+  void r.offsetWidth;
+  r.classList.add('no');
+}
+
+// ---- end of a game ------------------------------------------------------------------
+function finish(won) {
+  var tries = g.guesses.length;
+  g.over = true; g.won = won;
+  if (g.target) {
+    save.chal = null;
+    emit({ event: 'challenge_result', level: g.lvl + 1, score: won ? tries : MAXTRY + 1, target: g.target, won: won });
+  } else {
+    save.cur = null;
+    if (won) {
+      g.stars = starsFor(tries);
+      var l = g.lvl;
+      save.stars[l] = Math.max(save.stars[l], g.stars);
+      save.best[l] = save.best[l] ? Math.min(save.best[l], tries) : tries;
+      if (l + 2 > save.max) save.max = Math.min(N, l + 2);
+      save.level = Math.min(N, l + 2);
+      emit({ event: 'level_complete', level: l + 1, score: tries, stars: g.stars });
+    }
+  }
+  store();
+  clearTimeout(winTimer);
+  winTimer = setTimeout(showResult, reduced ? 0 : 450 + g.len * 90 + 200);
+}
+function plural(n, w) { return n + ' ' + w + (n > 1 ? 's' : ''); }
+function showResult() {
+  if (!g || !g.over) return;
+  screen = 'result';
+  var tries = g.guesses.length, chal = !!g.target;
+  var title, sub = '', rec = '';
+  if (g.won) {
+    title = chal ? 'Défi relevé !' : tries === 1 ? 'Du premier coup !' : 'Bravo !';
+    sub = 'Trouvé en ' + plural(tries, 'essai');
+  } else {
+    title = chal ? 'Défi perdu' : 'Raté…';
+    sub = 'Le mot était';
+  }
+  $('wTitle').textContent = title;
+  $('wSub').textContent = sub;
+  var sh = $('wStars'), i;
+  sh.hidden = !(g.won && !chal);
+  sh.innerHTML = '';
+  for (i = 0; i < 3; i++) sh.innerHTML += '<svg viewBox="0 0 24 24" class="' + (i < g.stars ? 'on' : '') + '"><use href="#star"/></svg>';
+  $('wWord').innerHTML = g.word.split('').map(function (c) { return '<b>' + c + '</b>'; }).join('');
+  if (g.won && !chal) {
+    rec = g.stars < 3 ? '3 étoiles en 3 essais ou moins' : '';
+  } else if (!g.won && !chal) rec = 'Tu y es presque. Retente !';
+  $('wRec').textContent = rec;
+  var c = $('wChal');
+  c.hidden = !chal;
+  if (chal) {
+    c.textContent = g.won ? 'Tu fais aussi bien que le défi.' : 'Il fallait ' + plural(g.target, 'essai') + ' ou moins.';
+    c.className = 'cres' + (g.won ? '' : ' lost');
+  }
+  var last = g.lvl + 1 >= N;
+  $('bNext').textContent = g.won && !chal ? (last ? 'Niveaux' : 'Suivant') : chal ? 'Accueil' : 'Niveaux';
+  $('bAgain').textContent = g.won ? 'Rejouer' : 'Réessayer';
+  $('bShare').hidden = !g.won;
+  $('bShare').textContent = 'Partager';
+  $('bChal').hidden = !g.won;
+  $('bChal').textContent = chal ? 'Renvoyer le défi' : 'Défier un ami';
+  $('bNext').className = g.won || chal ? 'btn gold' : 'btn line';
+  $('bAgain').className = g.won || chal ? 'btn line' : 'btn gold';
+  var w = $('win'), old = w.querySelectorAll('.bit');
+  for (i = 0; i < old.length; i++) w.removeChild(old[i]);
+  w.hidden = false;
+  if (reduced || !g.won) return;
+  var cols = ['#4FD1B5', '#FFC53D', '#F4F1E8'];
+  for (i = 0; i < 22; i++) {
+    var b = document.createElement('div');
+    b.className = 'bit';
+    b.style.cssText = 'left:' + Math.floor(4 + rnd() * 92) + '%;animation-delay:' + Math.floor(rnd() * 400) + 'ms;--dx:' +
+      Math.floor(rnd() * 80 - 40) + 'px;--rot:' + Math.floor(rnd() * 540 - 270) + 'deg;background:' + cols[i % 3] +
+      ';border-radius:' + (i % 2 ? '50%' : '3px');
+    w.appendChild(b);
+  }
+}
+
+// ---- sharing -------------------------------------------------------------------
+function starsText(s) { var st = ''; while (s--) st += '⭐'; return st; }
+function shapes() {
+  return g.guesses.map(function (gs) {
+    return evalGuess(gs, g.word).map(function (m) { return m === 2 ? '■' : m === 1 ? '●' : '□'; }).join('');
+  }).join('\n');
+}
+function shareText() {
+  return NAME + ' · Niveau ' + (g.lvl + 1) + ' · ' + starsText(starsFor(g.guesses.length)) + '\n' + shapes();
+}
+// The link base: MJ_CONFIG.shareBaseUrl, else the current address if it is http(s); otherwise no link.
+function shareBase() {
+  var b = window.MJ_CONFIG && window.MJ_CONFIG.shareBaseUrl;
+  if (typeof b !== 'string' || !b) b = /^https?:/i.test(String(location.href)) ? String(location.href) : '';
+  return b.split('#')[0];
+}
+// Fragment: letters, digits and hyphens only.
+function challengeLink() {
+  var base = shareBase();
+  return base ? base + '#defi-' + (g.lvl + 1) + '-' + g.guesses.length : '';
+}
+function challengeText() {
+  var link = challengeLink();
+  return NAME + ' · Niveau ' + (g.lvl + 1) + ' : trouvé en ' + plural(g.guesses.length, 'essai') + '. Fais aussi bien !' + (link ? ' ' + link : '');
+}
+function sendText(text, kind, btn) {
+  var done = function () { emit({ event: 'share', kind: kind }); };
+  var copied = function () { btn.textContent = 'Copié !'; done(); };
+  var legacy = function () {   // last resort: hidden textarea + execCommand
+    var ok = false;
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;left:0;top:0;opacity:0';
+      document.body.appendChild(ta);
+      ta.select(); ta.setSelectionRange(0, text.length);
+      ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (e) { ok = false; }
+    btn.textContent = ok ? 'Copié !' : 'Copie impossible';
+    if (ok) done();
+  };
+  var clip = function () {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(copied, legacy);
+    } catch (e) { /* fall through */ }
+    legacy();
+  };
+  try {
+    if (navigator.share) {
+      return navigator.share({ text: text }).then(done, function (e) { if (!e || e.name !== 'AbortError') clip(); });
+    }
+  } catch (e) { /* fall through */ }
+  clip();
+}
+
+// ---- challenges (#defi-<level>-<tries>) -------------------------------------------
+// Opening one never touches the progress or the game in progress: it lives in its own save slot.
+function openChallenge() {
+  var h = String(location.hash || ''), m;
+  try { if (h) history.replaceState(null, '', String(location.href).split('#')[0]); } catch (e) { /* ignore */ }
+  m = /^#defi-(\d{1,2})-(\d{1})$/.exec(h);
+  if (!m) return false;
+  var n = +m[1], target = +m[2];
+  if (n < 1 || n > N || target < 1 || target > MAXTRY) return false;
+  startGame(n - 1, null, target);
+  emit({ event: 'challenge_open', level: n, target: target });
+  show('game');
+  return true;
+}
+
+// ---- screens -------------------------------------------------------------------
+var SCREENS = ['home', 'levels'];
+function show(name) {
+  clearTimeout(winTimer);
+  screen = name;
+  SCREENS.forEach(function (s) { $(s).hidden = s !== name; });
+  if (name !== 'game') $('win').hidden = true;
+  if (name === 'home') renderHome();
+  else if (name === 'levels') renderLevels();
+  else if (name === 'game') layout();
+}
+function renderHome() {
+  var t = totalStars();
+  $('hTot').textContent = t + '/' + (N * 3);
+  $('hBar').style.width = Math.round(t * 100 / (N * 3)) + '%';
+  $('bGo').textContent = 'Continuer · Niveau ' + save.level;
+}
+var LOCK = '<svg viewBox="0 0 24 24"><path d="M7 10V8a5 5 0 0 1 10 0v2h1.500v10h-13V10zm2.500 0h5V8a2.500 2.500 0 0 0-5 0z"/></svg>';
+function renderLevels() {
+  $('lTot').textContent = totalStars() + '/' + (N * 3);
+  var h = '';
+  for (var i = 0; i < N; i++) {
+    var n = i + 1, locked = n > save.max, s = save.stars[i];
+    h += '<button class="cell' + (s ? ' ok' : '') + (n === save.level ? ' cur' : '') + '" data-level="' + n + '"' + (locked ? ' disabled' : '') +
+      ' aria-label="Niveau ' + n + (locked ? ', verrouillé' : ', ' + s + ' étoile' + (s > 1 ? 's' : '')) + '">' +
+      '<span class="n">' + (locked ? LOCK : n) + '</span><span class="s">' +
+      '<svg viewBox="0 0 24 24" class="' + (s > 0 ? 'on' : '') + '"><use href="#star"/></svg>' +
+      '<svg viewBox="0 0 24 24" class="' + (s > 1 ? 'on' : '') + '"><use href="#star"/></svg>' +
+      '<svg viewBox="0 0 24 24" class="' + (s > 2 ? 'on' : '') + '"><use href="#star"/></svg></span></button>';
+  }
+  $('grid').innerHTML = h;
+}
+// Back to the normal run (leaves a challenge without saving it).
+function startNormal(n) {
+  var r = save.cur && save.cur.level === n ? save.cur : null;
+  startGame(n - 1, r, 0);
+}
+function playLevel(n) {
+  save.chal = null;
+  if (save.cur && save.cur.level !== n) save.cur = null;
+  save.level = n;
+  store();
+  startNormal(n);
+  show('game');
+}
+function goContinue() { playLevel(save.level); }
+function restart() {
+  if (!g) return;
+  var t = g.target;
+  if (t) save.chal = null; else save.cur = null;
+  store();
+  startGame(g.lvl, null, t);
+  if (screen !== 'game') show('game');
+}
+
+// ---- events --------------------------------------------------------------------
+var lastPtr = 0;
+function onTap(el, fn) {
+  var down = false;
+  el.addEventListener('pointerdown', function () { down = true; });
+  el.addEventListener('pointerleave', function () { down = false; });
+  el.addEventListener('pointercancel', function () { down = false; });
+  el.addEventListener('pointerup', function (e) {
+    if (!down) return;
+    down = false; lastPtr = Date.now(); fn(e);
+  });
+  // keyboard / assistive activation (no pointer): click without a recent pointer tap
+  el.addEventListener('click', function (e) { if (Date.now() - lastPtr > 700) fn(e); });
+}
+function closestAttr(node, attr) {
+  while (node && node !== document.body) {
+    if (node.getAttribute && node.getAttribute(attr) !== null) return node;
+    node = node.parentNode;
+  }
+  return null;
+}
+// the keyboard reacts on press (fast typing)
+var kbDown = 0;
+$('kb').addEventListener('pointerdown', function (e) {
+  var k = closestAttr(e.target, 'data-k');
+  if (!k) return;
+  kbDown = Date.now();
+  press(k.getAttribute('data-k'));
+});
+$('kb').addEventListener('click', function (e) {
+  var k = closestAttr(e.target, 'data-k');
+  if (k && Date.now() - kbDown > 700) press(k.getAttribute('data-k'));
+});
+function press(c) {
+  if (c === 'ENTER') submit(); else if (c === 'BACK') backspace(); else typeLetter(c);
+}
+document.addEventListener('keydown', function (e) {
+  if (screen !== 'game' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === 'Enter') { if (e.target && e.target.tagName === 'BUTTON') return; submit(); }
+  else if (e.key === 'Backspace') backspace();
+  else if (/^[a-zA-Z]$/.test(e.key)) typeLetter(e.key.toUpperCase());
+});
+onTap($('grid'), function (e) {
+  var c = closestAttr(e.target, 'data-level');
+  if (c && !c.disabled) playLevel(+c.getAttribute('data-level'));
+});
+onTap($('bMap'), function () { leaveToLevels(); });
+onTap($('bReset'), restart);
+onTap($('bGo'), goContinue);
+onTap($('bLevels'), function () { show('levels'); });
+onTap($('bLBack'), function () { show('home'); });
+onTap($('bResume'), goContinue);
+function leaveToLevels() {
+  if (g && g.target) { save.chal = null; store(); startNormal(save.level); }
+  show('levels');
+}
+onTap($('bNext'), function () {
+  if (g.target) {   // challenge over: back to the normal run
+    startNormal(save.level); show('home');
+  } else if (g.won && g.lvl + 1 < N) { playLevel(g.lvl + 2); }
+  else show('levels');
+});
+onTap($('bAgain'), restart);
+onTap($('bShare'), function () { sendText(shareText(), 'result', $('bShare')); });
+onTap($('bChal'), function () { sendText(challengeText(), 'challenge', $('bChal')); });
+document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+window.addEventListener('resize', layout);
+window.addEventListener('hashchange', function () { if (/^#defi-/.test(location.hash)) openChallenge(); });
+
+// ---- boot ------------------------------------------------------------------------
+buildKeys();
+loadSave();
+if (save.chal) {   // a challenge in progress is resumed where it was
+  startGame(save.chal.level - 1, save.chal, save.chal.target);
+  show('game');
+} else {
+  save.chal = null;
+  startNormal(save.level);
+  show('home');
+}
+if (/^#defi-/.test(location.hash)) openChallenge();
+
+// ---- test hooks. The answers are never exposed here. -------------------------------
+window.__game = {
+  state: function () {
+    var marks = g.guesses.map(function (x) { return evalGuess(x, g.word).join(''); });
+    return {
+      screen: screen,
+      level: g.lvl + 1,
+      len: g.len,
+      first: g.first,
+      guesses: g.guesses.slice(),
+      marks: marks,
+      typed: g.typed,
+      tries: g.guesses.length,
+      limit: limit(),
+      over: g.over,
+      won: g.won,
+      stars: g.stars,
+      keys: keyStates(),
+      msg: lastMsg,
+      challenge: g.target ? { level: g.lvl + 1, target: g.target } : null,
+      save: { level: save.level, max: save.max, stars: save.stars.slice(), best: save.best.slice() },
+      total: totalStars()
+    };
+  },
+  levels: LEVELS,
+  loadLevel: function (n) {
+    n = n | 0;
+    if (n < 1 || n > N) throw new Error('level must be 1..' + N);
+    playLevel(n);
+    return this.state();
+  },
+  seed: function (n) { seedV = n | 0; },
+  // Plays without animation: replaces what is typed by `word` (first letter included), then submits.
+  play: function (word) {
+    word = String(word).toUpperCase();
+    g.typed = g.first;
+    for (var i = 1; i < word.length && g.typed.length < g.len; i++) typeLetter(word.charAt(i));
+    submit();
+    return this.state();
+  }
+};
+})();
+</script>
+</body>
+</html>
