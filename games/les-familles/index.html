@@ -345,6 +345,12 @@ function validCur(c) {
   }
   return { n: c.n, roll: c.roll, err: c.err, order: order, found: c.found.slice(), tried: tried, sel: sel };
 }
+function idWord(n, id) { return GRIDS[n - 1][famOf(id)][1][id % 3]; }
+// the saved form of a game in progress (words); validCur() turns it back into tile numbers
+function cutToWords(c) {
+  return { n: c.n, roll: c.roll, err: c.err, order: c.order.map(function (i) { return idWord(c.n, i); }), found: c.found.slice(),
+    tried: c.tried.slice(), sel: c.sel.map(function (i) { return idWord(c.n, i); }) };
+}
 function loadSave() {
   var i;
   save.max = 1; save.stars = []; save.cur = null;
@@ -355,7 +361,8 @@ function loadSave() {
       if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = intIn(s.stars[i], 0, 3) ? s.stars[i] : 0;
       save.max = intIn(s.max, 1, N) ? s.max : 1;
       for (i = 0; i < N; i++) if (save.stars[i] > 0 && save.max < Math.min(N, i + 2)) save.max = Math.min(N, i + 2);
-      save.cur = validCur(s.cur);
+      var vc = validCur(s.cur);
+      save.cur = vc ? cutToWords(vc) : null;
     }
   } catch (e) { /* no storage: play without it */ }
 }
@@ -392,7 +399,9 @@ function startLevel(n, roll, mode, target) {
   persist();
   show('game');
 }
-function resume(c) {
+function resume(saved) {
+  var c = validCur(saved);
+  if (!c) { startLevel(saved && saved.n || 1, 0); return; }
   clearTimeout(winTimer);
   g = { n: c.n, mode: 'level', target: 0, roll: c.roll, order: c.order, found: c.found, err: c.err, tried: c.tried, sel: c.sel, status: 'play', stars: 0, emitted: false };
   newBand = -1; shake = false; msgText = ''; msgKind = '';

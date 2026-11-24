@@ -298,11 +298,11 @@ var ENGINE = (function () {
   var STAR3 = 5, STAR2 = 2;     // lead (in cells per pion) over the best opponent for 3 and 2 stars
 
   // [pions, opponent strengths]; strength 0 plays at random ... 5 plays carefully (see TIERS).
-  var LEVELS = [
-    { k: 2, opp: [0] }, { k: 2, opp: [0] }, { k: 2, opp: [1] }, { k: 2, opp: [2] }, { k: 2, opp: [3] },
-    { k: 2, opp: [1, 1] }, { k: 2, opp: [2, 2] }, { k: 2, opp: [3, 2] }, { k: 2, opp: [2, 2] }, { k: 2, opp: [4, 3] },
-    { k: 3, opp: [2, 2] }, { k: 3, opp: [3, 3] }, { k: 3, opp: [4, 3] }, { k: 3, opp: [2, 2, 2] }, { k: 3, opp: [3, 3, 2] },
-    { k: 3, opp: [4, 3, 3] }, { k: 3, opp: [3, 3, 3] }, { k: 3, opp: [4, 4, 3] }, { k: 3, opp: [5, 4, 4] }, { k: 3, opp: [5, 5, 5] }
+  var LEVELS = [   // h: pions of the player, o: pions of each opponent, opp: strength of each opponent
+    { h: 2, o: 2, opp: [0] }, { h: 2, o: 2, opp: [0] }, { h: 2, o: 2, opp: [1] }, { h: 2, o: 2, opp: [2] }, { h: 2, o: 2, opp: [3] },
+    { h: 2, o: 2, opp: [1, 1] }, { h: 2, o: 2, opp: [2, 2] }, { h: 2, o: 2, opp: [3, 2] }, { h: 2, o: 2, opp: [2, 2] }, { h: 2, o: 2, opp: [4, 3] },
+    { h: 3, o: 3, opp: [2, 2] }, { h: 3, o: 3, opp: [3, 3] }, { h: 3, o: 3, opp: [4, 3] }, { h: 3, o: 3, opp: [2, 2, 2] }, { h: 3, o: 3, opp: [3, 3, 2] },
+    { h: 3, o: 3, opp: [4, 3, 3] }, { h: 3, o: 3, opp: [3, 3, 3] }, { h: 3, o: 3, opp: [4, 4, 3] }, { h: 3, o: 3, opp: [5, 4, 4] }, { h: 3, o: 3, opp: [5, 5, 5] }
   ];
   var TIERS = [
     { rand: 1 },
@@ -324,18 +324,21 @@ var ENGINE = (function () {
   function ringIdx(seat, pos) { return (GATE[seat] + 1 + pos) % RING; }
 
   function newGame(cfg) {
-    var np = cfg.seats.length, pos = [], turns = [], p, i;
+    var np = cfg.seats.length, pos = [], turns = [], ks = [], p, i;
     for (p = 0; p < np; p++) {
-      pos.push([]); turns.push(0);
-      for (i = 0; i < cfg.k; i++) pos[p].push(-1);
+      var kp = cfg.ks ? cfg.ks[p] : cfg.k;
+      ks.push(kp); pos.push([]); turns.push(0);
+      for (i = 0; i < kp; i++) pos[p].push(-1);
     }
     turns[0] = 1;
-    return { np: np, k: cfg.k, seats: cfg.seats.slice(), tiers: cfg.tiers.slice(), pos: pos, turn: 0, roll: 0, tries: 0,
+    return { np: np, ks: ks, k: Math.max.apply(null, ks), seats: cfg.seats.slice(), tiers: cfg.tiers.slice(), pos: pos, turn: 0, roll: 0, tries: 0,
       turns: turns, rng: cfg.seed | 0, rng2: (cfg.seed ^ 0x5bd1e995) | 0, over: false, winner: -1, last: 0, lastBy: 0, caps: 0 };
   }
   function levelGame(n, seed) {
     var L = LEVELS[n - 1], np = L.opp.length + 1;
-    return newGame({ k: L.k, seats: SEATS[np], tiers: [null].concat(L.opp), seed: seed });
+    var ks = [L.h];
+    for (var q = 1; q < np; q++) ks.push(L.o);
+    return newGame({ ks: ks, seats: SEATS[np], tiers: [null].concat(L.opp), seed: seed });
   }
   function hotGame(np, seed) {
     var t = [], i;
@@ -346,7 +349,7 @@ var ENGINE = (function () {
   // Legal moves of player p with value v. Pions standing on the same cell are interchangeable: one move for them.
   function legal(S, p, v) {
     var out = [], seen = {}, seat = S.seats[p], i, q, j;
-    for (i = 0; i < S.k; i++) {
+    for (i = 0; i < S.ks[p]; i++) {
       var from = S.pos[p][i], to;
       if (from === HOME || seen[from]) continue;
       if (from < 0) { if (v !== 6) continue; to = 0; }
@@ -358,7 +361,7 @@ var ENGINE = (function () {
         if (!REFUGE[idx]) {
           for (q = 0; q < S.np; q++) {
             if (q === p) continue;
-            for (j = 0; j < S.k; j++) {
+            for (j = 0; j < S.ks[q]; j++) {
               var s2 = S.pos[q][j];
               if (s2 >= 0 && s2 <= LAST_RING && ringIdx(S.seats[q], s2) === idx) mv.cap.push([q, j]);
             }
@@ -373,11 +376,11 @@ var ENGINE = (function () {
     S.pos[mv.p][mv.i] = mv.to;
     for (var c = 0; c < mv.cap.length; c++) { S.pos[mv.cap[c][0]][mv.cap[c][1]] = -1; S.caps++; }
     var done = true;
-    for (var i = 0; i < S.k; i++) if (S.pos[mv.p][i] !== HOME) done = false;
+    for (var i = 0; i < S.ks[mv.p]; i++) if (S.pos[mv.p][i] !== HOME) done = false;
     if (done) { S.over = true; S.winner = mv.p; }
   }
   function onTrack(S, p) {
-    for (var i = 0; i < S.k; i++) if (S.pos[p][i] >= 0 && S.pos[p][i] < HOME) return true;
+    for (var i = 0; i < S.ks[p]; i++) if (S.pos[p][i] >= 0 && S.pos[p][i] < HOME) return true;
     return false;
   }
   // End of a throw: a 6 replays; with nothing on the track a player gets 3 throws; else the turn passes.
@@ -389,8 +392,8 @@ var ENGINE = (function () {
     if (!moved && !onTrack(S, p)) { S.tries++; if (S.tries < 3) return; }
     S.turn = (p + 1) % S.np; S.tries = 0; S.turns[S.turn]++;
   }
-  function progress(S, p) { var t = 0; for (var i = 0; i < S.k; i++) t += S.pos[p][i] + 1; return t; }
-  function remain(S, p) { return S.k * (HOME + 1) - progress(S, p); }
+  function progress(S, p) { var t = 0; for (var i = 0; i < S.ks[p]; i++) t += S.pos[p][i] + 1; return t; }
+  function remain(S, p) { return S.ks[p] * (HOME + 1) - progress(S, p); }
   function lead(S) {     // cells between the winner and the best opponent
     var m = 1e9;
     for (var q = 0; q < S.np; q++) if (q !== S.winner) m = Math.min(m, remain(S, q));
@@ -420,7 +423,7 @@ var ENGINE = (function () {
     var ds = {}, n = 0, q, j;
     for (q = 0; q < S.np; q++) {
       if (q === p) continue;
-      for (j = 0; j < S.k; j++) {
+      for (j = 0; j < S.ks[q]; j++) {
         var s = S.pos[q][j];
         if (s < 0 || s > LAST_RING) continue;
         var d = (idx - ringIdx(S.seats[q], s) + RING) % RING;
@@ -437,7 +440,7 @@ var ENGINE = (function () {
       if (REFUGE[idx]) continue;
       for (q = 0; q < S.np; q++) {
         if (q === p) continue;
-        for (j = 0; j < S.k; j++) {
+        for (j = 0; j < S.ks[q]; j++) {
           var s = S.pos[q][j];
           if (s >= 0 && s <= LAST_RING && ringIdx(S.seats[q], s) === idx && !ds[d]) { ds[d] = 1; v += (s + 1) / 27; }
         }
@@ -509,20 +512,23 @@ function totalStars() { var t = 0; for (var i = 0; i < N; i++) t += save.stars[i
 function int(v, lo, hi) { v = Math.floor(+v); return isFinite(v) && v >= lo && v <= hi ? v : null; }
 function cleanState(s, cfgLike) {   // a saved game is only taken back when it is whole and coherent
   try {
-    var np = int(s.np, 2, 4), k = int(s.k, 2, 3), i, p;
-    if (np === null || k === null || !Array.isArray(s.seats) || !Array.isArray(s.tiers) || !Array.isArray(s.pos) || !Array.isArray(s.turns)) return null;
+    var np = int(s.np, 2, 4), i, p, ks = [];
+    if (np === null || !Array.isArray(s.ks) || s.ks.length !== np || !Array.isArray(s.seats) || !Array.isArray(s.tiers) || !Array.isArray(s.pos) || !Array.isArray(s.turns)) return null;
     if (s.seats.length !== np || s.tiers.length !== np || s.pos.length !== np || s.turns.length !== np) return null;
     var tiers = [];
     for (p = 0; p < np; p++) {
+      var kk = int(s.ks[p], 1, 3);
+      if (kk === null) return null;
+      ks.push(kk);
       var tv = s.tiers[p] === null ? null : int(s.tiers[p], 0, 5);
       if (tv === null && s.tiers[p] !== null) return null;
       tiers.push(tv);
     }
-    var t = ENGINE.newGame({ k: k, seats: ENGINE.SEATS[np], tiers: tiers, seed: 0 });
+    var t = ENGINE.newGame({ ks: ks, seats: ENGINE.SEATS[np], tiers: tiers, seed: 0 });
     for (p = 0; p < np; p++) {
       if (s.seats[p] !== ENGINE.SEATS[np][p]) return null;
-      if (!Array.isArray(s.pos[p]) || s.pos[p].length !== k) return null;
-      for (i = 0; i < k; i++) { var v = int(s.pos[p][i], -1, HOME); if (v === null) return null; t.pos[p][i] = v; }
+      if (!Array.isArray(s.pos[p]) || s.pos[p].length !== ks[p]) return null;
+      for (i = 0; i < ks[p]; i++) { var v = int(s.pos[p][i], -1, HOME); if (v === null) return null; t.pos[p][i] = v; }
       var tn = int(s.turns[p], 0, 9999); if (tn === null) return null; t.turns[p] = tn;
     }
     var f = { turn: int(s.turn, 0, np - 1), roll: int(s.roll, 0, 6), tries: int(s.tries, 0, 2), last: int(s.last, 0, 6), lastBy: int(s.lastBy, 0, np - 1),
@@ -531,15 +537,15 @@ function cleanState(s, cfgLike) {   // a saved game is only taken back when it i
     t.turn = f.turn; t.roll = f.roll; t.tries = f.tries; t.last = f.last; t.lastBy = f.lastBy; t.caps = f.caps; t.winner = f.winner;
     t.rng = s.rng | 0; t.rng2 = s.rng2 | 0; t.over = s.over === true;
     if (t.over !== (t.winner >= 0)) return null;
-    for (p = 0; p < np; p++) { var home = 0; for (i = 0; i < k; i++) if (t.pos[p][i] === HOME) home++; if ((home === k) !== (t.winner === p)) return null; }
-    if (cfgLike && (cfgLike.np !== np || cfgLike.k !== k || cfgLike.tiers.join() !== t.tiers.join())) return null;
+    for (p = 0; p < np; p++) { var home = 0; for (i = 0; i < ks[p]; i++) if (t.pos[p][i] === HOME) home++; if ((home === ks[p]) !== (t.winner === p)) return null; }
+    if (cfgLike && (cfgLike.np !== np || cfgLike.ks.join() !== ks.join() || cfgLike.tiers.join() !== t.tiers.join())) return null;
     return t;
   } catch (e) { return null; }
 }
 function cleanPack(o, n) {   // {S, undo: [S...]} for level n (0 = none expected)
   if (!o || typeof o !== 'object') return null;
   var cfg = null;
-  if (n) { var g = ENGINE.levelGame(n, 0); cfg = { np: g.np, k: g.k, tiers: g.tiers }; }
+  if (n) { var g = ENGINE.levelGame(n, 0); cfg = { np: g.np, ks: g.ks, tiers: g.tiers }; }
   var S = cleanState(o.S, cfg);
   if (!S || S.over) return null;
   var undo = [];
@@ -862,13 +868,13 @@ function buildBoard() {
   for (s = 0; s < 4; s++) for (i = 0; i < 2; i++) h += tile(who[s] < 0 ? 'lx' : 'l' + who[s], LANE[s][i][0], LANE[s][i][1], who[s] < 0 ? '' : SY(who[s]));
   h += tile('ctr', 3, 3, '<svg class="sy" viewBox="0 0 24 24"><use href="#hs"/></svg>');
   var p, j;
-  for (p = 0; p < S.np; p++) for (j = 0; j < S.k; j++) {
+  for (p = 0; p < S.np; p++) for (j = 0; j < S.ks[p]; j++) {
     h += '<button class="pion p' + p + '" data-p="' + p + '" data-i="' + j + '" tabindex="-1"><span class="d">' + SY(p, 'sy0').replace(' class="sy0"', '') + '</span></button>';
   }
   board.innerHTML = h;
   board.className = '';
   pionEls = [];
-  for (p = 0; p < S.np; p++) { pionEls.push([]); for (j = 0; j < S.k; j++) pionEls[p].push(board.querySelector('[data-p="' + p + '"][data-i="' + j + '"]')); }
+  for (p = 0; p < S.np; p++) { pionEls.push([]); for (j = 0; j < S.ks[p]; j++) pionEls[p].push(board.querySelector('[data-p="' + p + '"][data-i="' + j + '"]')); }
   destEls = [];
 }
 var pionEls = [], destEls = [], drawn = null;
@@ -887,7 +893,7 @@ function renderPions() {
   var S = G.S, groups = {}, p, i, key;
   var moves = G.kind !== undefined && S.roll > 0 && !S.over && humanAt(S.turn) ? ENGINE.legal(S, S.turn, S.roll) : [];
   var pick = moves.length > 1;
-  for (p = 0; p < S.np; p++) for (i = 0; i < S.k; i++) {
+  for (p = 0; p < S.np; p++) for (i = 0; i < S.ks[p]; i++) {
     var pos = S.pos[p][i];
     key = pos < 0 ? 'b' + p + '-' + i : pos === HOME ? 'h' + p + '-' + i : pos <= 23 ? 'r' + ENGINE.ringIdx(S.seats[p], pos) : 'l' + p + '-' + pos;
     (groups[key] = groups[key] || []).push([p, i]);
@@ -912,7 +918,7 @@ function renderPions() {
       el.style.transform = tr;
     });
   }
-  for (p = 0; p < S.np; p++) for (i = 0; i < S.k; i++) {
+  for (p = 0; p < S.np; p++) for (i = 0; i < S.ks[p]; i++) {
     var sl = board.querySelector('[data-slot="' + S.seats[p] + '-' + i + '"]');
     if (sl) sl.className = 'sl' + (S.pos[p][i] === HOME ? ' ok' : '');
   }
@@ -1021,7 +1027,7 @@ function renderLevels() {
   for (var n = 1; n <= N; n++) {
     var s = save.stars[n - 1] || 0, open = n <= save.max, L = ENGINE.LEVELS[n - 1];
     html += '<button class="cell' + (n === save.level ? ' cur' : '') + (s ? ' ok' : '') + '" data-level="' + n + '"' + (open ? '' : ' disabled') +
-      ' aria-label="Niveau ' + n + ', ' + L.k + ' pions, ' + plural(L.opp.length, 'adversaire') + (open ? ', ' + plural(s, 'étoile') : ', verrouillé') + '">' +
+      ' aria-label="Niveau ' + n + ', ' + L.h + ' contre ' + L.o + ' pions, ' + plural(L.opp.length, 'adversaire') + (open ? ', ' + plural(s, 'étoile') : ', verrouillé') + '">' +
       '<span class="n">' + (open ? n : LOCK) + '</span><span class="m">contre ' + L.opp.length + '</span><span class="s">' + starSvg(s >= 1) + starSvg(s >= 2) + starSvg(s >= 3) + '</span></button>';
   }
   $('grid').innerHTML = html;
@@ -1130,7 +1136,7 @@ fast = save.fast;
 // ---- test hooks (solutions never live here; seeds and the opponent search live in tools/course-des-pions) ------------
 window.__game = {
   engine: ENGINE,
-  levels: ENGINE.LEVELS.map(function (L, i) { return { n: i + 1, k: L.k, opp: L.opp.slice() }; }),
+  levels: ENGINE.LEVELS.map(function (L, i) { return { n: i + 1, h: L.h, o: L.o, opp: L.opp.slice() }; }),
   state: function () {
     var S = G.S, p = S.turn, mv = S.roll && !S.over ? ENGINE.legal(S, p, S.roll) : [], human = S.tiers[p] === null;
     return {
