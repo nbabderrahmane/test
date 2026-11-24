@@ -12,7 +12,7 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { chromium } = require('playwright');
 const R = require('../tools/semailles/engine');
-const { strongFor, naive } = require('../tools/semailles/player');
+const { strongFor } = require('../tools/semailles/player');
 
 const FILE = process.env.GAME_FILE || path.join(__dirname, '..', 'games', 'semailles', 'index.html');
 const GE = require('../tools/semailles/game-engine').load(FILE);
@@ -21,7 +21,7 @@ const KEY = 'mj:semailles:v1';
 const SHOTS = process.env.SHOTS || '';
 const MOBILE = { hasTouch: true, isMobile: true, deviceScaleFactor: 2 };
 const VIEWPORTS = [{ width: 320, height: 568 }, { width: 360, height: 640 }, { width: 430, height: 932 }];
-const SEED = () => 1;           // fixed seed of every level (tools/semailles/seeds.js: the test player wins all 20 with it)
+const SEED = n => 100 + n;     // fixed seed of level n (tools/semailles/seeds.js: the test player wins all 20 with these)
 
 let browser;
 const problems = [];   // console errors, page errors, unexpected requests (all pages)
@@ -221,7 +221,7 @@ const ENDS = [
     console.log(`        size: ${Buffer.byteLength(html)} bytes`);
   });
 
-  await test('hooks: 20 levels of 48 seeds, adversaries of rising strength, no solution in __game', async () => {
+  await test('hooks: 20 levels of 48 seeds, special starts announced, no solution in __game', async () => {
     const { context, page } = await open();
     const g = await page.evaluate(() => ({ keys: Object.keys(window.__game), levels: window.__game.levels, st: window.__game.state() }));
     assert.equal(g.levels.length, 20);
@@ -234,10 +234,6 @@ const ENDS = [
       assert.ok(l.nm.length >= 3 && l.nm.length <= 12, 'name ' + l.nm);
     });
     assert.equal(new Set(g.levels.map(l => l.nm)).size, 20, 'distinct adversary names');
-    for (let i = 1; i < 20; i++) {   // depth, then fewer blunders, then a larger budget: never weaker
-      const a = g.levels[i - 1].ai, b = g.levels[i].ai;
-      assert.ok(b.d > a.d || (b.d === a.d && (b.r < a.r || (b.r === a.r && b.n >= a.n))), `level ${i + 1} is not stronger than level ${i}`);
-    }
     assert.equal(g.levels[0].ai.r, 1, 'level 1 plays at random');
     assert.ok(g.levels.filter(l => l.note).length >= 4, 'a few special starts');
     assert.ok(g.levels.filter(l => l.p.some(v => v !== 4) || l.s[0] || l.s[1]).length < 20 && g.levels[19].p.every(v => v === 4), 'level 20 is the classical start');
@@ -456,6 +452,7 @@ const ENDS = [
       assert.equal(sv.stars[n - 1], want); assert.equal(sv.max, Math.min(20, n + 1)); assert.equal(sv.cur, null);
       await page.evaluate(sd => window.__game.seed(sd), SEED(Math.min(20, n + 1)));
       await page.locator('#bNext').tap();
+      await page.waitForTimeout(350);   // the board ignores taps for 300 ms after a result button
     }
     console.log(lines.map(l => '        ' + l).join('\n'));
     const s = await state(page);
@@ -481,7 +478,9 @@ const ENDS = [
     assert.equal(await page.locator('#wTitle').innerText(), 'Perdu');
     assert.equal(await page.locator('#bNext').isVisible(), false, 'no Suivant after a defeat');
     assert.equal(await page.locator('#wStars').isVisible(), false);
-    assert.equal(await page.locator('#bAgain').isVisible(), true);
+    // R2: a defeat offers "Réessayer" and "Niveaux", and reveals nothing else
+    const vis = await page.evaluate(() => [...document.querySelectorAll('#win .btn')].filter(b => b.offsetWidth > 0).map(b => b.textContent));
+    assert.deepEqual(vis, ['Réessayer', 'Niveaux']);
     const sv = await saved(page);
     assert.equal(sv.max, 1); assert.deepEqual(sv.stars, stars(20, 0)); assert.equal(sv.cur, null);
     assert.equal((await events(page, 'level_complete')).length, 0);
@@ -590,8 +589,9 @@ const ENDS = [
     await reload(page);
     let s = await state(page);
     assert.equal(s.screen, 'home');
-    assert.equal(await page.locator('#bGo').innerText(), 'Continuer · Niveau 10');
-    await page.locator('#bGo').tap();
+    assert.equal(await page.locator('#bGo').innerText(), 'Continuer · Niveau 1', 'Continuer points at the first level not won');
+    await page.locator('#bLevels').tap();
+    await page.locator('.cell[data-lv="10"]').tap();     // a game in progress on level 10 is resumed from the grid
     s = await state(page);
     assert.equal(s.level, 10); assert.deepEqual([s.board, s.store, s.hist, s.plies, s.seed], [before.board, before.store, before.hist, before.plies, before.seed]);
     assert.deepEqual(s.legal, before.legal);
@@ -608,8 +608,9 @@ const ENDS = [
     await a.page.locator('[data-pit="3"]').tap();
     await a.page.waitForFunction(() => window.__game.state().hist.length >= 1);
     await reload(a.page);
-    await a.page.locator('#bGo').tap();
-    await a.page.waitForFunction(() => !window.__game.state().busy && window.__game.state().turn === 0, null, { timeout: 6000 });
+    await a.page.locator('#bLevels').tap();
+    await a.page.locator('.cell[data-lv="12"]').tap();
+    await a.page.waitForFunction(() => !window.__game.state().busy && window.__game.state().turn === 0 && window.__game.state().plies === 2, null, { timeout: 6000 });
     const got = await state(a.page);
     assert.deepEqual([got.board, got.store, got.hist], [want.board, want.store, want.hist]);
     await a.context.close();
@@ -738,9 +739,9 @@ const ENDS = [
     const ref = await open({ width: 360, height: 640 });
     await ref.page.evaluate(sd => { window.__game.still(true); window.__game.seed(sd); window.__game.loadLevel(12); }, SEED(12));
     const fin = await playByHook(ref.page, strongFor(12, lvls[11]));
-    const myScore = fin.store[0], myHist = fin.hist.filter((_, i) => i % 2 === 0);
+    const myScore = Math.min(fin.store[0], 25), myHist = fin.hist.filter((_, i) => i % 2 === 0);
     await ref.context.close();
-    assert.ok(myScore >= 25);
+    assert.equal(myScore, 25, 'a challenge score is capped at 25');
     // open the link on level 12 while max is 3: opens, one goal on screen, progress untouched
     await A.page.goto(URL + `#defi-12-${myScore}`);
     await A.page.waitForFunction(() => window.__game.state().mode === 'challenge');
@@ -757,7 +758,8 @@ const ENDS = [
     await A.page.evaluate(sd => { window.__game.still(true); window.__game.seed(sd); }, SEED(12));
     for (const p of myHist) { const cur = await state(A.page); if (cur.over) break; await tapPit(A.page, p); }
     s = await state(A.page);
-    assert.equal(s.over, true); assert.equal(s.store[0], myScore);
+    assert.equal(s.over, true); assert.equal(Math.min(s.store[0], 25), myScore);
+    assert.equal(await A.page.locator('footer').isVisible(), false, 'no undo / restart in a challenge');
     await A.page.locator('#win').waitFor({ state: 'visible' });
     assert.equal(await A.page.locator('#wTitle').innerText(), 'Défi relevé !');
     assert.equal(await A.page.locator('#wChal').innerText(), `Objectif ${myScore} · toi ${myScore}`);
@@ -767,6 +769,10 @@ const ENDS = [
     assert.equal((await events(A.page, 'level_complete')).length, 0, 'a challenge is not a level win');
     assert.equal(keep(await saved(A.page)), keep(snapshot), 'a finished challenge does not touch the progress or the game in progress');
     assert.equal(await A.page.locator('#wStars').isVisible(), false);
+    // R3: no replay, no share of the result, only "Renvoyer le défi" (won) and "Accueil"
+    const cv = await A.page.evaluate(() => [...document.querySelectorAll('#win .btn')].filter(b => b.offsetWidth > 0).map(b => b.textContent));
+    assert.deepEqual(cv, ['Accueil', 'Renvoyer le défi']);
+    assert.equal((await events(A.page, 'challenge_result')).length, 1, 'challenge_result is sent once');
     // go home: the game in progress is still there
     await A.page.locator('#bNext').tap();
     assert.equal((await state(A.page)).screen, 'home');
@@ -774,14 +780,17 @@ const ENDS = [
     s = await state(A.page);
     assert.equal(s.mode, 'level'); assert.equal(s.level, 3); assert.deepEqual(s.hist, snapshot.cur.hist);
     // lost: a target nobody reaches
-    await A.page.evaluate(() => { window.location.hash = '#defi-2-48'; });
-    await A.page.waitForFunction(() => window.__game.state().mode === 'challenge');
+    await A.page.evaluate(() => { window.location.hash = '#defi-20-25'; });
+    await A.page.waitForFunction(() => window.__game.state().mode === 'challenge' && window.__game.state().level === 20);
     await A.page.evaluate(() => { window.__game.still(true); window.__game.seed(3); });
-    await playByHook(A.page, strongFor(2, lvls[1]));
+    await playByHook(A.page, s => R.legalMoves(s)[0]);
     await A.page.locator('#win').waitFor({ state: 'visible' });
     assert.equal(await A.page.locator('#wTitle').innerText(), 'Défi manqué');
+    const lv2 = await A.page.evaluate(() => [...document.querySelectorAll('#win .btn')].filter(b => b.offsetWidth > 0).map(b => b.textContent));
+    assert.deepEqual(lv2, ['Accueil'], 'a lost challenge cannot be retried');
     ev = await events(A.page, 'challenge_result');
-    assert.equal(ev[ev.length - 1].won, false); assert.equal(ev[ev.length - 1].target, 48);
+    assert.equal(ev.length, 2, 'one result per opening');
+    assert.equal(ev[1].won, false); assert.equal(ev[1].target, 25);
     assert.equal(keep(await saved(A.page)).includes('"max":3'), true);
     assert.equal((await saved(A.page)).stars[1], 1, 'stars of level 2 untouched');
     await A.context.close();
@@ -797,7 +806,7 @@ const ENDS = [
     assert.equal(s.mode, 'challenge'); assert.equal(s.level, 6); assert.equal(s.challenge.target, 30); assert.equal(s.screen, 'game');
     assert.deepEqual([s.board, s.hist], [before.board, before.hist]);
     await context.close();
-    const bad = ['#defi-', '#defi-0-5', '#defi-21-5', '#defi-3-0', '#defi-3-49', '#defi-3-x', '#defi-1-2-3', '#defi-99999999999-1', '#DEFI-3-5', '#defi-3', '#defi--3-5', '#defi-3-5%20', '#defi-3-5;alert(1)', '#defi-%3Cb%3E-5', '#autre'];
+    const bad = ['#defi-', '#defi-0-5', '#defi-21-5', '#defi-3-0', '#defi-3-26', '#defi-3-48', '#defi-3-49', '#defi-3-x', '#defi-1-2-3', '#defi-99999999999-1', '#DEFI-3-5', '#defi-3', '#defi--3-5', '#defi-3-5%20', '#defi-3-5;alert(1)', '#defi-%3Cb%3E-5', '#autre'];
     for (const h of bad) {
       const b = await open({ width: 360, height: 640 }, { hash: h });
       const st = await state(b.page);
@@ -830,6 +839,191 @@ const ENDS = [
     const s = await state(page);
     assert.deepEqual([lc[0].level, lc[0].score, lc[0].stars], [1, s.store[0], s.stars]);
     await context.close();
+  });
+
+  // ------------------------------------------------------------------ second review (R1 to R10)
+  await test('R6: "Continuer" points at the first level not won; replaying an old level does not move it', async () => {
+    const save = { level: 3, max: 3, stars: [3, 2, 0].concat(stars(17, 0)), best: stars(20, 0), cur: null };
+    const { context, page } = await open({ width: 360, height: 640 }, { save });
+    assert.equal(await page.locator('#bGo').innerText(), 'Continuer · Niveau 3');
+    await page.locator('#bLevels').tap();
+    await page.locator('.cell[data-lv="1"]').tap();
+    await page.evaluate(() => { window.__game.still(true); window.__game.seed(101); });
+    const lv = await page.evaluate(() => window.__game.levels);
+    await playByHook(page, strongFor(1, lv[0]));          // level 1 won again
+    assert.equal((await state(page)).won, true);
+    await page.waitForSelector('#win', { state: 'visible' });
+    await page.locator('#bNext').tap();                    // goes on to level 2: a replay too
+    await page.waitForTimeout(350);
+    await page.locator('#bMap').tap(); await page.locator('#bLBack').tap();
+    assert.equal((await state(page)).screen, 'home');
+    assert.equal(await page.locator('#bGo').innerText(), 'Continuer · Niveau 3', 'still the first level not won');
+    assert.equal((await state(page)).current, 3);
+    await context.close();
+  });
+
+  await test('R3/R4: challenge link = origin + pathname + fragment, never the query of the address or of MJ_CONFIG', async () => {
+    const fake = 'https://exemple.test/jeux/semailles/index.html';
+    const ctx = await browser.newContext({ ...MOBILE, viewport: { width: 360, height: 640 } });
+    const html = fs.readFileSync(FILE, 'utf8');
+    await ctx.route('https://exemple.test/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: html }));
+    for (const [addr, config, want] of [
+      [fake + '?token=secret123&u=42', null, fake + '#defi-1-25'],
+      [fake + '?token=secret123#old', null, fake + '#defi-1-25'],
+      [fake + '?x=1', { shareBaseUrl: 'https://autre.test/a/b/?token=zzz#frag' }, 'https://autre.test/a/b/#defi-1-25'],
+      [fake, { shareBaseUrl: 'javascript:alert(1)' }, ''],
+      [fake, { shareBaseUrl: 'not a url' }, ''],
+    ]) {
+      const page = await ctx.newPage();
+      page.on('pageerror', e => problems.push('pageerror: ' + e.message));
+      if (config) await page.addInitScript(c => { window.MJ_CONFIG = c; }, config);
+      await page.goto(addr);
+      await page.waitForFunction(() => !!window.__game);
+      await page.evaluate(sd => { window.__game.still(true); window.__game.seed(sd); window.__game.loadLevel(1); }, 101);
+      await playByTaps(page, strongFor(1, (await page.evaluate(() => window.__game.levels))[0]));
+      await page.locator('#win').waitFor({ state: 'visible' });
+      await page.evaluate(() => { window.__shared = []; Object.defineProperty(navigator, 'share', { value: async d => { window.__shared.push(d.text); }, configurable: true }); });
+      await page.locator('#bChal').tap();
+      await page.waitForFunction(() => window.__shared.length === 1);
+      const text = (await page.evaluate(() => window.__shared))[0];
+      assert.ok(!/token|secret|\?|u=42|zzz|old/.test(text), 'query leaked: ' + text);
+      const m = /(https?:\/\/\S+)$/.exec(text);
+      assert.equal(m ? m[1] : '', want, text);
+      await page.close();
+    }
+    await ctx.close();
+  });
+
+  await test('R3: only the targets a game can reach (1 to 25) open a challenge', async () => {
+    for (const h of ['#defi-3-26', '#defi-3-30', '#defi-3-48']) {
+      const b = await open({ width: 360, height: 640 }, { hash: h });
+      const st = await state(b.page);
+      assert.equal(st.mode, 'level', h); assert.equal((await events(b.page, 'challenge_open')).length, 0, h);
+      await b.context.close();
+    }
+    for (const h of ['#defi-3-1', '#defi-3-25']) {
+      const b = await open({ width: 360, height: 640 }, { hash: h });
+      assert.equal((await state(b.page)).mode, 'challenge', h);
+      await b.context.close();
+    }
+  });
+
+  await test('Annuler: the first use says that the game is now worth 2 stars at most, and the cap is applied', async () => {
+    const { context, page } = await open();
+    await page.evaluate(sd => { window.__game.still(true); window.__game.seed(sd); window.__game.loadLevel(1); }, 101);
+    assert.equal(await page.locator('#bUndo').isDisabled(), true);
+    await tapPit(page, (await state(page)).legal[0]);
+    await page.locator('#bUndo').tap();
+    assert.match(await page.locator('#msg').innerText(), /Annuler utilisé.*2 étoiles/);
+    assert.equal((await state(page)).undone, true);
+    const lv = await page.evaluate(() => window.__game.levels);
+    const fin = await playByTaps(page, strongFor(1, lv[0]));
+    const m = fin.store[0] - fin.store[1];
+    assert.ok(m >= 16, 'this game is a +16 win without the cap (margin ' + m + ')');
+    assert.equal(fin.stars, 2, 'capped at 2 stars');
+    await page.locator('#win').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#wStars svg.on').count(), 2);
+    assert.match(await page.locator('#wWhy').innerText(), /Annuler utilisé/);
+    assert.equal((await saved(page)).stars[0], 2);
+    // a fresh game of the same level, without Annuler, reaches 3 stars
+    await page.locator('#bAgain').tap(); await page.waitForTimeout(350);
+    assert.equal((await state(page)).undone, false);
+    await page.evaluate(sd => window.__game.seed(sd), 101);
+    const fin2 = await playByTaps(page, strongFor(1, lv[0]));
+    assert.equal(fin2.stars, 3);
+    await context.close();
+  });
+
+  await test('the special start of a level is announced before the first move', async () => {
+    const { context, page } = await open();
+    await page.evaluate(() => { window.__game.still(true); window.__game.loadLevel(1); });
+    assert.match(await page.locator('#msg').innerText(), /Départ avancé : tu as déjà 16 graines/);
+    await page.evaluate(() => window.__game.loadLevel(11));
+    assert.match(await page.locator('#msg').innerText(), /Quatre gros tas/);
+    await page.evaluate(() => window.__game.loadLevel(15));
+    assert.match(await page.locator('#msg').innerText(), /Disette : 14 graines contre 10/);
+    await page.evaluate(() => window.__game.loadLevel(4));
+    assert.equal(await page.locator('#msg').innerText(), 'À toi de jouer.');
+    await context.close();
+  });
+
+  await test('double taps: one tap never sows twice, nothing is played during the animation or the adversary\'s turn, a long press plays once', async () => {
+    const { context, page } = await open({ width: 360, height: 640 });
+    const centre = async i => page.evaluate(k => { const r = document.querySelector(`[data-pit="${k}"]`).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }, i);
+    const fresh = async (lv, sd) => { await page.evaluate(([l, d]) => { window.__game.seed(d); window.__game.loadLevel(l); }, [lv, sd]); };
+    const settle = () => page.waitForFunction(() => { const s = window.__game.state(); return !s.busy && s.turn === 0; }, null, { timeout: 8000 });
+    // 1) two taps on the same pit, a few ms apart
+    await fresh(9, 3);
+    let c = await centre(2);
+    await page.touchscreen.tap(c[0], c[1]); await page.touchscreen.tap(c[0], c[1]);
+    await settle();
+    let s = await state(page);
+    assert.equal(s.hist.length, 2, 'one move of mine and the answer: ' + s.hist);
+    // 2) taps on three pits in a row while the seeds are still being laid and while the adversary thinks
+    await fresh(9, 3);
+    for (const k of [1, 3, 4]) { c = await centre(k); await page.touchscreen.tap(c[0], c[1]); }
+    await settle();
+    s = await state(page);
+    assert.equal(s.hist.length, 2); assert.equal(s.hist[0], 1, 'only the first tap played');
+    // 3) a tap in the middle of the adversary's thinking time
+    await fresh(9, 3);
+    c = await centre(0); await page.touchscreen.tap(c[0], c[1]);
+    await page.waitForFunction(() => window.__game.state().turn === 1 && window.__game.state().busy);
+    c = await centre(5); await page.touchscreen.tap(c[0], c[1]);
+    await settle();
+    s = await state(page);
+    assert.equal(s.hist.length, 2); assert.equal(s.hist[0], 0);
+    // 4) a long press of 800 ms plays once (touch events through the protocol)
+    await fresh(9, 3);
+    c = await centre(2);
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: c[0], y: c[1] }] });
+    await page.waitForTimeout(800);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await settle();
+    s = await state(page);
+    assert.equal(s.hist.length, 2, 'long press: ' + s.hist); assert.equal(s.hist[0], 2);
+    // 5) a double tap on "Suivant" must not play a move of the next level
+    await page.evaluate(() => { window.__game.still(true); window.__game.seed(101); window.__game.loadLevel(1); });
+    await playByHook(page, strongFor(1, (await page.evaluate(() => window.__game.levels))[0]));
+    await page.locator('#win').waitFor({ state: 'visible' });
+    const b = await page.locator('#bNext').boundingBox();
+    await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
+    await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
+    await page.waitForTimeout(250);
+    s = await state(page);
+    assert.equal(s.level, 2); assert.equal(s.plies, 0, 'the second tap did not reach the board'); assert.equal(s.hist.length, 0);
+    await context.close();
+  });
+
+  await test('curve of the 20 levels: the published rates are recomputed (100 games per cell, tolerance 10 points) and meet the targets', async () => {
+    const pub = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'tools', 'semailles', 'rates.json'), 'utf8')).rows;
+    const RP = require('../tools/semailles/reference-players');
+    assert.equal(pub.length, 20);
+    // targets on the published table
+    pub.forEach(([n, h, d, b]) => {
+      if (n <= 2) assert.ok(d >= 85, `level ${n}: beginner ${d} %`);
+      if (n <= 8) assert.ok(d >= 50, `level ${n}: beginner ${d} %`);
+      if (n <= 14) assert.ok(b >= 60, `level ${n}: good player ${b} %`);
+      if (n === 20) assert.ok(b >= 30, `level 20: good player ${b} %`);
+    });
+    // every level is told from the previous one by at least one reference player (6 points), up or down
+    const visible = [];
+    for (let i = 1; i < 20; i++) {
+      const delta = Math.max(Math.abs(pub[i][1] - pub[i - 1][1]), Math.abs(pub[i][2] - pub[i - 1][2]), Math.abs(pub[i][3] - pub[i - 1][3]));
+      assert.ok(delta >= 6, `levels ${i} and ${i + 1} are indistinguishable (${delta} points)`);
+      visible.push(pub[i][4] - pub[i - 1][4]);
+    }
+    const breathers = visible.filter(v => v < 0).length;
+    assert.ok(breathers >= 3 && breathers <= 5, 'a few deliberate breathers: ' + breathers);
+    assert.ok(pub[19][4] > pub[0][4] + 60, 'the curve climbs overall');
+    // recomputation (same engine as the game, seeds 1..100)
+    const NG = 100, TOL = 10;
+    for (let n = 1; n <= 20; n++) {
+      const L = RP.G.LEVELS[n - 1];
+      const got = [RP.rate(L, RP.hasard, NG), RP.rate(L, RP.debutant, NG), RP.rate(L, RP.bonJoueur, NG)].map(x => Math.round(x * 100));
+      got.forEach((v, k) => assert.ok(Math.abs(v - pub[n - 1][k + 1]) <= TOL, `level ${n}: ${['hasard', 'debutant', 'bon joueur'][k]} ${v} % against ${pub[n - 1][k + 1]} % published`));
+    }
   });
 
   // ------------------------------------------------------------------ layout
@@ -878,7 +1072,7 @@ const ENDS = [
       const wc = await page.evaluate(() => { const q = document.querySelector('#win .card').getBoundingClientRect(); return { t: q.top, b: q.bottom, l: q.left, r: q.right, ih: innerHeight, iw: innerWidth }; });
       assert.ok(wc.t >= 0 && wc.b <= wc.ih && wc.l >= 0 && wc.r <= wc.iw, 'win card out of screen ' + JSON.stringify(wc));
       await shot(page, `win-${tag}`);
-      await page.goto(URL + '#defi-20-48');
+      await page.goto(URL + '#defi-20-25');
       await page.waitForFunction(() => window.__game.state().mode === 'challenge');
       await page.evaluate(() => window.__game.still(true));
       checkFit(await measure(page, '.pit, .btn, .icon'), 'challenge ' + tag);
