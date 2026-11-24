@@ -13,7 +13,24 @@ Aucune dépendance serveur ni super-app. Tout reste dans `games/tri-couleurs/ind
   | Un seul tube vide | moins de marge |
   | Tube court | un tube de capacité 2 remplace un tube vide |
   | Billes mystère | seule la bille du dessus est visible ; les autres se révèlent quand on les découvre, et restent révélées |
-- Table indicative : M1 bases · M2 plus de couleurs · M3 tube haut · M4 un seul tube vide · M5 tube court · M6 mystère · M7 à M10 combinaisons, jusqu'à 10 couleurs. Le codeur ajuste avec les mesures du solveur et consigne la table finale ici.
+- **Table finale des mondes** (mesurée par `tools/gen-levels.js`, graine fixe ; « solution » = longueur de la solution du solveur, repère des étoiles ; « vides » = tubes vides de pleine hauteur) :
+
+  | Monde | Nom | Mécaniques | Hauteur | Vides | Couleurs | Solution min-max | 1er → 20e |
+  |---|---|---|---|---|---|---|---|
+  | 1 | Le Tiroir | bases | 4 (3 aux niveaux 1-2) | 2 (1 au niveau 1) | 2-9 | 3-35 | 3 → 35 |
+  | 2 | L'Étagère | plus de couleurs (jusqu'à 10) | 4 | 2 | 6-10 | 19-41 | 20 → 41 |
+  | 3 | Le Grenier | tube haut | 5 | 2 | 4-8 | 17-46 | 17 → 46 |
+  | 4 | Le Placard | un seul tube vide | 4 | 1 | 4-8 | 16-42 | 16 → 42 |
+  | 5 | La Cave | tube court | 4 | 1 + 1 tube court | 4-8 | 13-37 | 13 → 37 |
+  | 6 | La Brume | billes mystère | 4 | 2 | 4-8 | 13-34 | 13 → 34 |
+  | 7 | L'Atelier | tube haut + un seul vide | 5 | 1 | 4-8 | 21-70 | 23 → 70 |
+  | 8 | Le Garage | tube court + mystère | 4 | 1 + 1 tube court | 5-9 | 18-39 | 18 → 39 |
+  | 9 | Le Hangar | un seul vide + mystère | 4 | 1 | 5-9 | 19-53 | 21 → 53 |
+  | 10 | Pile Poil | tout : haut, court, un seul vide, mystère | 5 | 1 + 1 tube court | 7-10 | 39-72 | 40 → 72 |
+
+  Courbe : chaque monde est découpé en 4 groupes de 5 niveaux (respiration au 1er de chaque groupe, pointe au 5e, pointes croissantes ; le 20e est le plus long du monde et le seul de sa longueur). Dans le monde 1, les niveaux 1 à 10 sont ceux du lot 1 (courbe croissante continue), les niveaux 11 à 20 repartent de 5 couleurs.
+  Niveaux du jour (120) : hauteur 4, 2 tubes vides, sans mécanique, 7 à 9 couleurs, 24 à 37 coups.
+  Solutions : prouvées optimales par A* quand le solveur y arrive (presque tous les niveaux, sauf environ 16 sur 20 du monde 10), sinon issues d'un A* pondéré ; dans tous les cas rejouées par les tests.
 - Le solveur garantit que tout niveau est gagnable. Au-delà de ce qu'un A* optimal résout en temps raisonnable, une solution non optimale suffit : le repère d'étoiles est la longueur de la solution trouvée.
 - **Format compact** dans le fichier (une chaîne par niveau). Les **solutions ne sont pas embarquées** dans le jeu : elles vivent dans `tools/solutions.json`, lu par les tests. `window.__game.solutions` disparaît.
 

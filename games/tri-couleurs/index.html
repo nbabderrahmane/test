@@ -9,7 +9,7 @@
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
   --bg:#131A2E;--panel:#1D2742;--line:#4A5880;--glass:rgba(255,255,255,.05);
-  --ink:#F4F1E8;--dim:#A9B4D0;--gold:#FFC53D;--gold-ink:#231A00;--off:#3A4567;
+  --ink:#F4F1E8;--dim:#A9B4D0;--gold:#FFC53D;--gold-ink:#231A00;--off:#3A4567;--fire:#FF8A3D;
 }
 html,body{height:100%;overflow:hidden;background:var(--bg);overscroll-behavior:none}
 body{
@@ -29,13 +29,16 @@ svg{display:block}
 header{display:flex;align-items:center;gap:8px;padding:8px 12px 4px;flex:none}
 .icon{width:48px;height:48px;border-radius:14px;background:var(--panel);display:flex;align-items:center;justify-content:center;flex:none}
 .icon svg{width:24px;height:24px;fill:var(--ink)}
+.icon svg.st{fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
 .ttl{flex:1;min-width:0;text-align:center}
-.brand{display:block;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
-#lvl{display:block;font-size:20px;font-weight:800}
+.brand{display:block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#lvl{display:block;font-size:20px;font-weight:800;white-space:nowrap}
 .moves{width:48px;height:48px;border-radius:14px;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none}
 .moves b{font-size:19px;line-height:1;font-weight:800;font-variant-numeric:tabular-nums}
 .moves small{font-size:10px;color:var(--dim);margin-top:2px}
 
+#chal{flex:none;display:flex;align-items:center;justify-content:center;gap:6px;height:26px;margin:0 12px;border-radius:13px;background:rgba(255,197,61,.14);color:var(--gold);font-size:13px;font-weight:700}
+#chal svg{width:14px;height:14px;fill:var(--gold)}
 #goal{flex:none;display:flex;align-items:center;justify-content:center;gap:6px;height:24px;font-size:13px;color:var(--dim)}
 #goal svg{width:14px;height:14px;fill:var(--gold)}
 
@@ -49,6 +52,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 12px 4px;flex:none}
 .tube i:before,.tube i:after{content:"";position:absolute;top:0;width:6px;height:2px;background:var(--line);transition:background-color .2s}
 .tube i:before{left:-6px;border-radius:2px 0 0 2px}
 .tube i:after{right:-6px;border-radius:0 2px 2px 0}
+.tube.short i{border-style:dashed;border-top:0}
 .tube.sel i{border-color:var(--ink);background:rgba(255,255,255,.1)}
 .tube.sel i:before,.tube.sel i:after{background:var(--ink)}
 .tube.done i{border-color:var(--gold);background:rgba(255,197,61,.1)}
@@ -57,10 +61,14 @@ header{display:flex;align-items:center;gap:8px;padding:8px 12px 4px;flex:none}
 @keyframes no{25%{transform:translateX(-5px)}50%{transform:translateX(5px)}75%{transform:translateX(-3px)}}
 .ball{
   position:absolute;left:0;top:0;border-radius:50%;pointer-events:none;will-change:transform;
-  transition:transform .13s ease-out;display:flex;align-items:center;justify-content:center;
+  transition:transform .13s ease-out,background-color .2s;display:flex;align-items:center;justify-content:center;
 }
 .ball svg{width:58%;height:58%}
 .ball:after{content:"";position:absolute;left:16%;top:10%;width:34%;height:22%;border-radius:50%;background:rgba(255,255,255,.28);transform:rotate(-28deg)}
+.ball.hid{background:#2B3558;box-shadow:inset 0 0 0 2px #46537F}
+.ball.hid:after{background:rgba(255,255,255,.1)}
+.ball.rev svg{animation:rev .35s cubic-bezier(.2,1.6,.4,1)}
+@keyframes rev{from{transform:scale(.2) rotate(-60deg);opacity:0}}
 .still .ball{transition:none}
 
 #hand{position:absolute;left:0;top:0;width:44px;height:44px;pointer-events:none;transition:transform .25s}
@@ -68,10 +76,11 @@ header{display:flex;align-items:center;gap:8px;padding:8px 12px 4px;flex:none}
 @keyframes tap{0%,100%{transform:translateY(8px)}50%{transform:translateY(-4px) scale(.94)}}
 
 #msg{
-  flex:none;min-height:40px;margin:0 12px;display:flex;align-items:center;justify-content:center;text-align:center;
-  font-size:14px;font-weight:600;color:var(--dim);border-radius:12px;padding:4px 10px;
+  flex:none;height:44px;margin:0 12px;display:flex;align-items:center;justify-content:center;text-align:center;
+  font-size:13px;line-height:1.15;font-weight:600;color:var(--dim);border-radius:12px;padding:3px 10px;overflow:hidden;
 }
 #msg.warn{color:#FFD9A0}
+#msg.hint{color:var(--ink)}
 #msg.stuck{background:#4A2530;color:#FFE1E4}
 footer{flex:none;display:flex;gap:10px;padding:6px 12px 12px}
 .btn{
@@ -86,59 +95,119 @@ footer{flex:none;display:flex;gap:10px;padding:6px 12px 12px}
 .btn.need{box-shadow:inset 0 0 0 2px var(--gold);color:var(--gold)}
 
 .over{position:absolute;top:0;right:0;bottom:0;left:0;z-index:5;display:flex;align-items:center;justify-content:center;
-  background:rgba(12,17,32,.9);padding:16px;overflow:hidden;animation:fade .2s}
+  background:rgba(12,17,32,.9);padding:12px 16px;overflow:hidden;animation:fade .2s}
 @keyframes fade{from{opacity:0}}
-.card{position:relative;z-index:1;width:100%;max-width:330px;background:var(--panel);border-radius:22px;padding:22px 18px 16px;text-align:center;animation:pop .28s cubic-bezier(.2,1.3,.5,1)}
+.card{position:relative;z-index:1;width:100%;max-width:330px;background:var(--panel);border-radius:22px;padding:18px 18px 14px;text-align:center;animation:pop .28s cubic-bezier(.2,1.3,.5,1)}
 @keyframes pop{from{transform:translateY(24px) scale(.94);opacity:0}}
 .card h2{font-size:26px;font-weight:800}
 .card p{color:var(--dim);margin-top:4px;font-size:15px}
-.stars{display:flex;justify-content:center;align-items:flex-end;gap:6px;margin:14px 0 6px}
-.stars svg{width:54px;height:54px;fill:var(--off)}
-.stars svg:nth-child(2){width:68px;height:68px}
+.stars{display:flex;justify-content:center;align-items:flex-end;gap:6px;margin:10px 0 4px}
+.stars svg{width:50px;height:50px;fill:var(--off)}
+.stars svg:nth-child(2){width:62px;height:62px}
 .stars svg.on{fill:var(--gold);animation:star .4s cubic-bezier(.2,1.6,.4,1) backwards}
 .stars svg.on:nth-child(2){animation-delay:.14s}
 .stars svg.on:nth-child(3){animation-delay:.28s}
 @keyframes star{from{transform:scale(.2) rotate(-40deg);opacity:0}}
-.big{font-size:44px;font-weight:800;line-height:1;margin-top:8px;font-variant-numeric:tabular-nums}
+.big{font-size:40px;font-weight:800;line-height:1;margin-top:6px;font-variant-numeric:tabular-nums}
 .big small{font-size:16px;font-weight:600;color:var(--dim);margin-left:6px}
-.rec{min-height:20px}
-.acts{display:flex;flex-direction:column;gap:10px;margin-top:16px}
-.acts .row{display:flex;gap:10px}
+.card p.rec{min-height:20px}
+.card p.cres{margin-top:6px;font-weight:800;font-size:16px;color:var(--gold)}
+.card p.cres.lost{color:#FFB4BC}
+.news{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:6px}
+.news span{background:rgba(255,197,61,.16);color:var(--gold);border-radius:12px;padding:4px 10px;font-size:13px;font-weight:700}
+.acts{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.acts .row{display:flex;gap:8px}
+.acts .btn{min-height:48px}
 .bit{position:absolute;top:-24px;width:14px;height:14px;animation:fall 1.5s cubic-bezier(.3,.2,.6,1) forwards}
 .bit svg{width:100%;height:100%}
 @keyframes fall{to{transform:translate(var(--dx),105vh) rotate(var(--rot));opacity:.9}}
 
-#map{position:absolute;top:0;right:0;bottom:0;left:0;z-index:4;background:var(--bg);display:flex;flex-direction:column;
+/* full-screen menus */
+.scr{position:absolute;top:0;right:0;bottom:0;left:0;z-index:4;background:var(--bg);display:flex;flex-direction:column;
   padding:calc(env(safe-area-inset-top) + 10px) calc(env(safe-area-inset-right) + 14px) calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 14px)}
-#map .top{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px}
-#map h1{font-size:26px;font-weight:800;color:var(--gold);letter-spacing:.01em}
-#map .sub{font-size:13px;color:var(--dim);margin-top:2px}
-.total{display:flex;align-items:center;gap:6px;background:var(--panel);border-radius:14px;height:44px;padding:0 12px;font-weight:800;font-variant-numeric:tabular-nums}
+.top{flex:none;display:flex;align-items:center;gap:10px}
+.top .tt{flex:1;min-width:0}
+.top h1{font-size:24px;font-weight:800;color:var(--gold);letter-spacing:.01em;white-space:nowrap}
+.top .sub{font-size:12px;color:var(--dim);margin-top:2px;line-height:1.2}
+.total{display:flex;align-items:center;gap:6px;background:var(--panel);border-radius:14px;height:44px;padding:0 12px;font-weight:800;font-variant-numeric:tabular-nums;flex:none}
 .total svg{width:18px;height:18px;fill:var(--gold)}
-#grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,1fr));gap:8px;margin:12px 0}
-.cell{
-  position:relative;min-height:48px;max-height:84px;border-radius:16px;background:var(--panel);display:flex;align-items:center;gap:10px;
-  padding:0 10px;text-align:left;align-self:center;height:100%;overflow:hidden;
-}
-.cell .n{width:36px;height:36px;border-radius:50%;background:var(--off);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;flex:none}
-.cell .n svg{width:18px;height:18px;fill:var(--dim)}
-.cell .d{min-width:0}
-.cell .s{display:flex;gap:2px}
-.cell .s svg{width:17px;height:17px;fill:var(--off)}
+
+#home{justify-content:center;gap:12px}
+.hbrand{text-align:center;margin-bottom:4px}
+.hbrand h1{font-size:36px;font-weight:800;color:var(--gold);letter-spacing:.01em;line-height:1.1}
+.hbrand .sub{color:var(--dim);font-size:13px;margin-top:2px}
+.stats{display:flex;gap:10px}
+.stat{flex:1;min-width:0;background:var(--panel);border-radius:16px;padding:10px 12px;display:flex;align-items:center;gap:10px;min-height:66px}
+.stat svg.fl{width:30px;height:30px;fill:var(--off);flex:none}
+.stat.lit svg.fl{fill:var(--fire)}
+.stat .tx{min-width:0;flex:1}
+.stat b{display:block;font-size:24px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.stat.rk b{font-size:16px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat small{display:block;font-size:12px;color:var(--dim);margin-top:3px;white-space:nowrap}
+.stat small:empty{display:none}
+#hJoker{color:var(--gold)}
+.pbar{height:6px;border-radius:3px;background:var(--off);margin-top:6px;overflow:hidden}
+.pbar u{display:block;height:100%;background:var(--gold);text-decoration:none}
+.daily{background:var(--panel);border-radius:16px;padding:12px;display:flex;align-items:center;gap:10px}
+.daily .tx{flex:1;min-width:0}
+.daily b{display:block;font-size:17px}
+.daily span{display:block;font-size:13px;color:var(--dim);margin-top:2px}
+.daily.todo{box-shadow:inset 0 0 0 2px var(--gold)}
+.daily.todo span{color:var(--gold)}
+.daily .btn{flex:none;width:96px}
+#home .btn{flex:none}
+#bGo{min-height:58px;font-size:17px}
+#home .hrow .btn{flex:1}
+.hrow{display:flex;gap:10px}
+
+#wlist{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,1fr));gap:8px;margin:12px 0 0}
+.wc{position:relative;min-height:48px;border-radius:16px;background:var(--panel);display:flex;align-items:center;gap:10px;padding:0 10px;text-align:left;overflow:hidden}
+.wc .n{width:36px;height:36px;border-radius:50%;background:var(--off);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;flex:none}
+.wc .n svg{width:18px;height:18px;fill:var(--dim)}
+.wc .d{min-width:0;flex:1}
+.wc .d span{display:block}
+.wc .nm{font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wc .mc{font-size:11px;color:var(--dim);margin-top:1px;line-height:1.15}
+.wc .sc{font-size:12px;font-weight:700;margin-top:3px;color:var(--gold);white-space:nowrap}
+.wc.cur{box-shadow:inset 0 0 0 2px var(--gold)}
+.wc.ok .n{background:#2F7D5B}
+.wc[disabled]{background:#182036;cursor:default}
+.wc[disabled] .nm,.wc[disabled] .mc,.wc[disabled] .sc{color:#66739A}
+.wc:not([disabled]):active{transform:scale(.97)}
+
+#grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,1fr));gap:8px;margin:12px 0}
+.cell{position:relative;min-height:48px;border-radius:14px;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;overflow:hidden}
+.cell .n{font-weight:800;font-size:19px;line-height:1;font-variant-numeric:tabular-nums}
+.cell .n svg{width:18px;height:18px;fill:#66739A}
+.cell .s{display:flex;gap:1px}
+.cell .s svg{width:14px;height:14px;fill:var(--off)}
 .cell .s svg.on{fill:var(--gold)}
-.cell .t{font-size:12px;color:var(--dim);margin-top:3px;white-space:nowrap}
 .cell.cur{box-shadow:inset 0 0 0 2px var(--gold)}
-.cell.cur .n{background:var(--gold);color:var(--gold-ink)}
-.cell.ok .n{background:#2F7D5B}
+.cell.ok{background:#1F4A44}
 .cell[disabled]{background:#182036;cursor:default}
-.cell[disabled] .t{color:#66739A}
-.cell:not([disabled]):active{transform:scale(.97)}
+.cell:not([disabled]):active{transform:scale(.96)}
+
+#blist{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.bd{flex:1;min-height:52px;max-height:76px;border-radius:16px;background:var(--panel);display:flex;align-items:center;gap:12px;padding:0 12px}
+.bd .ic{width:40px;height:40px;border-radius:50%;background:var(--off);display:flex;align-items:center;justify-content:center;flex:none}
+.bd .ic svg{width:22px;height:22px;fill:#66739A}
+.bd b{display:block;font-size:15px;color:var(--ink)}
+.bd span{display:block;font-size:12px;color:var(--dim);margin-top:1px;line-height:1.2}
+.bd.got .ic{background:var(--gold)}
+.bd.got .ic svg{fill:var(--gold-ink)}
+.bd:not(.got) b{color:#8590B0}
 
 @media (max-height:600px){
   header{padding-top:4px}
-  #msg{min-height:34px}
+  #msg{height:38px}
   footer{padding-bottom:8px}
   .btn{min-height:46px}
+  .stars svg{width:40px;height:40px}.stars svg:nth-child(2){width:50px;height:50px}
+  .card{padding:14px 16px 12px}.card h2{font-size:22px}
+  .big{font-size:34px}
+  .acts{gap:6px;margin-top:8px}.acts .btn{min-height:46px}
+  .hbrand h1{font-size:30px}
+  #home{gap:9px}
 }
 @media (prefers-reduced-motion:reduce){
   *,*:before,*:after{animation:none!important;transition:none!important}
@@ -148,12 +217,13 @@ footer{flex:none;display:flex;gap:10px;padding:6px 12px 12px}
 <body>
 <div id="app">
   <header>
-    <button class="icon" id="bMap" aria-label="Carte des niveaux">
+    <button class="icon" id="bMap" aria-label="Niveaux">
       <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
     </button>
-    <div class="ttl"><span class="brand">Pile Poil</span><span id="lvl">Niveau 1</span></div>
+    <div class="ttl"><span class="brand" id="brand">Pile Poil</span><span id="lvl">Niveau 1</span></div>
     <div class="moves" aria-label="Coups joués"><b id="mv">0</b><small>coups</small></div>
   </header>
+  <div id="chal" hidden><svg viewBox="0 0 24 24"><path d="M5 3h2v18H5zM8 4h11l-3 4.500 3 4.500H8z"/></svg><span id="chalT"></span></div>
   <div id="goal"></div>
   <main id="board"><div id="stage"></div></main>
   <div id="msg" role="status" aria-live="polite"></div>
@@ -169,23 +239,66 @@ footer{flex:none;display:flex;gap:10px;padding:6px 12px 12px}
       <div class="stars" id="wStars"></div>
       <div class="big"><span id="wMoves">0</span><small>coups</small></div>
       <p class="rec" id="wRec"></p>
+      <p class="cres" id="wChal" hidden></p>
+      <div class="news" id="wNews"></div>
       <div class="acts">
         <button class="btn gold" id="bNext">Suivant</button>
         <div class="row">
-          <button class="btn line" id="bShare">Partager</button>
           <button class="btn line" id="bAgain">Rejouer</button>
+          <button class="btn line" id="bShare">Partager</button>
         </div>
+        <button class="btn line" id="bChal">Défier un ami</button>
       </div>
     </div>
   </section>
 
-  <section id="map" hidden>
+  <section class="scr" id="home" hidden>
+    <div class="hbrand"><h1>Pile Poil</h1><div class="sub">Une couleur par tube, pile poil.</div></div>
+    <div class="stats">
+      <div class="stat" id="hStreak" aria-label="Série">
+        <svg class="fl" viewBox="0 0 24 24"><path d="M12 2c.6 3.600 5.800 6.200 5.800 11.300a5.800 5.800 0 0 1-11.600 0c0-2.100.9-3.600 2-4.800.3 1.500 1.100 2.500 2.100 2.700C9.700 8.600 10.400 4.800 12 2z"/></svg>
+        <div class="tx"><b id="hStreakN">0</b><small id="hStreakT">jour de suite</small><small id="hJoker"></small></div>
+      </div>
+      <div class="stat rk" id="hRank" aria-label="Rang">
+        <div class="tx"><b id="hRankN">Fouillis</b><small id="hStars">0 étoile</small><div class="pbar"><u id="hBar"></u></div></div>
+      </div>
+    </div>
+    <div class="daily" id="hDaily">
+      <div class="tx"><b>Niveau du jour</b><span id="hDailyT">Pas encore joué</span></div>
+      <button class="btn gold" id="bDaily">Jouer</button>
+    </div>
+    <button class="btn gold" id="bGo">Continuer</button>
+    <div class="hrow">
+      <button class="btn" id="bWorlds">Mondes</button>
+      <button class="btn" id="bBadges">Badges</button>
+    </div>
+  </section>
+
+  <section class="scr" id="worlds" hidden>
     <div class="top">
-      <div><h1>Pile Poil</h1><div class="sub">Une couleur par tube, pile poil.</div></div>
-      <div class="total" aria-label="Étoiles gagnées"><svg viewBox="0 0 24 24"><use href="#star"/></svg><span id="mTotal">0/30</span></div>
+      <button class="icon" id="bWBack" aria-label="Accueil"><svg class="st" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="tt"><h1>Mondes</h1><div class="sub">20 niveaux chacun</div></div>
+      <div class="total" aria-label="Étoiles gagnées"><svg viewBox="0 0 24 24"><use href="#star"/></svg><span id="mTotal">0/600</span></div>
+    </div>
+    <div id="wlist"></div>
+  </section>
+
+  <section class="scr" id="wgrid" hidden>
+    <div class="top">
+      <button class="icon" id="bGBack" aria-label="Mondes"><svg class="st" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="tt"><h1 id="gTitle">Monde 1</h1><div class="sub" id="gSub"></div></div>
+      <div class="total" aria-label="Étoiles du monde"><svg viewBox="0 0 24 24"><use href="#star"/></svg><span id="gTotal">0/60</span></div>
     </div>
     <div id="grid"></div>
     <button class="btn gold" id="bBack" style="flex:none">Reprendre</button>
+  </section>
+
+  <section class="scr" id="badges" hidden>
+    <div class="top">
+      <button class="icon" id="bBBack" aria-label="Accueil"><svg class="st" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="tt"><h1>Badges</h1><div class="sub" id="bSub"></div></div>
+    </div>
+    <div id="blist"></div>
   </section>
 </div>
 
@@ -200,38 +313,377 @@ footer{flex:none;display:flex;gap:10px;padding:6px 12px 12px}
 var GAME = 'tri-couleurs';
 var NAME = 'Pile Poil';
 var KEY = 'mj:' + GAME + ':v1';
+var SHORT_CAP = 2;
 
 /*LEVELS:BEGIN (generated by tools/gen-levels.js, do not edit by hand)*/
 var LEVELS=[
-  {cap:3,par:3,tubes:[[1,1,0],[0,0,1],[]]},
-  {cap:3,par:6,tubes:[[1,0,1],[1,0,2],[2,2,0],[],[]]},
-  {cap:4,par:13,tubes:[[2,2,3,1],[0,3,0,1],[0,2,0,3],[1,1,3,2],[],[]]},
-  {cap:4,par:17,tubes:[[1,1,4,0],[2,1,1,2],[3,0,2,2],[3,4,0,4],[0,3,4,3],[],[]]},
-  {cap:4,par:19,tubes:[[0,3,2,4],[0,3,1,0],[1,4,1,3],[2,1,2,4],[2,3,4,0],[],[]]},
-  {cap:4,par:21,tubes:[[2,5,3,1],[5,5,1,0],[4,2,0,0],[4,3,1,2],[5,3,1,4],[3,0,4,2],[],[]]},
-  {cap:4,par:24,tubes:[[6,6,0,4],[0,4,4,2],[3,2,2,3],[5,0,5,3],[6,4,6,5],[5,3,1,1],[2,1,0,1],[],[]]},
-  {cap:4,par:27,tubes:[[5,4,6,3],[3,0,4,2],[0,2,3,1],[0,1,5,1],[2,6,6,5],[2,3,4,1],[0,6,4,5],[],[]]},
-  {cap:4,par:29,tubes:[[2,1,4,7],[3,0,7,1],[5,4,6,5],[1,6,1,0],[6,3,4,3],[2,0,6,4],[7,7,5,0],[5,2,2,3],[],[]]},
-  {cap:4,par:34,tubes:[[5,2,4,4],[6,3,7,8],[1,6,0,3],[0,6,8,4],[5,5,8,3],[2,8,7,2],[2,7,1,0],[1,5,4,6],[3,1,7,0],[],[]]}
+  "3|3|bba/aab/",
+  "6|3|bab/bac/cca//",
+  "13|4|ccdb/adab/acad/bbdc//",
+  "17|4|bbea/cbbc/dacc/deae/aded//",
+  "19|4|adce/adba/bebd/cbce/cdea//",
+  "21|4|cfdb/ffba/ecaa/edbc/fdbe/daec//",
+  "24|4|ggae/aeec/dccd/fafd/gegf/fdbb/cbab//",
+  "27|4|fegd/daec/acdb/abfb/cggf/cdeb/agef//",
+  "29|4|cbeh/dahb/fegf/bgba/gded/cage/hhfa/fccd//",
+  "34|4|fcee/gdhi/bgad/agie/ffid/cihc/chba/bfeg/dbha//",
+  "16|4|eeca/ddab/eebb/bddc/caac//",
+  "18|4|bdee/baca/deae/bdcb/accd//",
+  "21|4|caeb/abcd/effa/adfd/febd/cecb//",
+  "27|4|ecbf/agca/aebb/ecfe/dbda/dffg/cggd//",
+  "30|4|echh/agcc/faee/fgbd/dbch/hgbe/affg/dbad//",
+  "16|4|bcea/eeac/dacb/edcd/dabb//",
+  "21|4|dacb/fdba/edef/acad/beec/ffbc//",
+  "25|4|gecd/cace/gfag/afdb/adfb/fbcg/dbee//",
+  "30|4|fgda/efbe/chcd/gehc/agfa/bghb/bfac/ddhe//",
+  "35|4|dfbg/cecb/iehh/dcdg/gchh/fbfi/iaeb/daia/efga//",
+  "20|4|ebcc/fbaa/aecf/bded/aedc/ffbd//",
+  "25|4|ddgb/fgbf/efeg/cgda/bcac/abee/cdfa//",
+  "26|4|afgb/cgec/ebge/aafb/cbfd/cage/dfdd//",
+  "30|4|cdcc/egfa/dhge/effg/bdaa/bbef/bhdh/ghac//",
+  "32|4|degh/dfhe/afch/gcbg/fdfa/cacb/edbe/gbah//",
+  "19|4|cabd/cffe/fbef/eebd/dcab/aacd//",
+  "25|4|fdfa/gfab/gbgb/fecc/gcad/eaeb/ddce//",
+  "30|4|chca/dbba/ehah/fdge/cgec/hbdg/ffbf/dage//",
+  "31|4|cfbe/fheg/ghbg/hdfd/dcbd/baea/haca/fgec//",
+  "34|4|dbae/hafh/iagh/beec/eabf/dcfc/dchd/giig/igbf//",
+  "20|4|fcdf/edff/abee/ccad/badc/babe//",
+  "26|4|adgb/bagf/bagc/dfcg/efba/cdde/feec//",
+  "31|4|hfad/gfbd/gffa/dccb/ebhh/dhge/gabc/ceea//",
+  "33|4|ecaf/feia/bgga/dfib/hhdi/ecdb/cahi/gfbg/dhec//",
+  "36|4|cbgg/chbi/edhi/ehfb/idfb/acdf/gfeg/acia/haed//",
+  "19|4|beca/bdca/bbdf/aadc/ffed/feec//",
+  "25|4|bebb/ecbf/dcga/fdce/fgfe/aadd/acgg//",
+  "30|4|ehge/dhgb/acgd/dfed/bbeh/fcca/bfca/ghaf//",
+  "34|4|ffeb/dgfc/cgih/iceh/cfea/adgb/hbia/habd/gedi//",
+  "41|4|gcda/hehe/cicb/fdca/gifb/ijdi/ajef/aghe/hgjd/bbjf//",
+  "17|5|aadcd/ccbcd/badbb/bcaad//",
+  "23|5|aecba/addbc/cdacc/eedad/bebbe//",
+  "25|5|cadab/bdcca/ebcae/cdeea/bdbed//",
+  "30|5|ddeef/efdcc/badbf/cafde/afbac/ceabb//",
+  "31|5|fedea/daccf/cdecb/febca/defdb/fabba//",
+  "18|5|cdaab/ccabd/acdbb/acddb//",
+  "23|5|abdeb/bbceb/aacae/eaded/cddcc//",
+  "29|5|daccb/feefd/edafb/dfeca/bebcd/caafb//",
+  "30|5|acdbc/cbdef/fcdae/bdfde/babae/cafef//",
+  "35|5|gecaa/bbfdc/dafdb/cefcg/dgegb/afeba/fgedc//",
+  "17|5|bbdad/dcbcd/dbcac/cabaa//",
+  "23|5|babcd/eebca/aeeda/adedc/cdcbb//",
+  "29|5|cfbfe/cfddb/cdbeb/dfbae/aacef/ecada//",
+  "37|5|abgef/afbag/eddgc/ecebd/dcgfb/cgaec/ffbda//",
+  "38|5|dcfbd/cedbg/afegb/gfdea/acafg/fgeba/bcedc//",
+  "17|5|cbcca/abbcd/cadbd/ddbaa//",
+  "24|5|cdabd/bcbea/eccda/ecabb/addee//",
+  "29|5|efbfb/bceed/eadfb/acfac/fbacd/aecdd//",
+  "35|5|fgdad/ecegc/daagf/bbdbg/abcee/acgbf/fdfce//",
+  "46|5|gfgda/cehfh/hafge/ahcba/bcgde/dgdhf/ebbfa/beccd//",
+  "16|4|bdab/ddaa/cacd/bcbc/",
+  "19|4|eced/bcaa/cedd/aabe/bcdb/",
+  "22|4|decd/ceab/cbae/acda/edbb/",
+  "28|4|edfa/bcba/bdcf/fcfd/ceab/edae/",
+  "34|4|cfda/befb/abeb/cfce/edad/adcf/",
+  "17|4|cbba/dacb/abac/ddcd/",
+  "21|4|ccad/baae/aebc/bebc/dded/",
+  "24|4|ffef/ebbd/dacd/aaea/edcb/ccfb/",
+  "32|4|babf/cebc/bcef/cfaa/eadd/eddf/",
+  "34|4|bdad/caab/gefg/dbcc/cabg/fgfe/dfee/",
+  "16|4|cdbc/bccd/dada/aabb/",
+  "23|4|cadb/aeab/cedc/aede/dbcb/",
+  "26|4|dfaa/ddeb/beed/fbec/bcff/caca/",
+  "34|4|aggd/babf/cfad/eeda/gebd/ecfc/bfcg/",
+  "35|4|ddcd/gcgd/cacb/afae/egbg/faeb/bffe/",
+  "16|4|cbcd/daca/dbba/bcda/",
+  "22|4|abbe/bdca/cdda/ecbe/dace/",
+  "26|4|ebfa/ebac/cded/fbca/bdfe/dcfa/",
+  "31|4|cefa/aabf/gfgd/eedd/bcda/fcbg/bgce/",
+  "42|4|hhcd/dgae/fbag/cbee/gceg/badf/bfhc/dafh/",
+  "13|4|cbbd/bcda/daab/ccda//~",
+  "19|4|aeae/abbc/badd/dcec/ebcd//~",
+  "20|4|ceaa/bced/deaa/bdbc/becd//~",
+  "24|4|eaff/efab/cabb/edec/acdd/fdbc//~",
+  "25|4|bfcc/feac/baeb/befd/afcd/dade//~",
+  "14|4|aabb/bdca/dbcc/dadc//~",
+  "19|4|eabe/edcd/caeb/ccda/dabb//~",
+  "24|4|dbfd/ceff/dcee/bcaa/cabe/fbda//~",
+  "26|4|efdc/dfbb/cbce/adab/daff/eace//~",
+  "31|4|addf/efde/cgfb/eggb/bcga/cadf/cbea//~",
+  "14|4|adcc/bbcb/dbad/aacd//~",
+  "19|4|bdde/bcab/bacc/ceda/aede//~",
+  "24|4|afcf/dbdc/afeb/feea/cade/bdbc//~",
+  "30|4|beeb/cdea/gfde/agdf/cbcb/afcg/afgd//~",
+  "31|4|gfef/agec/bdcb/gbaa/cadg/cffe/bded//~",
+  "13|4|bbdc/aadc/cdbc/bada//~",
+  "19|4|edbc/adec/eead/bcba/dbca//~",
+  "21|4|dcef/dbaa/defa/bbfc/abdf/eecc//~",
+  "31|4|gdce/adad/becb/facb/fbga/gcfg/deef//~",
+  "37|4|aedc/ahbc/dfgf/adhb/egeb/hfag/hecg/bfcd//~",
+  "13|4m|abda/cdac/cbba/ddbc//",
+  "17|4m|cdaa/edbd/bcca/debc/aeeb//",
+  "18|4m|dbcc/dabe/cedc/bade/baea//",
+  "21|4m|acec/afdb/edfd/efea/dbcb/fcab//",
+  "22|4m|fedc/aafd/bfbc/abee/dade/cbfc//",
+  "13|4m|ddac/dbcc/abda/cbba//",
+  "17|4m|ebac/eeac/deda/bcda/cbdb//",
+  "21|4m|adfd/cebc/ceae/efbb/acdd/affb//",
+  "23|4m|fdae/eece/fadb/acdb/bfdc/acfb//",
+  "28|4m|afag/cadd/fdbg/ebeb/cdeb/fgca/fegc//",
+  "13|4m|aacd/dcba/cbdd/bcab//",
+  "17|4m|cabe/ecdb/debb/aacc/aedd//",
+  "21|4m|daee/bcec/fdfa/bade/bcdf/cfab//",
+  "25|4m|gcda/bffa/dbda/fcge/deac/gecb/ebgf//",
+  "27|4m|dcac/dbag/gebc/fdab/fedg/efab/ecgf//",
+  "13|4m|dacc/abbc/dacb/ddba//",
+  "17|4m|deed/bbec/acba/bcda/acde//",
+  "21|4m|dfee/aabe/cacb/dbef/acdf/bcdf//",
+  "27|4m|gaea/efgd/adcb/befb/cage/dbcd/gcff//",
+  "34|4m|efag/acbf/daed/bchb/eghc/ehgb/dcdg/fhaf//",
+  "23|5|bcdda/dbaca/cbbda/daccb/",
+  "30|5|baedc/aedbc/edcdc/bbaea/dcaeb/",
+  "33|5|bcaea/cdcea/dbded/aaceb/bcdbe/",
+  "42|5|acaee/dcdcb/daeba/cbddf/bffee/afbfc/",
+  "48|5|bafbc/edaff/caebe/cfedb/acdad/fedcb/",
+  "22|5|baadc/bcdab/abcda/ccdbd/",
+  "32|5|edcbe/aabee/dcabe/cdbdc/bdaac/",
+  "45|5|bcdde/daebf/cbcfc/edaea/beafb/dffca/",
+  "53|5|bfeda/adfad/cebcc/fedae/ebabf/dcfbc/",
+  "61|5|cfbdb/edgdg/afege/aegae/dbgff/cadcc/fbcba/",
+  "25|5|cdabc/addba/accbd/bdcab/",
+  "32|5|deaae/cabcb/eecda/bbacb/dcded/",
+  "41|5|bdfcf/efbac/dcdda/fbeae/ebafe/ccabd/",
+  "51|5|daede/acaae/cfebg/bgfbf/fdfgd/gdgca/cbebc/",
+  "55|5|afcba/eggfd/bddac/badfg/ecega/gefdc/bfbec/",
+  "21|5|aacbd/bdcdd/bcbda/cbaac/",
+  "32|5|ecdae/eaacb/cddcb/dcdea/ebabb/",
+  "42|5|abaed/bebcf/dfbea/ecafd/adccd/ffbce/",
+  "55|5|edffb/ceega/fgcba/ddabg/acbfe/cfcda/dgbeg/",
+  "70|5|egdbh/baagf/ceheh/bfgad/cbgbf/ecdcd/fdafa/gehhc/",
+  "18|4m|ebce/ccad/edda/bcba/aebd//~",
+  "22|4m|ebfb/dfce/caad/ccef/bafd/ebda//~",
+  "24|4m|ddac/daff/eaeb/cefe/fcbb/cadb//~",
+  "29|4m|bfge/bffd/agdd/cbee/ecfc/abac/dgag//~",
+  "32|4m|efdb/cddf/bced/cbea/bagg/aefg/cgfa//~",
+  "18|4m|abcc/ebeb/ddac/eacd/abde//~",
+  "24|4m|fada/ecbd/dabf/eceb/bfcc/afde//~",
+  "30|4m|bcge/fdea/fadc/gbag/cegf/bfcd/dabe//~",
+  "31|4m|eccg/bgcb/agef/fgdd/fadb/faed/beac//~",
+  "36|4m|fheh/cgbb/gaed/fdbf/dheg/aeac/cbcf/adhg//~",
+  "18|4m|eeaa/dabd/adec/ccbd/ecbb//~",
+  "23|4m|efed/abdb/bfda/ecfc/ccea/abdf//~",
+  "28|4m|gfcf/gdda/bade/bbae/fdge/fecg/cacb//~",
+  "31|4m|ahdc/bgec/hhbe/egga/hafd/fbad/gcfd/cebf//~",
+  "35|4m|fbgg/bebe/adac/fdcg/cefh/hfhd/dabc/geah//~",
+  "18|4m|ccea/dabb/cbda/ecda/eedb//~",
+  "24|4m|fced/efaa/bfea/abcb/bcdd/edfc//~",
+  "27|4m|eegb/gcfe/dfdc/fcgg/acea/bdfb/daab//~",
+  "33|4m|gbfe/hegc/hbhc/dafb/cafe/fdbc/gdde/ahag//~",
+  "39|4m|bfib/aeeh/fafg/iddi/edac/beag/gcfg/hdbh/cich//~",
+  "21|4m|bcdd/ebea/cddc/cbea/eaab/",
+  "24|4m|ebaa/dcaa/edeb/ccde/bffd/ffbc/",
+  "27|4m|cafa/bcea/ebeb/febd/dccd/fdfa/",
+  "35|4m|caba/dcgg/abdc/ebbf/decg/effe/afdg/",
+  "39|4m|acge/gccf/bada/fbeb/fdge/gfba/dced/",
+  "22|4m|edeb/baad/ccae/bdca/edbc/",
+  "24|4m|efef/dcba/bcad/fbaa/eddc/cfeb/",
+  "31|4m|gdaa/affc/ecbg/debb/fdef/caec/gdgb/",
+  "35|4m|bfad/cged/abcg/cfdf/aace/fbge/gdbe/",
+  "39|4m|hdfa/cgab/dfdh/cfge/hede/efhg/gabc/bbca/",
+  "19|4m|eaeb/bcce/aadd/edbc/dcab/",
+  "22|4m|daea/ccdf/defb/bfdf/eacb/aceb/",
+  "32|4m|ceea/aegd/cgcf/fcdg/egba/fbdb/abfd/",
+  "39|4m|hgcf/bheh/cdcg/dabe/bega/efca/fhfb/gdad/",
+  "43|4m|cbfh/daeg/egbb/hecf/hedc/ahgd/caba/gdff/",
+  "23|4m|acab/ebac/ddbe/cced/beda/",
+  "25|4m|eaef/ffcd/ebdb/cecf/babd/caad/",
+  "33|4m|abfe/gafa/efgc/decg/fbcd/cddb/agbe/",
+  "39|4m|cfag/hedh/ehdc/dbfa/gcbf/aehe/babd/cggf/",
+  "53|4m|gbdi/cagd/hahe/fehc/icfi/eibg/bgcb/adfh/dfae/",
+  "40|5m|gbegc/abbga/edefg/fcbfe/fcada/cfdde/dgacb//~",
+  "46|5m|edhfb/gcfbb/ceade/aecgd/chcad/daggf/fabhg/hhebf//~",
+  "51|5m|egfga/dhbhf/adebe/ecahf/gchfa/bdfac/gdhcb/cdgeb//~",
+  "56|5m|achgd/dfdgc/eghec/afchh/eabhb/ebgbe/cadfg/dbffa//~",
+  "61|5m|igiga/bcdah/ahhba/cbege/ffbdg/fdbce/fchic/hedfg/adiei//~",
+  "39|5m|dfgae/bcega/gebcb/affcc/eabfd/daddc/bfgge//~",
+  "50|5m|ehcgf/ggeff/hddbc/cabae/hbdef/gaccb/ebdaa/fdghh//~",
+  "53|5m|cgcga/bcdge/bhdah/hgchf/faffd/aegab/feddb/cebeh//~",
+  "58|5m|hffce/heace/iidcd/gaggh/haefb/fcbib/dbhab/igdid/eafcg//~",
+  "62|5m|gbabf/hgfie/cidff/adghe/ebebc/ieicc/ddfgb/chgaa/ihhad//~",
+  "40|5m|gadff/gfeca/cbbed/befdb/fgdee/acadg/gccab//~",
+  "47|5m|ccdeh/bcaff/ehhcb/aedga/bhffa/egdcg/bdhgg/dafbe//~",
+  "51|5m|ddade/eabhf/dchaa/ghecc/cffgg/eegbb/dfafb/chghb//~",
+  "60|5m|abfei/ighac/ehgch/dhhdd/abiad/eabgb/fcfge/igdff/cbcei//~",
+  "71|5m|fbefi/ejjaj/cdjea/gbcgf/eiibh/fadbe/ahjhc/diggi/hdbga/dhcfc//~",
+  "39|5m|agfeg/fgcef/fefbb/eedbd/aacdc/cdaca/dgbbg//~",
+  "49|5m|fegab/gefeh/fbdba/fcbeg/bcchg/chfdh/agahd/dcead//~",
+  "61|5m|dbgcc/haahi/baeea/dffhi/efcdd/bgieg/icgih/debfh/afgcb//~",
+  "63|5m|cegcf/ebffi/bahba/hicde/bigdi/cdhdf/dgaeb/eagah/cghfi//~",
+  "72|5m|hagjd/edfie/bghgi/bdbfh/jcgaj/cidai/bdhbj/cgaee/cehca/ifjff//~"
 ];
-/* Solver solutions, [from,to] per move. Test use only. */
-var SOLUTIONS=[
-  [[1,2],[0,1],[2,0]],
-  [[2,3],[1,2],[1,3],[0,1],[0,3],[0,1]],
-  [[3,4],[3,5],[1,3],[0,3],[0,5],[4,0],[1,4],[1,5],[2,5],[2,1],[4,1],[2,0],[2,1]],
-  [[3,5],[2,6],[2,6],[1,6],[3,2],[3,5],[4,3],[4,5],[4,3],[2,4],[2,4],[2,3],[0,4],[0,5],[1,0],[1,0],[1,6]],
-  [[3,5],[2,6],[0,5],[3,0],[2,3],[2,5],[3,2],[3,2],[0,3],[0,3],[0,6],[4,0],[4,5],[4,6],[4,3],[1,0],[1,2],[1,6],[1,0]],
-  [[2,6],[2,6],[5,7],[3,7],[2,7],[5,2],[5,6],[4,2],[3,4],[3,5],[3,2],[4,3],[4,3],[4,5],[1,6],[1,3],[4,1],[0,3],[0,5],[0,1],[0,7]],
-  [[6,7],[5,7],[5,7],[2,5],[1,2],[1,8],[1,8],[6,1],[6,7],[2,6],[2,6],[2,6],[5,2],[5,2],[4,5],[3,2],[3,5],[3,1],[3,5],[0,8],[0,1],[4,0],[4,8],[4,0]],
-  [[2,7],[0,2],[0,8],[5,7],[0,5],[6,0],[4,0],[4,8],[4,8],[1,4],[6,1],[6,8],[3,7],[3,0],[3,7],[3,6],[5,3],[5,3],[1,3],[1,3],[1,6],[5,1],[5,4],[2,1],[2,1],[2,4],[2,6]],
-  [[6,8],[5,9],[2,6],[2,5],[2,9],[6,2],[6,2],[3,8],[1,3],[1,6],[1,8],[7,1],[4,1],[4,9],[4,1],[5,4],[5,4],[5,8],[7,5],[7,5],[7,2],[3,7],[3,7],[3,4],[3,7],[0,6],[0,9],[0,7],[0,5]],
-  [[8,9],[8,10],[6,9],[8,6],[4,8],[2,8],[2,9],[1,4],[1,10],[1,8],[7,1],[2,1],[6,2],[6,2],[6,10],[5,6],[5,10],[3,7],[5,3],[5,6],[4,5],[4,5],[3,5],[3,5],[3,1],[3,9],[7,3],[7,3],[7,4],[7,2],[0,3],[0,3],[0,6],[0,4]]
+var DAILY=[
+  "26|4|eead/gcgd/cbbf/afge/dcgc/adfe/bfba//",
+  "29|4|dgeh/agdh/cheb/fbfg/adaf/faec/bdeh/bgcc//",
+  "33|4|acaa/idif/gede/bhbh/hfce/gbcg/gbfi/achd/edif//",
+  "26|4|bcag/dbdg/ffee/cagc/fadf/cega/bebd//",
+  "30|4|cedg/eabh/hcgb/abdf/hbca/cffd/hfee/gdga//",
+  "34|4|giai/cbdc/bceb/ahgf/aefd/feeb/dhga/idhf/higc//",
+  "24|4|bede/ffeb/gcfa/agcf/bcdb/cgad/gade//",
+  "30|4|dfch/adhb/eagg/aafe/chge/fdbh/gcdb/ebcf//",
+  "37|4|beea/bfie/chcd/bcef/fdig/fgdi/ahab/gchg/daih//",
+  "26|4|deeg/fgab/ecaa/bfeb/cfcd/bcdg/gadf//",
+  "28|4|geba/eegc/fbgc/hfdc/ahdg/fdba/face/dbhh//",
+  "33|4|dchh/idbd/fbbe/aech/ggah/ciac/eieg/agbf/fidf//",
+  "25|4|cebe/dabc/cgff/fgac/fdag/edbe/adbg//",
+  "29|4|bbff/dbdb/acea/cgfe/hdge/fcge/hgac/hhda//",
+  "32|4|ghei/hfgd/ffge/abbi/aeaa/cdcd/bcce/hbgd/iihf//",
+  "26|4|ecgd/fdba/gffd/eaed/egcb/cabf/bgca//",
+  "31|4|feff/dgfe/bcgh/hcah/acgd/ehgd/eadb/cbba//",
+  "33|4|eaid/ddbb/cgae/igcf/fbhe/ghab/fcha/cghi/feid//",
+  "26|4|bead/dfgg/eaff/gcbc/cbed/deag/bcfa//",
+  "27|4|dhee/ffhd/bchd/gaeh/abbe/agbg/cdfg/cfca//",
+  "33|4|gded/ibea/iiec/dceh/ccbg/dfhg/hgfi/bfah/afab//",
+  "24|4|cgdf/aafb/ggcf/ebec/dafe/bdab/gcde//",
+  "30|4|ecgf/cdaf/bcaf/ghee/bhfc/dgha/hdeb/dbag//",
+  "33|4|efci/bbea/iecc/fdfi/dfhh/hdai/bheg/acbg/adgg//",
+  "25|4|bbcb/dacf/cgdc/dabg/geeg/aafe/fedf//",
+  "31|4|dfac/hghg/achg/bdee/aehc/effb/afgd/cbdb//",
+  "32|4|dbii/cahc/eefh/fgbi/dbge/afbe/gidh/hdaf/ccga//",
+  "26|4|acga/bdfe/cgae/egac/fbbd/bfeg/cddf//",
+  "30|4|abfe/abbe/hahb/dffe/dgec/dggc/cdfg/cahh//",
+  "34|4|dgaa/fdah/gigi/ebfd/hafe/bdec/bheh/ciic/cbfg//",
+  "27|4|edcd/begc/agbe/acbd/dgba/faef/fcfg//",
+  "30|4|hdbf/ehee/fdcf/gbag/gcfc/cadg/edah/hbba//",
+  "36|4|hfdi/bicf/bdia/bhfg/heab/egde/gahd/fieg/ccac//",
+  "26|4|gcge/dfeb/eccf/gddg/fbca/ebad/baaf//",
+  "30|4|cfad/hdgf/bgeh/fbag/ddcc/cefe/bhag/baeh//",
+  "34|4|cegg/bcea/ibbi/fdac/gahb/heci/edah/gfdi/fhdf//",
+  "26|4|cgdf/eaec/egea/cbbd/gddb/bfgc/fafa//",
+  "30|4|cefb/bdfb/ffae/dagg/gaeh/cgeh/chhb/dcad//",
+  "34|4|giha/dfch/aeea/gddg/chbb/ebfe/ichi/idga/bcff//",
+  "26|4|gbfb/efca/egbd/acgf/aeeb/ddfa/gdcc//",
+  "29|4|egaf/ccgh/fgdd/hhcd/efeb/bgac/hfba/bead//",
+  "30|4|hcag/bidi/dhge/aabb/deai/gccb/ghif/ffcf/eehd//",
+  "25|4|egbg/ddfa/dgaf/cbdb/eaec/gecf/fcba//",
+  "28|4|dcdc/fgeg/hbfe/bfag/bbac/fdda/caeh/eghh//",
+  "34|4|aedi/edib/hfci/hacb/bgdh/eieb/fgfa/cfgd/cahg//",
+  "26|4|fgfg/deba/ebef/bcea/gdcc/cdgf/baad//",
+  "30|4|bgec/hdbb/gfac/egde/cehb/dhcf/gadf/fhaa//",
+  "35|4|hici/fdcb/dbgg/aefe/hfbe/iaga/ghei/dfbh/cdca//",
+  "26|4|agcg/edfe/eadg/fgfd/accf/babb/bdec//",
+  "30|4|dbge/abah/fccb/dhaa/cfbg/hhef/decg/fdeg//",
+  "35|4|adaa/cbie/dfhb/chia/eegg/fbhb/eccd/ghgi/fdif//",
+  "26|4|cbbe/aeaf/gcff/bedb/gdgg/dcda/eafc//",
+  "31|4|hcba/ebef/adhg/effd/cbbc/dghf/agch/dgae//",
+  "34|4|hcbg/hdfc/fhgc/eefi/bifc/gaie/dage/iadh/bdab//",
+  "25|4|dacg/cgff/ebda/ecfd/bebe/abdg/gacf//",
+  "32|4|efch/bdbc/dcgb/deah/dhag/hgaf/faee/bgfc//",
+  "35|4|gifa/fdhc/hdaa/ecia/ebgg/eicb/bhdf/gdhf/bice//",
+  "26|4|bfag/bfcc/aeeg/dcfa/aegb/gfec/ddbd//",
+  "31|4|ebfd/cgfh/ddga/hacb/geaf/cbha/hdfe/gceb//",
+  "34|4|iabh/ieaf/dchb/ggic/acff/gedf/bice/hdgb/aehd//",
+  "25|4|becf/ggdc/gdab/effe/bgaa/fcae/bcdd//",
+  "30|4|fbbg/dbce/fdfh/dehc/gdaf/bcac/ehhg/gaea//",
+  "35|4|adbe/cdfa/iffg/agce/hgbe/bhgc/cdie/fdih/ahbi//",
+  "26|4|efee/dgbd/ccbd/efag/cafd/cgab/agbf//",
+  "31|4|gfhg/cgea/bhdh/hcaf/dcbg/eafe/bfab/dedc//",
+  "34|4|aibh/bege/haif/ehdg/ebic/cfdc/gafa/gcdb/difh//",
+  "25|4|febf/baeg/ccac/abce/gbfe/ddad/dgfg//",
+  "30|4|bcbh/acdh/hdfg/edge/bfhd/agae/cbgf/feca//",
+  "35|4|iceb/afdh/fhee/bdfa/ghgc/ihid/cidb/afec/ggba//",
+  "24|4|dfdg/beba/gfca/egeg/fcba/accf/ddeb//",
+  "30|4|ahhb/aecb/gcfb/dhcf/gada/fged/cgde/ehfb//",
+  "36|4|febg/gdic/agdc/hafg/eieh/adff/bdcb/iheh/cabi//",
+  "25|4|cbfd/edgd/cbgf/cbee/gacf/aafa/begd//",
+  "30|4|ahbc/hgce/edfc/dgae/bffh/gbea/acdh/gdbf//",
+  "34|4|dhcd/cebd/eeie/hacf/gifb/hgba/cdib/hfaf/aggi//",
+  "25|4|ccda/egbg/fafg/ebdd/gffb/edac/caeb//",
+  "31|4|cfhf/debd/cghe/afba/egdc/gbbf/hdge/acah//",
+  "34|4|hcge/aehg/ffda/icga/acbb/hecd/dedf/gbbf/iihi//",
+  "26|4|ccdf/gbad/fabd/ceea/bgfe/dfag/gceb//",
+  "30|4|gech/fabg/gfdb/abhd/ebed/fgac/fcca/edhh//",
+  "35|4|bbab/egdc/hefi/aigd/ifif/dhbf/chge/aghc/aced//",
+  "25|4|fgbe/bdea/aacd/fdce/bffe/cagb/cdgg//",
+  "28|4|ffhe/geed/aabd/chac/cbgc/dbgh/ebdh/fagf//",
+  "34|4|ifai/bbed/fcaf/heei/fgbh/caed/dbhc/cagd/gihg//",
+  "27|4|fbec/caag/bdgf/cbga/dgdd/cefe/fbae//",
+  "30|4|gegc/adda/facd/fcga/ehbe/chdg/bfbh/ebfh//",
+  "33|4|heif/gfga/gfae/aabc/hdbi/befc/dgbd/cecd/hhii//",
+  "26|4|cage/fbag/gcdd/cbag/deab/eceb/ffdf//",
+  "30|4|hghd/ghdc/geda/bafa/eadf/hfbc/bgce/febc//",
+  "34|4|ieci/ddie/dahb/ahfg/idgf/fcgb/fgeb/baeh/chac//",
+  "26|4|eagf/cbcc/fdgb/efbg/eega/dabf/dacd//",
+  "30|4|dchh/gfga/cbcc/haeg/beda/gebb/fadh/fedf//",
+  "36|4|hecd/dfdi/deac/ciib/chef/bfia/agbh/geab/fghg//",
+  "26|4|gfbf/fbge/ecgb/afcd/aeda/bdgc/aecd//",
+  "29|4|abdg/heff/cafe/ehfg/chdg/caec/dahb/dbgb//",
+  "36|4|adfg/aacc/dhfg/ahgb/fbdi/eiie/bcef/ehbd/gihc//",
+  "25|4|cecf/cdef/ggba/dcbe/gaaf/abdb/fegd//",
+  "29|4|eafe/dhce/dgdb/chfh/gcaf/dhbb/bace/ggaf//",
+  "34|4|gehi/fgid/abgf/dbfh/ebac/adhb/edei/cgih/cfac//",
+  "25|4|fggc/aage/fcge/afbe/cddb/dbbc/fade//",
+  "31|4|ecgh/bdfa/gacf/dfhf/cedc/ghda/gebe/ahbb//",
+  "31|4|diba/diff/cchb/dhea/fegd/eeab/cbac/gihf/ighg//",
+  "25|4|gaee/ccfe/acfa/bedg/cddb/fbdg/gabf//",
+  "30|4|cdce/dgbh/gfaf/bdah/hedg/bahf/ecfg/abec//",
+  "36|4|dcfe/hcbd/aebh/gbig/fifi/acic/daah/edgf/ebgh//",
+  "25|4|ggff/dbaa/ecfd/gecd/bgce/fdab/ecab//",
+  "32|4|cagh/aehg/gecd/fdeb/bfgf/acbe/hdca/dhbf//",
+  "33|4|bbhe/dgah/egii/ddcf/effb/gcic/ahei/adfb/ahgc//",
+  "26|4|egde/bagc/gadd/acfd/fbec/fcfa/begb//",
+  "28|4|abag/fheh/acbf/hdef/dahb/cede/ggbf/gdcc//",
+  "36|4|ahgf/ehfi/dcfg/cdfd/hbea/edbb/eihi/cibg/gaac//",
+  "26|4|bgcd/cgdf/adgb/ecge/faad/bffc/eabe//",
+  "30|4|fgae/cgch/eaaf/dbhc/ebdd/gceb/bfga/hdfh//",
+  "36|4|dgcf/abce/bfea/baac/gfhh/hced/bgii/fidg/heid//",
+  "26|4|dbdd/ecff/baac/gfgg/befa/aced/ebcg//",
+  "31|4|fcbc/dhhg/hadh/abgd/cacb/defb/faeg/egfe//",
+  "33|4|hcaf/eeci/fhgi/bgeh/bdhf/aaeb/bidc/digd/acgf//",
+  "26|4|dcfa/bcde/efac/bgaa/edeb/gcbf/fgdg//",
+  "31|4|ghhc/gfac/cedf/fhdb/ehcd/baga/abbe/gefd//",
+  "32|4|bffe/gefc/igig/idec/adgb/ibde/fbaa/hhcd/ahch//"
 ];
 /*LEVELS:END*/
 
+// Level string: "<par>|<cap>[m]|<tube>/<tube>/..." ; tube = letters a..j bottom to top, "~" = short tube, "m" = mystery.
+function decode(str) {
+  var p = str.split('|'), cap = parseInt(p[1], 10), caps = [];
+  var tubes = p[2].split('/').map(function (s) {
+    var short = s.charAt(0) === '~', t = [];
+    caps.push(short ? SHORT_CAP : cap);
+    for (var i = short ? 1 : 0; i < s.length; i++) t.push(s.charCodeAt(i) - 97);
+    return t;
+  });
+  return { par: +p[0], cap: cap, caps: caps, mystery: p[1].indexOf('m') > 0, tubes: tubes };
+}
+var LV = LEVELS.map(decode), DL = DAILY.map(decode);
+var N = LV.length, ND = DL.length, PER_WORLD = 20;
+
+var WORLDS = [
+  { n: 'Le Tiroir',  m: 'bases',                  h: '' },
+  { n: "L'Étagère",  m: 'plus de couleurs',       h: '' },
+  { n: 'Le Grenier', m: 'tubes hauts',            h: 'Tubes hauts : 5 billes par tube.' },
+  { n: 'Le Placard', m: 'un seul tube vide',      h: 'Un seul tube vide : réfléchis avant de bouger.' },
+  { n: 'La Cave',    m: 'tube court',             h: 'Tube court : il ne tient que 2 billes.' },
+  { n: 'La Brume',   m: 'billes mystère',         h: 'Billes mystère : la couleur se révèle au sommet.' },
+  { n: "L'Atelier",  m: 'hauts, un seul vide',    h: 'Tubes hauts et un seul tube vide.' },
+  { n: 'Le Garage',  m: 'court et mystère',       h: 'Tube court et billes mystère.' },
+  { n: 'Le Hangar',  m: 'un seul vide, mystère',  h: 'Un seul tube vide et billes mystère.' },
+  { n: 'Pile Poil',  m: 'tout ensemble',          h: 'Tout ensemble : tubes hauts, court, mystère.' }
+];
+var RANKS = [
+  { n: 'Fouillis', s: 0 }, { n: 'Apprenti', s: 15 }, { n: 'Trieur', s: 40 }, { n: 'Rangeur', s: 80 },
+  { n: 'Organisé', s: 140 }, { n: 'Maniaque', s: 230 }, { n: 'Maître trieur', s: 360 }, { n: 'Pile Poil', s: 520 }
+];
+var BADGES = [
+  { id: 'monde1',     n: 'Premier monde',   d: 'Termine les 20 niveaux d’un monde.' },
+  { id: 'parfait',    n: 'Monde parfait',   d: '60 étoiles dans un même monde.' },
+  { id: 'serie7',     n: 'Série de 7',      d: '7 niveaux du jour d’affilée.' },
+  { id: 'serie30',    n: 'Série de 30',     d: '30 niveaux du jour d’affilée.' },
+  { id: 'etoiles100', n: '100 étoiles',     d: 'Gagne 100 étoiles en tout.' },
+  { id: 'defi',       n: 'Défi relevé',     d: 'Relève le défi d’un ami.' }
+];
+
 // First-move hint of level 1 (animated hand): lift the top ball, drop it in the empty tube.
 var HINT = (function () {
-  var t = LEVELS[0].tubes, to = -1, i;
+  var t = LV[0].tubes, to = -1, i;
   for (i = 0; i < t.length; i++) if (!t[i].length) to = i;
   return [0, to];
 })();
@@ -246,26 +698,76 @@ var COLORS = [
   { n: 'orange, croix',    bg: '#F76B15', fg: '#fff',    d: 'M9.2 3.5h5.6v5.7h5.700v5.6h-5.700v5.7H9.2v-5.7H3.5V9.2h5.700z' },
   { n: 'rose, cœur',       bg: '#F29AC2', fg: '#6B1740', d: 'M12 20.5s-8-4.900-8-10.700a4.500 4.500 0 0 1 8-2.700 4.500 4.500 0 0 1 8 2.700c0 5.800-8 10.700-8 10.700z' },
   { n: 'turquoise, lune',  bg: '#2CC5D2', fg: '#053B41', d: 'M14.500 3.500a8.500 8.500 0 1 0 6 12.500 7 7 0 0 1-6-12.500z' },
-  { n: 'gris, barres',     bg: '#D9DEE9', fg: '#2A3350', d: 'M4.500 6h15v4.200h-15zM4.500 13.800h15V18h-15z' }
+  { n: 'gris, barres',     bg: '#D9DEE9', fg: '#2A3350', d: 'M4.500 6h15v4.200h-15zM4.500 13.800h15V18h-15z' },
+  { n: 'citron, goutte',   bg: '#A6D23A', fg: '#2A3C00', d: 'M12 2.800s-6.500 7.200-6.500 11.700a6.500 6.500 0 0 0 13 0C18.500 10 12 2.800 12 2.800z' }
 ];
+var HIDDEN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#9FABD0" stroke-width="3" stroke-linecap="round"><path d="M8.500 9.200a3.500 3.500 0 1 1 5.300 3c-1.200.7-1.800 1.300-1.800 2.800M12 19.200v.1"/></svg>';
 
 var $ = function (id) { return document.getElementById(id); };
 var board = $('board'), stage = $('stage');
 var reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
+// ---- host page (only the events listed in the game sheet, no personal data) ----
+function emit(msg) {
+  msg.source = 'mini-jeu'; msg.game = GAME;
+  try { window.parent.postMessage(msg, '*'); } catch (e) { /* ignore */ }
+}
+
+// ---- days (local calendar day numbers; setToday fakes the date for tests) ----------
+var simDay = null;
+function dayOf(y, m, d) { return Math.floor(Date.UTC(y, m - 1, d) / 864e5); }
+function todayNum() {
+  if (simDay !== null) return simDay;
+  var d = new Date();
+  return dayOf(d.getFullYear(), d.getMonth() + 1, d.getDate());
+}
+function dayIndex(day) { return ((day % ND) + ND) % ND; }
+
 // ---- persistence (always guarded: the game works without storage) ------------
-var save = { level: 1, max: 1, stars: [], best: [], cur: null };
+var save = { level: 1, max: 1, stars: [], best: [], cur: null, streak: 0, jokers: 0, lastDay: 0, badges: [], rankSeen: 0 };
+function totalStars() {
+  var t = 0;
+  for (var i = 0; i < save.stars.length; i++) t += save.stars[i] || 0;
+  return t;
+}
+function rankOf(total) {
+  var r = 0;
+  for (var i = 0; i < RANKS.length; i++) if (total >= RANKS[i].s) r = i;
+  return r;
+}
+function worldStars(w) {
+  var t = 0;
+  for (var i = w * PER_WORLD; i < (w + 1) * PER_WORLD; i++) t += save.stars[i] || 0;
+  return t;
+}
 function loadSave() {
+  var i;
+  save.stars = []; save.best = [];
+  for (i = 0; i < N; i++) { save.stars.push(0); save.best.push(0); }
   try {
     var s = JSON.parse(localStorage.getItem(KEY) || 'null');
-    if (!s || typeof s !== 'object') return;
-    var n = LEVELS.length;
-    var clamp = function (v) { v = v | 0; return v < 1 ? 1 : v > n ? n : v; };
-    save.max = clamp(s.max);
-    save.level = Math.min(clamp(s.level), save.max);
-    if (Array.isArray(s.stars)) save.stars = s.stars.slice(0, n).map(function (v) { v = v | 0; return v > 3 ? 3 : v < 0 ? 0 : v; });
-    if (Array.isArray(s.best)) save.best = s.best.slice(0, n).map(function (v) { return v > 0 ? v | 0 : 0; });
-    if (s.cur && Array.isArray(s.cur.hist)) save.cur = { level: s.cur.level | 0, hist: s.cur.hist };
+    if (s && typeof s === 'object') {
+      var clamp = function (v, hi) { v = v | 0; return v < 1 ? 1 : v > hi ? hi : v; };
+      var nat = function (v, hi) { v = v | 0; return v < 0 ? 0 : v > hi ? hi : v; };
+      save.max = clamp(s.max, N);
+      save.level = Math.min(clamp(s.level, N), save.max);
+      if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = nat(s.stars[i], 3);
+      if (Array.isArray(s.best)) for (i = 0; i < N && i < s.best.length; i++) save.best[i] = nat(s.best[i], 9999);
+      if (s.cur && Array.isArray(s.cur.hist)) {
+        save.cur = { level: s.cur.level | 0, hist: s.cur.hist };
+        if (Array.isArray(s.cur.hid)) save.cur.hid = s.cur.hid;
+      }
+      save.streak = nat(s.streak, 9999);
+      save.jokers = nat(s.jokers, 2);
+      save.lastDay = nat(s.lastDay, 99999999);
+      if (Array.isArray(s.badges)) save.badges = s.badges.filter(function (id) { return BADGES.some(function (b) { return b.id === id; }); });
+      // A lot 1 save (10 levels): the last level reached was finished, so the next one is open.
+      while (save.max < N && save.stars[save.max - 1] > 0) {
+        if (save.level === save.max && !save.cur) save.level = save.max + 1;
+        save.max++;
+      }
+      save.rankSeen = s.rankSeen === undefined ? rankOf(totalStars()) : nat(s.rankSeen, RANKS.length - 1);
+    }
   } catch (e) { /* no storage: play without it */ }
 }
 function store() {
@@ -273,9 +775,17 @@ function store() {
 }
 
 // ---- game state --------------------------------------------------------------
-var level = 0;        // zero-based index
+var mode = 'level';   // 'level' (fixed levels) or 'daily'
+var cur = LV[0];      // current level object
+var level = 0;        // zero-based index of the fixed level
+var dailyIdx = -1;
+var dayN = 0;         // day the daily counts for (0 = practice, no effect on the streak)
+var free = false;     // challenge on a locked level: nothing is saved
+var chal = null;      // {target, level, day} while a friend's challenge is on
 var cap = 4;
+var caps = [];        // capacity of each tube
 var tubes = [];       // arrays of colour indices, bottom -> top
+var hid = [];         // hid[i] = number of hidden (mystery) balls at the bottom of tube i
 var els = [];         // ball elements, same shape as tubes
 var hist = [];        // [from,to] moves, unlimited undo
 var sel = -1;
@@ -284,20 +794,24 @@ var stuck = false;
 var tubeEls = [];
 var G = null;         // current geometry
 var winTimer = 0, msgTimer = 0;
+var screen = 'home';
 
 function canMove(from, to) {
   if (from === to) return false;
   var a = tubes[from], b = tubes[to];
-  if (!a.length || b.length >= cap) return false;
+  if (!a.length || b.length >= caps[to]) return false;
   return !b.length || b[b.length - 1] === a[a.length - 1];
 }
-function tubeDone(t) {
-  if (t.length !== cap) return false;
+function mono(t) {
   for (var i = 1; i < t.length; i++) if (t[i] !== t[0]) return false;
   return true;
 }
+function tubeDone(i) {   // full, one colour, nothing hidden (never leaks a hidden colour)
+  var t = tubes[i];
+  return t.length === caps[i] && caps[i] === cap && hid[i] === 0 && mono(t);
+}
 function isWon() {
-  for (var i = 0; i < tubes.length; i++) if (tubes[i].length && !tubeDone(tubes[i])) return false;
+  for (var i = 0; i < tubes.length; i++) if (tubes[i].length && !(tubes[i].length === caps[i] && mono(tubes[i]))) return false;
   return true;
 }
 function anyMove() {
@@ -305,12 +819,12 @@ function anyMove() {
     for (var j = 0; j < tubes.length; j++) if (canMove(i, j)) return true;
   return false;
 }
-function limits(lv) {
-  var p = LEVELS[lv].par;
+function limits() {
+  var p = cur.par;
   return [p + Math.max(2, Math.ceil(p * 0.15)), p + Math.max(4, Math.ceil(p * 0.5))];
 }
-function starsFor(lv, moves) {
-  var l = limits(lv);
+function starsFor(moves) {
+  var l = limits();
   return moves <= l[0] ? 3 : moves <= l[1] ? 2 : 1;
 }
 
@@ -361,9 +875,9 @@ function layout() {
   stage.className = 'still';
   stage.style.cssText = 'left:' + G.x0 + 'px;top:' + G.y0 + 'px;width:' + G.w + 'px;height:' + G.h + 'px';
   for (var i = 0; i < tubes.length; i++) {
-    var b = tubeBox(i), t = tubeEls[i];
+    var b = tubeBox(i), t = tubeEls[i], h = caps[i] * G.ball + 8;
     t.style.cssText = 'left:' + b.x + 'px;top:' + b.y + 'px;width:' + G.tubeW + 'px;height:' + G.rowH + 'px';
-    t.firstChild.style.cssText = 'height:' + G.tubeH + 'px;border-radius:0 0 ' + (G.tubeW / 2) + 'px ' + (G.tubeW / 2) + 'px';
+    t.firstChild.style.cssText = 'height:' + h + 'px;border-radius:0 0 ' + (G.tubeW / 2) + 'px ' + (G.tubeW / 2) + 'px';
     for (var k = 0; k < tubes[i].length; k++) {
       var e = els[i][k];
       e.style.width = e.style.height = (G.ball - 2) + 'px';
@@ -376,12 +890,28 @@ function layout() {
 }
 
 // ---- rendering ---------------------------------------------------------------
-function makeBall(c) {
-  var e = document.createElement('div'), col = COLORS[c];
-  e.className = 'ball';
-  e.style.background = col.bg;
-  e.innerHTML = '<svg viewBox="0 0 24 24" fill="' + col.fg + '" fill-rule="evenodd"><path d="' + col.d + '"/></svg>';
+// A hidden ball carries no colour and no symbol in the DOM: the true colour only lives in `tubes`.
+function paint(e, c, hidden) {
+  if (hidden) {
+    e.className = 'ball hid';
+    e.style.background = '';
+    e.innerHTML = HIDDEN_SVG;
+  } else {
+    var col = COLORS[c];
+    e.className = 'ball';
+    e.style.background = col.bg;
+    e.innerHTML = '<svg viewBox="0 0 24 24" fill="' + col.fg + '" fill-rule="evenodd"><path d="' + col.d + '"/></svg>';
+  }
+}
+function makeBall(c, hidden) {
+  var e = document.createElement('div');
+  paint(e, c, hidden);
   return e;
+}
+function revealTop(i) {   // the ball that just became the top of tube i is no longer hidden
+  var k = tubes[i].length - 1;
+  paint(els[i][k], tubes[i][k], false);
+  if (!reduced) els[i][k].classList.add('rev');
 }
 function build() {
   stage.textContent = '';
@@ -398,7 +928,7 @@ function build() {
   for (i = 0; i < tubes.length; i++) {
     els.push([]);
     for (k = 0; k < tubes[i].length; k++) {
-      var e = makeBall(tubes[i][k]);
+      var e = makeBall(tubes[i][k], k < hid[i]);
       stage.appendChild(e);
       els[i].push(e);
     }
@@ -412,7 +942,7 @@ function build() {
 function placeHand() {
   var h = $('hand');
   if (!h || !G) return;
-  var show = level === 0 && !hist.length && !won && !save.stars[0];
+  var show = mode === 'level' && level === 0 && !chal && !hist.length && !won && !save.stars[0];
   var target = sel < 0 ? HINT[0] : sel === HINT[0] ? HINT[1] : -1;
   if (!show || target < 0) { h.hidden = true; return; }
   var b = tubeBox(target);
@@ -422,16 +952,18 @@ function placeHand() {
 function starSvg(on) {
   return '<svg viewBox="0 0 24 24"' + (on ? ' class="on"' : '') + '><use href="#star"/></svg>';
 }
+function worldOf(lv) { return Math.floor(lv / PER_WORLD); }
 function refresh() {
-  $('lvl').textContent = 'Niveau ' + (level + 1);
+  $('lvl').textContent = mode === 'daily' ? 'Niveau du jour' : 'Niveau ' + (level + 1);
+  $('brand').textContent = mode === 'daily' ? NAME : 'Monde ' + (worldOf(level) + 1) + ' · ' + WORLDS[worldOf(level)].n;
   $('mv').textContent = hist.length;
   $('bUndo').disabled = !hist.length || won;
   $('bReset').disabled = !hist.length && !won;
-  $('goal').innerHTML = starSvg(1) + starSvg(1) + starSvg(1) + '<span>en ' + limits(level)[0] + ' coups ou moins</span>';
+  $('goal').innerHTML = starSvg(1) + starSvg(1) + starSvg(1) + '<span>en ' + limits()[0] + ' coups ou moins</span>';
   for (var i = 0; i < tubes.length; i++) {
     var t = tubes[i], top = t.length ? COLORS[t[t.length - 1]].n : '';
-    tubeEls[i].className = 'tube' + (sel === i ? ' sel' : '') + (tubeDone(t) ? ' done' : '');
-    tubeEls[i].setAttribute('aria-label', 'Tube ' + (i + 1) + ', ' +
+    tubeEls[i].className = 'tube' + (caps[i] < cap ? ' short' : '') + (sel === i ? ' sel' : '') + (tubeDone(i) ? ' done' : '');
+    tubeEls[i].setAttribute('aria-label', 'Tube ' + (i + 1) + (caps[i] < cap ? ' court' : '') + ', ' +
       (t.length ? t.length + ' bille' + (t.length > 1 ? 's' : '') + ', dessus : ' + top : 'vide'));
   }
   stuck = !won && !anyMove();
@@ -457,10 +989,10 @@ function shake(i) {
 
 // ---- moves -------------------------------------------------------------------
 // The state changes at once; the animation (lift, travel, drop) is cosmetic only.
-function fly(el, from, to, wasLifted) {
+function fly(el, from, to, wasLifted, quiet) {
   var a = liftPos(from), b = liftPos(to), end = slotPos(to, tubes[to].length - 1);
   put(el, end);
-  if (reduced || !el.animate) return;
+  if (quiet || reduced || !el.animate) return;
   var up = { x: end.x, y: end.y - 4 };
   var frames = [
     { transform: tr(a), easing: 'ease-in-out' },
@@ -477,17 +1009,25 @@ function fly(el, from, to, wasLifted) {
   for (var i = 0; i < frames.length; i++) frames[i].offset = offs[i];
   el.animate(frames, { duration: wasLifted ? 260 : 320 });
 }
-function apply(from, to, wasLifted) {
+// Moving a ball off a tube uncovers the one below it: a mystery ball is revealed for good.
+function uncover(i) {
+  if (hid[i] > 0 && hid[i] === tubes[i].length) { hid[i]--; return true; }
+  return false;
+}
+function apply(from, to, wasLifted, quiet) {
   var c = tubes[from].pop(), e = els[from].pop();
   tubes[to].push(c); els[to].push(e);
-  fly(e, from, to, wasLifted);
+  if (uncover(from)) revealTop(from);
+  fly(e, from, to, wasLifted, quiet);
 }
 function persistCur() {
+  if (mode !== 'level' || free) return;
   save.cur = hist.length && !won ? { level: level + 1, hist: hist } : null;
+  if (save.cur && cur.mystery) save.cur.hid = hid.slice();
   store();
 }
-function move(from, to) {
-  apply(from, to, sel === from);
+function move(from, to, quiet) {
+  apply(from, to, sel === from, quiet);
   hist.push([from, to]);
   sel = -1;
   if (isWon()) return win();
@@ -508,7 +1048,8 @@ function tapTube(i) {
     return move(sel, i);
   } else {
     shake(i);
-    say(tubes[i].length >= cap ? 'Ce tube est plein.' : 'Même couleur ou tube vide seulement.', 'warn');
+    say(tubes[i].length >= caps[i] ? (caps[i] < cap ? 'Tube court : 2 billes au plus.' : 'Ce tube est plein.') :
+      'Même couleur ou tube vide seulement.', 'warn');
   }
   refresh();
 }
@@ -525,81 +1066,211 @@ function undo() {
   persistCur();
   refresh();
 }
-function start(n, replay) {
+
+// ---- starting a level ----------------------------------------------------------
+// o = {mode, level, dailyIdx, dayN, free, chal, replay}
+function begin(L, o) {
   clearTimeout(winTimer);
-  level = n - 1;
-  cap = LEVELS[level].cap;
-  tubes = LEVELS[level].tubes.map(function (t) { return t.slice(); });
+  mode = o.mode; cur = L;
+  level = o.level | 0; dailyIdx = o.mode === 'daily' ? o.dailyIdx : -1; dayN = o.dayN | 0;
+  free = !!o.free; chal = o.chal || null;
+  cap = L.cap; caps = L.caps.slice();
+  tubes = L.tubes.map(function (t) { return t.slice(); });
+  hid = tubes.map(function (t) { return L.mystery ? Math.max(0, t.length - 1) : 0; });
   hist = []; sel = -1; won = false; stuck = false;
-  if (replay) {   // resume an unfinished level: replay the saved moves, drop them if invalid
-    for (var i = 0; i < replay.length; i++) {
-      var m = replay[i];
-      if (!m || !tubes[m[0]] || !tubes[m[1]] || !canMove(m[0], m[1])) { return start(n); }
+  var r = o.replay;
+  if (r) {   // resume an unfinished level: replay the saved moves, drop them if invalid
+    for (var i = 0; i < r.hist.length; i++) {
+      var m = r.hist[i];
+      if (!m || !tubes[m[0]] || !tubes[m[1]] || !canMove(m[0], m[1])) return begin(L, { mode: o.mode, level: o.level, free: o.free, chal: o.chal });
       tubes[m[1]].push(tubes[m[0]].pop());
+      uncover(m[0]);
       hist.push([m[0], m[1]]);
     }
-    if (isWon()) return start(n);
+    if (isWon()) return begin(L, { mode: o.mode, level: o.level, free: o.free, chal: o.chal });
+    if (L.mystery && Array.isArray(r.hid) && r.hid.length === hid.length) {   // reveals made then undone stay revealed
+      for (var k = 0; k < hid.length; k++) if (r.hid[k] >= 0 && r.hid[k] < hid[k]) hid[k] = r.hid[k] | 0;
+    }
   }
   $('win').hidden = true;
-  $('map').hidden = true;
   say('');
+  $('chal').hidden = !chal;
+  if (chal) $('chalT').textContent = 'À battre : ' + chal.target + ' coup' + (chal.target > 1 ? 's' : '');
   build();
-  save.level = n;
-  if (n > save.max) save.max = n;
+  if (mode === 'level' && !free) {
+    save.level = level + 1;
+    if (level + 1 > save.max) save.max = level + 1;
+  }
   persistCur();
   refresh();
+  var hint = mode === 'level' && !chal && !hist.length && level % PER_WORLD === 0 ? WORLDS[worldOf(level)].h : '';
+  if (hint && !stuck) say(hint, 'hint', true);
 }
-function restart() { start(level + 1); }
+function startLevel(n, replay, o) {
+  o = o || {};
+  begin(LV[n - 1], { mode: 'level', level: n - 1, replay: replay, free: o.free, chal: o.chal });
+}
+function startDaily(i, day, o) {
+  begin(DL[i], { mode: 'daily', dailyIdx: i, dayN: day, chal: o && o.chal });
+}
+function restart() {
+  if (mode === 'daily') startDaily(dailyIdx, dayN, { chal: chal });
+  else startLevel(level + 1, null, { free: free, chal: chal });
+}
+
+// ---- streak, jokers, rank, badges ------------------------------------------------
+// A missed day is covered by a joker if there is one; otherwise the streak is lost.
+function syncStreak() {
+  var t = todayNum();
+  if (save.streak > 0 && save.lastDay && t > save.lastDay + 1 && t - save.lastDay - 1 > save.jokers) {
+    save.streak = 0;
+    store();
+    emit({ event: 'streak_lost' });
+  }
+}
+function dailyDone() { return save.lastDay > 0 && todayNum() <= save.lastDay; }
+// First win of the day: +1 (jokers pay the missed days). A clock that went back changes nothing.
+function recordDaily(t) {
+  syncStreak();
+  if (save.lastDay && t <= save.lastDay) return false;
+  if (save.streak > 0 && save.lastDay && t - save.lastDay > 1) save.jokers -= t - save.lastDay - 1;
+  save.streak = save.streak > 0 ? save.streak + 1 : 1;
+  if (save.streak % 7 === 0 && save.jokers < 2) save.jokers++;
+  save.lastDay = t;
+  return true;
+}
+function hasBadge(id) { return save.badges.indexOf(id) >= 0; }
+function badgeEarned(id) {
+  var w, i;
+  switch (id) {
+    case 'monde1':
+      for (w = 0; w < N / PER_WORLD; w++) {
+        for (i = w * PER_WORLD; i < (w + 1) * PER_WORLD && save.stars[i] > 0; i++);
+        if (i === (w + 1) * PER_WORLD) return true;
+      }
+      return false;
+    case 'parfait':
+      for (w = 0; w < N / PER_WORLD; w++) if (worldStars(w) === PER_WORLD * 3) return true;
+      return false;
+    case 'serie7': return save.streak >= 7;
+    case 'serie30': return save.streak >= 30;
+    case 'etoiles100': return totalStars() >= 100;
+    default: return false;
+  }
+}
+// Called after anything that can change rank or badges. Pushes events and win-screen lines.
+function checkProgress(events, news, extra) {
+  var r = rankOf(totalStars());
+  if (r > save.rankSeen) {
+    save.rankSeen = r;
+    events.push({ event: 'rank_up', rank: r + 1 });
+    news.push('Nouveau rang : ' + RANKS[r].n);
+  }
+  BADGES.forEach(function (b) {
+    if (hasBadge(b.id) || !(badgeEarned(b.id) || extra === b.id)) return;
+    save.badges.push(b.id);
+    events.push({ event: 'badge', id: b.id });
+    news.push('Badge : ' + b.n);
+  });
+}
 
 // ---- win ---------------------------------------------------------------------
 function win() {
   won = true;
-  var moves = hist.length, n = level + 1, s = starsFor(level, moves);
-  var prevBest = save.best[level] || 0;
-  if (s > (save.stars[level] || 0)) save.stars[level] = s;
-  if (!prevBest || moves < prevBest) save.best[level] = moves;
-  if (n < LEVELS.length) { save.max = Math.max(save.max, n + 1); save.level = n + 1; }
-  save.cur = null;
+  var i, k;
+  for (i = 0; i < tubes.length; i++) if (hid[i]) { hid[i] = 0; for (k = 0; k < tubes[i].length; k++) paint(els[i][k], tubes[i][k], false); }
+  var moves = hist.length, s = starsFor(moves), n = level + 1;
+  var events = [], news = [], info = { moves: moves, stars: s, prevBest: 0, counted: false, chal: null };
+  var badgeExtra = '';
+  if (mode === 'level') {
+    if (!free) {
+      info.prevBest = save.best[level] || 0;
+      if (s > (save.stars[level] || 0)) save.stars[level] = s;
+      if (!info.prevBest || moves < info.prevBest) save.best[level] = moves;
+      if (n < N) { save.max = Math.max(save.max, n + 1); save.level = n + 1; }
+      save.cur = null;
+    }
+    events.push({ event: 'level_complete', level: n, moves: moves, stars: s });
+  } else if (dayN && dayN === todayNum()) {
+    info.counted = recordDaily(dayN);
+    if (info.counted) events.push({ event: 'daily_complete', day: dayN, moves: moves, streak: save.streak });
+  }
+  if (chal) {
+    var ok = moves <= chal.target;
+    info.chal = { ok: ok, diff: moves - chal.target, target: chal.target };
+    var ev = { event: 'challenge_result', level: mode === 'daily' ? 0 : n, moves: moves, target: chal.target, won: ok };
+    if (mode === 'daily') ev.day = dayN;
+    events.push(ev);
+    if (ok) badgeExtra = 'defi';
+  }
+  checkProgress(events, news, badgeExtra);
+  info.news = news;
   store();
   refresh();
-  try {
-    window.parent.postMessage({ source: 'mini-jeu', game: GAME, event: 'level_complete', level: n, moves: moves }, '*');
-  } catch (e) { /* ignore */ }
-  winTimer = setTimeout(function () { showWin(n, moves, s, prevBest); }, reduced ? 80 : 480);
+  events.forEach(emit);
+  winTimer = setTimeout(function () { showWin(info); }, reduced ? 80 : 480);
 }
-function showWin(n, moves, s, prevBest) {
-  var last = n === LEVELS.length;
-  $('wTitle').textContent = last ? 'Tout est rangé !' : s === 3 ? 'Pile poil !' : s === 2 ? 'Bien joué !' : 'Rangé !';
-  $('wSub').textContent = 'Niveau ' + n + ' terminé';
+function showWin(info) {
+  var s = info.stars, moves = info.moves, daily = mode === 'daily';
+  var last = !daily && level + 1 === N;
+  $('wTitle').textContent = last && !free ? 'Tout est rangé !' : s === 3 ? 'Pile poil !' : s === 2 ? 'Bien joué !' : 'Rangé !';
+  $('wSub').textContent = daily ? 'Niveau du jour terminé' : 'Niveau ' + (level + 1) + ' terminé';
   $('wStars').innerHTML = starSvg(s >= 1) + starSvg(s >= 2) + starSvg(s >= 3);
   $('wStars').setAttribute('aria-label', s + ' étoile' + (s > 1 ? 's' : '') + ' sur 3');
   $('wMoves').textContent = moves;
-  $('wRec').textContent = prevBest && moves < prevBest ? 'Nouveau record !' :
-    prevBest ? 'Record : ' + prevBest + ' coups' :
-    s < 3 ? '3 étoiles en ' + limits(level)[0] + ' coups ou moins' : '';
-  $('bNext').textContent = last ? 'Carte des niveaux' : 'Suivant';
+  var rec = '';
+  if (daily) rec = info.counted ? 'Série : ' + save.streak + ' jour' + (save.streak > 1 ? 's' : '') :
+    dayN && dayN === todayNum() ? 'Déjà compté aujourd’hui' : 'Entraînement : la série ne bouge pas';
+  else if (info.prevBest) rec = moves < info.prevBest ? 'Nouveau record !' : 'Record : ' + info.prevBest + ' coups';
+  else if (s < 3) rec = '3 étoiles en ' + limits()[0] + ' coups ou moins';
+  $('wRec').textContent = rec;
+  var c = $('wChal');
+  c.hidden = !info.chal;
+  if (info.chal) {
+    c.textContent = info.chal.ok ? 'Défi relevé !' : 'Raté de ' + info.chal.diff + ' coup' + (info.chal.diff > 1 ? 's' : '');
+    c.className = 'cres' + (info.chal.ok ? '' : ' lost');
+  }
+  $('wNews').innerHTML = info.news.map(function (t) { return '<span>' + t + '</span>'; }).join('');
+  $('bNext').textContent = daily || free ? 'Accueil' : last ? 'Mondes' : 'Suivant';
   $('bShare').textContent = 'Partager';
+  $('bChal').textContent = info.chal ? 'Renvoyer le défi' : 'Défier un ami';
   var w = $('win'), old = w.querySelectorAll('.bit'), i;
   for (i = 0; i < old.length; i++) w.removeChild(old[i]);
   w.hidden = false;
   if (reduced) return;
   for (i = 0; i < 22; i++) {
-    var c = COLORS[i % COLORS.length], b = document.createElement('div');
+    var col = COLORS[i % COLORS.length], b = document.createElement('div');
     b.className = 'bit';
     b.style.cssText = 'left:' + (4 + (i * 37) % 92) + '%;animation-delay:' + ((i * 53) % 400) + 'ms;--dx:' +
       (((i * 29) % 80) - 40) + 'px;--rot:' + (((i * 97) % 540) - 270) + 'deg';
-    b.innerHTML = '<svg viewBox="0 0 24 24" fill="' + c.bg + '" fill-rule="evenodd"><path d="' + c.d + '"/></svg>';
+    b.innerHTML = '<svg viewBox="0 0 24 24" fill="' + col.bg + '" fill-rule="evenodd"><path d="' + col.d + '"/></svg>';
     w.appendChild(b);
   }
 }
+
+// ---- sharing -----------------------------------------------------------------
+function starsText(s) { var st = ''; while (s--) st += '⭐'; return st; }
+function label() { return mode === 'daily' ? 'Niveau du jour' : 'Niveau ' + (level + 1); }
 function shareText() {
-  var s = starsFor(level, hist.length), st = '';
-  while (s--) st += '⭐';
-  return NAME + ' · Niveau ' + (level + 1) + ' en ' + hist.length + ' coups ' + st;
+  return NAME + ' · ' + label() + ' en ' + hist.length + ' coups ' + starsText(starsFor(hist.length));
 }
-function share() {
-  var text = shareText(), btn = $('bShare');
-  var copied = function () { btn.textContent = 'Copié !'; };
+function shareBase() {
+  var b = window.MJ_CONFIG && window.MJ_CONFIG.shareBaseUrl;
+  if (typeof b !== 'string' || !b) b = String(location.href);
+  return b.split('#')[0];
+}
+// Fragment: letters, digits and hyphens only.
+function challengeLink() {
+  var day = dayN || todayNum() - dayIndex(todayNum()) + dailyIdx;   // a day whose daily is this level
+  var frag = mode === 'daily' ? 'defi-jour-' + day + '-' + hist.length : 'defi-' + (level + 1) + '-' + hist.length;
+  return shareBase() + '#' + frag;
+}
+function challengeText() {
+  return NAME + ' · ' + label() + ' en ' + hist.length + ' coups. À toi de faire mieux ! ' + challengeLink();
+}
+function sendText(text, kind, btn, idle) {
+  var done = function () { emit({ event: 'share', kind: kind }); };
+  var copied = function () { btn.textContent = 'Copié !'; done(); };
   var legacy = function () {   // last resort: hidden textarea + execCommand
     var ok = false;
     try {
@@ -612,6 +1283,7 @@ function share() {
       document.body.removeChild(ta);
     } catch (e) { ok = false; }
     btn.textContent = ok ? 'Copié !' : 'Copie impossible';
+    if (ok) done();
   };
   var clip = function () {
     try {
@@ -621,34 +1293,127 @@ function share() {
   };
   try {
     if (navigator.share) {
-      return navigator.share({ text: text }).then(null, function (e) { if (!e || e.name !== 'AbortError') clip(); });
+      return navigator.share({ text: text }).then(done, function (e) { if (!e || e.name !== 'AbortError') clip(); });
     }
   } catch (e) { /* fall through */ }
   clip();
 }
 
-// ---- level map ---------------------------------------------------------------
+// ---- challenges (#defi-<level>-<moves> or #defi-jour-<day>-<moves>) -------------------
+function openChallenge() {
+  var h = String(location.hash || ''), m;
+  try { if (h) history.replaceState(null, '', String(location.href).split('#')[0]); } catch (e) { /* ignore */ }
+  if ((m = /^#defi-(\d{1,3})-(\d{1,4})$/.exec(h))) {
+    var n = +m[1], target = +m[2];
+    if (n < 1 || n > N || target < 1) return false;
+    var c = { target: target, level: n, day: 0 };
+    startLevel(n, null, { free: n > save.max, chal: c });
+    emit({ event: 'challenge_open', level: n, target: target });
+  } else if ((m = /^#defi-jour-(\d{1,6})-(\d{1,4})$/.exec(h))) {
+    var day = +m[1], t2 = +m[2];
+    if (t2 < 1) return false;
+    startDaily(dayIndex(day), day, { chal: { target: t2, level: 0, day: day } });
+    emit({ event: 'challenge_open', level: 0, day: day, target: t2 });
+  } else return false;
+  show('game');
+  return true;
+}
+
+// ---- screens -------------------------------------------------------------------
+var SCREENS = ['home', 'worlds', 'wgrid', 'badges'];
+function show(name) {
+  screen = name;
+  SCREENS.forEach(function (s) { $(s).hidden = s !== name; });
+  if (name !== 'game') $('win').hidden = true;
+  if (name === 'home') renderHome();
+  else if (name === 'worlds') renderWorlds();
+  else if (name === 'badges') renderBadges();
+}
 var LOCK = '<svg viewBox="0 0 24 24"><path d="M7 10V8a5 5 0 0 1 10 0v2h1.500v10h-13V10zm2.500 0h5V8a2.500 2.500 0 0 0-5 0z"/></svg>';
-function showMap() {
-  var g = $('grid'), total = 0, html = '';
-  for (var i = 0; i < LEVELS.length; i++) {
-    var n = i + 1, s = save.stars[i] || 0, open = n <= save.max, cur = n === level + 1;
+var BADGE_ICONS = {
+  monde1: 'M4 20V6l8-3 8 3v14h-5v-6H9v6z',
+  parfait: 'M12 2.500l2.900 6 6.600.9-4.800 4.600 1.200 6.500L12 17.400l-5.900 3.100 1.200-6.500L2.500 9.400l6.600-.9z',
+  serie7: 'M12 2c.6 3.600 5.800 6.200 5.800 11.300a5.800 5.800 0 0 1-11.600 0c0-2.100.9-3.600 2-4.800.3 1.500 1.100 2.500 2.100 2.700C9.700 8.600 10.400 4.800 12 2z',
+  serie30: 'M13 2 4 14h6l-1 8 9-12h-6z',
+  etoiles100: 'M12 3l9 9-9 9-9-9z',
+  defi: 'M5 3h2v18H5zM8 4h11l-3 4.500 3 4.500H8z'
+};
+function renderHome() {
+  syncStreak();
+  var t = totalStars(), r = rankOf(t), next = RANKS[r + 1];
+  $('hStreakN').textContent = save.streak;
+  $('hStreakT').textContent = (save.streak > 1 ? 'jours de suite' : 'jour de suite');
+  $('hJoker').textContent = save.jokers ? 'joker ×' + save.jokers : '';
+  $('hStreak').classList.toggle('lit', save.streak > 0 && dailyDone());
+  $('hRankN').textContent = RANKS[r].n;
+  $('hStars').textContent = next ? t + ' / ' + next.s + ' étoiles' : t + ' étoiles';
+  $('hBar').style.width = (next ? Math.round(100 * (t - RANKS[r].s) / (next.s - RANKS[r].s)) : 100) + '%';
+  var done = dailyDone();
+  $('hDaily').classList.toggle('todo', !done);
+  $('hDailyT').textContent = done ? 'Fait pour aujourd’hui' : 'Pas encore joué';
+  $('bDaily').textContent = done ? 'Rejouer' : 'Jouer';
+  $('bGo').textContent = 'Continuer · Niveau ' + save.level;
+}
+function renderWorlds() {
+  var html = '', total = 0;
+  for (var w = 0; w < N / PER_WORLD; w++) {
+    var open = w * PER_WORLD + 1 <= save.max, s = worldStars(w), cur = worldOf(save.level - 1) === w;
     total += s;
-    html += '<button class="cell' + (cur ? ' cur' : '') + (s ? ' ok' : '') + '" data-level="' + n + '"' + (open ? '' : ' disabled') +
-      ' aria-label="Niveau ' + n + (open ? ', ' + s + ' étoile' + (s > 1 ? 's' : '') : ', verrouillé') + '">' +
-      '<span class="n">' + (open ? n : LOCK) + '</span><span class="d"><span class="s">' +
-      starSvg(s >= 1) + starSvg(s >= 2) + starSvg(s >= 3) + '</span><span class="t">' +
-      (s ? 'Record : ' + save.best[i] + ' coups' : open ? (cur && hist.length && !won ? 'En cours' : 'À jouer') : 'Verrouillé') +
-      '</span></span></button>';
+    html += '<button class="wc' + (cur ? ' cur' : '') + (s ? ' ok' : '') + '" data-world="' + w + '"' + (open ? '' : ' disabled') +
+      ' aria-label="Monde ' + (w + 1) + ', ' + WORLDS[w].n + (open ? ', ' + s + ' étoiles sur 60' : ', verrouillé') + '">' +
+      '<span class="n">' + (open ? w + 1 : LOCK) + '</span><span class="d"><span class="nm">' + WORLDS[w].n +
+      '</span><span class="mc">' + WORLDS[w].m + '</span><span class="sc">' + (open ? s + '/60 ★' : 'Verrouillé') + '</span></span></button>';
   }
-  g.innerHTML = html;
-  $('mTotal').textContent = total + '/' + (LEVELS.length * 3);
-  $('win').hidden = true;
-  $('map').hidden = false;
+  $('wlist').innerHTML = html;
+  $('mTotal').textContent = total + '/' + (N * 3);
+}
+var gridWorld = 0;
+function renderGrid(w) {
+  gridWorld = w;
+  var html = '';
+  for (var i = w * PER_WORLD; i < (w + 1) * PER_WORLD; i++) {
+    var n = i + 1, s = save.stars[i] || 0, open = n <= save.max, isCur = n === save.level;
+    html += '<button class="cell' + (isCur ? ' cur' : '') + (s ? ' ok' : '') + '" data-level="' + n + '"' + (open ? '' : ' disabled') +
+      ' aria-label="Niveau ' + n + (open ? ', ' + s + ' étoile' + (s > 1 ? 's' : '') : ', verrouillé') + '">' +
+      '<span class="n">' + (open ? n : LOCK) + '</span><span class="s">' + starSvg(s >= 1) + starSvg(s >= 2) + starSvg(s >= 3) + '</span></button>';
+  }
+  $('grid').innerHTML = html;
+  $('gTitle').textContent = 'Monde ' + (w + 1);
+  $('gSub').textContent = WORLDS[w].n + ' · ' + WORLDS[w].m;
+  $('gTotal').textContent = worldStars(w) + '/' + (PER_WORLD * 3);
+}
+function renderBadges() {
+  var html = '', got = 0;
+  BADGES.forEach(function (b) {
+    var on = hasBadge(b.id);
+    if (on) got++;
+    html += '<div class="bd' + (on ? ' got' : '') + '" data-badge="' + b.id + '"><span class="ic"><svg viewBox="0 0 24 24"><path d="' + BADGE_ICONS[b.id] +
+      '"/></svg></span><span><b>' + b.n + '</b><span>' + b.d + '</span></span></div>';
+  });
+  $('blist').innerHTML = html;
+  $('bSub').textContent = got + ' sur ' + BADGES.length;
+}
+function goContinue() {
+  var n = save.level;
+  if (mode === 'level' && !free && level + 1 === n && !won) { show('game'); return; }
+  startLevel(n, save.cur && save.cur.level === n ? save.cur : null);
+  show('game');
+}
+function goDaily() {
+  var t = todayNum(), i = dayIndex(t);
+  if (mode === 'daily' && dayN === t && !won && hist.length) { show('game'); return; }
+  startDaily(i, t);
+  show('game');
 }
 function pickLevel(n) {
-  if (n === level + 1 && !won) { $('map').hidden = true; return; }   // keep the level in progress
-  start(n);
+  if (mode === 'level' && !free && n === level + 1 && !won && !chal) { show('game'); return; }   // keep the level in progress
+  startLevel(n, null);
+  show('game');
+}
+function openGrid() {
+  if (mode === 'daily') return show('home');
+  renderGrid(worldOf(level));
+  show('wgrid');
 }
 
 // ---- input: pointer events, with a click fallback for keyboards and assistive tech ----
@@ -685,41 +1450,100 @@ onTap($('grid'), function (e) {
   var c = closestAttr(e.target, 'data-level');
   if (c && !c.disabled) pickLevel(+c.getAttribute('data-level'));
 });
+onTap($('wlist'), function (e) {
+  var c = closestAttr(e.target, 'data-world');
+  if (c && !c.disabled) { renderGrid(+c.getAttribute('data-world')); show('wgrid'); }
+});
 onTap($('bUndo'), undo);
 onTap($('bReset'), restart);
-onTap($('bMap'), showMap);
-onTap($('bBack'), function () { if (won) start(save.level); else $('map').hidden = true; });
-onTap($('bNext'), function () { if (level + 1 < LEVELS.length) start(level + 2); else showMap(); });
+onTap($('bMap'), openGrid);
+onTap($('bBack'), goContinue);
+onTap($('bGBack'), function () { show('worlds'); });
+onTap($('bWBack'), function () { show('home'); });
+onTap($('bBBack'), function () { show('home'); });
+onTap($('bGo'), goContinue);
+onTap($('bDaily'), goDaily);
+onTap($('bWorlds'), function () { show('worlds'); });
+onTap($('bBadges'), function () { show('badges'); });
+onTap($('bNext'), function () {
+  if (mode === 'daily' || free) show('home');
+  else if (level + 1 < N) { startLevel(level + 2); show('game'); }
+  else show('worlds');
+});
 onTap($('bAgain'), restart);
-onTap($('bShare'), share);
+onTap($('bShare'), function () { sendText(shareText(), 'result', $('bShare')); });
+onTap($('bChal'), function () { sendText(challengeText(), 'challenge', $('bChal')); });
 document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
 window.addEventListener('resize', function () { if (tubeEls.length) layout(); });
+window.addEventListener('hashchange', function () { if (/^#defi-/.test(location.hash)) openChallenge(); });
 
 // ---- boot --------------------------------------------------------------------
 loadSave();
-start(save.level, save.cur && save.cur.level === save.level ? save.cur.hist : null);
+syncStreak();
+startLevel(save.level, save.cur && save.cur.level === save.level ? save.cur : null);
+show('home');
+if (/^#defi-/.test(location.hash)) openChallenge();
 
-// Test hooks.
+// Test hooks. Solutions are never embedded: they live in tools/solutions.json.
 window.__game = {
   state: function () {
+    var t = todayNum();
     return {
-      level: level + 1,
-      tubes: tubes.map(function (t) { return t.slice(); }),
+      mode: mode,
+      level: mode === 'level' ? level + 1 : 0,
+      dailyIndex: dailyIdx,
+      tubes: tubes.map(function (x) { return x.slice(); }),
+      caps: caps.slice(),
+      hidden: hid.slice(),
       moves: hist.length,
       won: won,
       selected: sel,
       stuck: stuck,
       cap: cap,
-      stars: won ? starsFor(level, hist.length) : 0
+      mystery: cur.mystery,
+      stars: won ? starsFor(hist.length) : 0,
+      screen: screen,
+      total: totalStars(),
+      rank: rankOf(totalStars()) + 1,
+      streak: save.streak,
+      jokers: save.jokers,
+      lastDay: save.lastDay,
+      today: t,
+      todayIndex: dayIndex(t),
+      badges: save.badges.slice(),
+      challenge: chal ? { target: chal.target, level: chal.level, day: chal.day } : null
     };
   },
-  levels: LEVELS,
-  solutions: SOLUTIONS,
+  levels: LV,
+  daily: DL,
   loadLevel: function (n) {
     n = n | 0;
-    if (n < 1 || n > LEVELS.length) throw new Error('level must be 1..' + LEVELS.length);
-    start(n);
+    if (n < 1 || n > N) throw new Error('level must be 1..' + N);
+    startLevel(n);
+    show('game');
+    return this.state();
+  },
+  // i is the zero-based index in `daily`; it counts for the series only if it is today's one.
+  loadDaily: function (i) {
+    i = i | 0;
+    if (i < 0 || i >= ND) throw new Error('daily must be 0..' + (ND - 1));
+    startDaily(i, i === dayIndex(todayNum()) ? todayNum() : 0);
+    show('game');
+    return this.state();
+  },
+  applyMove: function (from, to) {
+    if (won || !tubes[from] || !tubes[to] || !canMove(from, to)) return false;
+    dropSel();
+    move(from, to, true);
+    return true;
+  },
+  setToday: function (str) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(str));
+    if (!m) throw new Error('date must be AAAA-MM-JJ');
+    simDay = dayOf(+m[1], +m[2], +m[3]);
+    syncStreak();
+    if (screen === 'home') renderHome();
     return this.state();
   }
 };
