@@ -84,11 +84,20 @@ function verify() {
     seenSets.add(key);
     rows.push({ n: g + 1, solutions: a.solutions.length, traps: a.traps, longest: Math.max(...all.map(w => w.length)) });
   });
-  // difficulty must climb: the number of traps never goes down from one block of five grids to the next
+  // variety: two grids share at most one word, and no family is reused as a whole
+  for (let i = 0; i < GRIDS.length; i++) for (let j = i + 1; j < GRIDS.length; j++) {
+    const wi = GRIDS[i].flatMap(f => f[1]), wj = GRIDS[j].flatMap(f => f[1]);
+    const common = wi.filter(w => wj.includes(w));
+    if (common.length > 1) problems.push('grids ' + (i + 1) + ' and ' + (j + 1) + ' share ' + common.length + ' words: ' + common.join(', '));
+  }
+  // the word table must not list words that no grid uses (it would hide unreviewed entries)
+  const used = new Set(GRIDS.flatMap(g => g.flatMap(f => f[1])));
+  Object.keys(WORDS).forEach(w => { if (!used.has(w)) problems.push('"' + w + '" is in the word table but in no grid'); });
+  // difficulty must climb: no trap in the first five grids, at least one from the sixth, and the
+  // number of traps never goes down from one block of five grids to the next
   const block = i => rows.slice(i * 5, i * 5 + 5).reduce((s, r) => s + r.traps.length, 0);
   if (rows.length === 20) {
     for (let b = 1; b < 4; b++) if (block(b) < block(b - 1)) problems.push('traps drop between blocks ' + b + ' and ' + (b + 1) + ' (' + block(b - 1) + ' -> ' + block(b) + ')');
-    if (block(0) !== 0) problems.push('the first five grids must have no trap');
     rows.slice(0, 5).forEach(r => { if (r.traps.length) problems.push('grid ' + r.n + ' is meant to be plain'); });
     rows.slice(5).forEach(r => { if (!r.traps.length) problems.push('grid ' + r.n + ' has no trap'); });
   }

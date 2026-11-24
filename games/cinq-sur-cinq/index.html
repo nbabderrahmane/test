@@ -274,7 +274,7 @@ function orderFor(seed, n, att, qi) {
 }
 
 // ---- persistence (always guarded: the game works without storage) ------------
-var save = { seed: 1, att: 0, level: 1, max: 1, stars: [], best: [], cur: null };
+var save = { seed: 1, att: 0, max: 1, stars: [], best: [], cur: null };
 function int(v, lo, hi) { v = v | 0; return v < lo ? lo : v > hi ? hi : v; }
 function loadSave() {
   var i;
@@ -287,7 +287,6 @@ function loadSave() {
       save.seed = int(s.seed, 1, 1e9) || save.seed;
       save.att = int(s.att, 0, 1e6);
       save.max = int(s.max, 1, N) || 1;
-      save.level = Math.min(int(s.level, 1, N) || 1, save.max);
       if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = int(s.stars[i], 0, 3);
       if (Array.isArray(s.best)) for (i = 0; i < N && i < s.best.length; i++) save.best[i] = int(s.best[i], 0, TARGET_MAX);
       var c = s.cur;
@@ -306,6 +305,11 @@ function loadSave() {
 }
 function store() {
   try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) { /* ignore */ }
+}
+// "Continuer" always points at the first level not finished yet (replaying an old level moves nothing).
+function firstOpen() {
+  for (var i = 0; i < N; i++) if (!save.stars[i]) return Math.min(i + 1, save.max);
+  return N;
 }
 function totalStars() { var t = 0; for (var i = 0; i < N; i++) t += save.stars[i]; return t; }
 
@@ -343,7 +347,7 @@ function startLevel(num, opts) {   // num: 1-based
   }
   G.order = orderFor(G.seed, G.n, G.att, G.qi);
   lastSec = -1;
-  if (!G.chal) { if (num <= save.max) save.level = num; persist(); }
+  if (!G.chal) persist();
   show('game');
   renderGame();
 }
@@ -368,6 +372,7 @@ function answer(d) {
   return true;
 }
 function timeout() {
+  lockUntil = Date.now() + 100;
   G.res.push({ ok: false, pts: 0, pick: -1 });
   G.sel = -1;
   afterAnswer();
@@ -391,10 +396,7 @@ function finish() {
   if (score > save.best[i]) save.best[i] = score;
   if (won) {
     save.max = Math.max(save.max, Math.min(N, i + 2));
-    save.level = Math.min(N, i + 2);
     emit({ event: 'level_complete', level: i + 1, score: score, stars: G.fin.stars });
-  } else {
-    save.level = i + 1;
   }
   persist();   // G.fin is set: clears the saved game
 }
@@ -444,7 +446,7 @@ function renderGame() {
     var cls = 'a';
     if (revealed) cls += d === right ? ' right' : d === G.sel ? ' wrong' : ' dim';
     h += '<button class="' + cls + '" data-d="' + d + '"' + (revealed ? ' disabled' : '') + '><span class="l">' + LETTERS[d] + '</span>' +
-      '<span class="t"></span><svg class="m" viewBox="0 0 24 24">' + (d === right ? '<path d="M5 12.500l4.500 4.500L19 7.500"/>' : '<path d="M6 6l12 12M18 6L6 18"/>') + '</svg></button>';
+      '<span class="t"></span><svg class="m" viewBox="0 0 24 24">' + (!revealed ? '' : d === right ? '<path d="M5 12.500l4.500 4.500L19 7.500"/>' : '<path d="M6 6l12 12M18 6L6 18"/>') + '</svg></button>';   // marks only after the answer
   }
   $('ans').innerHTML = h;
   var bs = $('ans').children;
@@ -466,14 +468,14 @@ function renderGame() {
 }
 function renderHome() {
   $('hTotal').textContent = totalStars();
-  $('bGo').textContent = 'Continuer · Niveau ' + (save.cur ? save.cur.n + 1 : save.level);
+  $('bGo').textContent = 'Continuer · Niveau ' + firstOpen();
 }
 function renderGrid() {
   var h = '';
   for (var i = 0; i < N; i++) {
     var locked = i + 1 > save.max, st = '';
     for (var k = 0; k < 3; k++) st += '<svg viewBox="0 0 24 24" class="' + (k < save.stars[i] ? 'on' : '') + '"><use href="#star"/></svg>';
-    h += '<button class="cell' + (i + 1 === (save.cur ? save.cur.n + 1 : save.level) ? ' cur' : '') + (save.stars[i] ? ' ok' : '') + '" data-n="' + (i + 1) + '"' +
+    h += '<button class="cell' + (i + 1 === firstOpen() ? ' cur' : '') + (save.stars[i] ? ' ok' : '') + '" data-n="' + (i + 1) + '"' +
       (locked ? ' disabled aria-label="Niveau ' + (i + 1) + ' verrouillé"' : ' aria-label="Niveau ' + (i + 1) + ', ' + save.stars[i] + ' étoiles"') + '>' +
       '<span class="n">' + (locked ? LOCK : i + 1) + '</span><span class="s">' + st + '</span></button>';
   }
@@ -503,8 +505,10 @@ function renderResult() {
   }
   $('bRNext').hidden = !!c || !f.won || G.n >= N - 1;
   $('bShare').hidden = !!c;
-  $('bChal').hidden = !!c;
   $('bChal').disabled = f.score < 1;
+  $('bChal').hidden = c ? !f.chalWon : false;
+  $('bChal').textContent = c ? 'Renvoyer le défi' : 'Défier un ami';
+  $('bAgain').hidden = !!c;
   $('bHome').hidden = !c;
 }
 
@@ -528,11 +532,14 @@ function marks() { return G.res.map(function (r) { return r.ok ? '✅' : '❌'; 
 function shareText() {
   return NAME + ' · Niveau ' + (G.n + 1) + ' · ' + starsText(G.fin.stars) + ' · ' + G.fin.score + ' pts ' + marks();
 }
-// The link base: MJ_CONFIG.shareBaseUrl, else the current address if it is http(s); otherwise no link.
+// The link base: origin + pathname of MJ_CONFIG.shareBaseUrl, else of the current address if http(s); otherwise no link.
 function shareBase() {
-  var b = window.MJ_CONFIG && window.MJ_CONFIG.shareBaseUrl;
-  if (typeof b !== 'string' || !b) b = /^https?:/i.test(String(location.href)) ? String(location.href) : '';
-  return b.split('#')[0];
+  var b = window.MJ_CONFIG && window.MJ_CONFIG.shareBaseUrl, u;
+  if (typeof b === 'string' && b) {
+    try { u = new URL(b); if (/^https?:$/.test(u.protocol)) return u.origin + u.pathname; return ''; } catch (e) { /* fall back */ }
+  }
+  if (/^https?:$/.test(location.protocol)) return location.origin + location.pathname;   // never the query string
+  return '';
 }
 function challengeText() {
   var base = shareBase();
@@ -578,21 +585,31 @@ function openChallenge() {
   m = /^#defi-(\d{1,2})-(\d{1,4})$/.exec(h);
   if (!m) return false;
   var n = +m[1], target = +m[2];
-  if (n < 1 || n > N || target < 1 || target > TARGET_MAX) return false;
+  if (n < 1 || n > N || target < 100 || target > TARGET_MAX) return false;
   startLevel(n, { chal: { target: target } });
   emit({ event: 'challenge_open', level: n, target: target });
   return true;
 }
 
 // ---- input (pointer events; Enter/Space reach click with detail 0) ------------------
+// A tap needs its pointerdown and pointerup on the same element, and two accepted taps are never closer than 100 ms:
+// a double tap cannot answer the question that appears under the finger, nor hit the screen that replaces the button.
+var lockUntil = 0, downEl = null;
+function accept(el) {
+  var ok = downEl === el && Date.now() >= lockUntil;
+  downEl = null;
+  if (ok) lockUntil = Date.now() + 100;
+  return ok;
+}
+document.addEventListener('pointerdown', function (e) { downEl = e.target.closest ? e.target.closest('button') : null; }, true);
 function tap(el, fn) {
-  el.addEventListener('pointerup', function (e) { if (e.button > 0 || el.disabled) return; fn(e); });
+  el.addEventListener('pointerup', function (e) { if (e.button > 0 || el.disabled) return; if (accept(el)) fn(e); });
   el.addEventListener('click', function (e) { if (e.detail === 0 && !el.disabled) fn(e); });
 }
 function tapIn(box, sel, fn) {
   box.addEventListener('pointerup', function (e) {
     var t = e.target.closest && e.target.closest(sel);
-    if (t && box.contains(t) && !t.disabled && e.button <= 0) fn(t);
+    if (t && box.contains(t) && !t.disabled && e.button <= 0 && accept(t)) fn(t);
   });
   box.addEventListener('click', function (e) {
     var t = e.target.closest && e.target.closest(sel);
@@ -601,17 +618,15 @@ function tapIn(box, sel, fn) {
 }
 tapIn($('ans'), '.a', function (b) { answer(+b.getAttribute('data-d')); });
 tap($('bNext'), function () { if (G && G.fin) showResult(); else nextQuestion(); });
-tap($('bGo'), function () { startLevel(save.cur ? save.cur.n + 1 : save.level); });
+tap($('bGo'), function () { startLevel(firstOpen()); });
 tap($('bLevels'), function () { show('grid'); });
 tap($('bGBack'), function () { show('home'); });
 tap($('bMap'), function () { show('grid'); });
 tapIn($('cells'), '.cell', function (b) { startLevel(+b.getAttribute('data-n')); });
 tap($('bRNext'), function () { startLevel(G.n + 2, { fresh: true }); });
-tap($('bAgain'), function () {
-  if (G.chal) startLevel(G.n + 1, { chal: G.chal }); else startLevel(G.n + 1, { fresh: true });
-});
+tap($('bAgain'), function () { if (G && !G.chal) startLevel(G.n + 1, { fresh: true }); });
 tap($('bShare'), function () { if (G && G.fin) sendText(shareText(), 'result', $('bShare'), 'Partager'); });
-tap($('bChal'), function () { if (G && G.fin && G.fin.score > 0) sendText(challengeText(), 'challenge', $('bChal'), 'Défier un ami'); });
+tap($('bChal'), function () { if (G && G.fin && G.fin.score > 0) sendText(challengeText(), 'challenge', $('bChal'), G.chal ? 'Renvoyer le défi' : 'Défier un ami'); });
 tap($('bHome'), function () { show('home'); });
 
 document.addEventListener('visibilitychange', function () { lastTick = Date.now(); });
@@ -628,7 +643,7 @@ window.__game = {
   levels: DATA.map(function (l, i) { return { n: i + 1, theme: l[0], questions: l[1].length }; }),
   state: function () {
     var o = {
-      screen: screen, max: save.max, level: save.level, stars: save.stars.slice(), best: save.best.slice(),
+      screen: screen, max: save.max, level: firstOpen(), stars: save.stars.slice(), best: save.best.slice(),
       totalStars: totalStars(), seed: save.seed, att: save.att, hasSaved: !!save.cur, frozen: frozen, game: null
     };
     if (G) {

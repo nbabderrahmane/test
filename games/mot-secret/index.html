@@ -9,7 +9,7 @@
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
   --bg:#131A2E;--panel:#1D2742;--line:#4A5880;--ink:#F4F1E8;--dim:#A9B4D0;--off:#3A4567;
-  --acc:#4FD1B5;--acc-ink:#07241D;--gold:#FFC53D;--gold-ink:#231A00;--abs:#2A3453;--abs-ink:#8D9AC0;
+  --acc:#FF8A5B;--acc-ink:#2B1006;--gold:#FFC53D;--lav:#B9A2FF;--lav-ink:#1B1240;--abs:#2A3453;--abs-ink:#8D9AC0;
 }
 html,body{height:100%;overflow:hidden;background:var(--bg);overscroll-behavior:none}
 body{
@@ -36,7 +36,7 @@ header{display:flex;align-items:center;gap:8px;padding:6px 12px 2px;flex:none}
 #goal,#chal{flex:none;display:flex;align-items:center;justify-content:center;gap:10px;height:26px;margin:0 12px;font-size:13px;color:var(--dim);white-space:nowrap}
 #goal span{display:flex;align-items:center;gap:3px}
 #goal svg{width:13px;height:13px;fill:var(--gold)}
-#chal{border-radius:13px;background:rgba(79,209,181,.14);color:var(--acc);font-weight:700}
+#chal{border-radius:13px;background:rgba(255,138,91,.15);color:var(--acc);font-weight:700}
 #chal svg{width:14px;height:14px;fill:var(--acc);flex:none}
 
 #board{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;margin:0 8px;overflow:hidden}
@@ -54,26 +54,17 @@ header{display:flex;align-items:center;gap:8px;padding:6px 12px 2px;flex:none}
 .t.g{box-shadow:inset 0 0 0 2px var(--acc);color:var(--acc)}
 .t.f.pop{animation:pop .12s}
 @keyframes pop{50%{transform:scale(1.1)}}
-.t.s0,.t.s1,.t.s2{box-shadow:none;animation:flip .42s var(--d,0s) backwards}
+.t.s0,.t.s1,.t.s2{box-shadow:none;animation:drop .32s var(--d,0s) backwards}
 .t.s0{background:var(--abs);color:var(--abs-ink)}
-.t.s1{background:var(--gold);color:var(--gold-ink)}
+.t.s1{background:var(--lav);color:var(--lav-ink)}
 .t.s2{background:var(--acc);color:var(--acc-ink)}
-@keyframes flip{
-  from{transform:scaleY(1);background:var(--panel);box-shadow:inset 0 0 0 2px var(--off);color:var(--ink)}
-  45%{transform:scaleY(0);background:var(--panel);box-shadow:inset 0 0 0 2px var(--off);color:var(--ink)}
-  55%{transform:scaleY(0)}
-}
-/* shape marks: filled square = right place, disc = elsewhere, empty square = absent */
-.t.s0:after,.t.s1:after,.t.s2:after,.k.s0:after,.k.s1:after,.k.s2:after{
-  content:"";position:absolute;left:10%;top:10%;width:calc(var(--m,.2)*100%);height:calc(var(--m,.2)*100%);
-  background:currentColor;
-}
-.t.s2:after,.k.s2:after{border-radius:2px}
-.t.s1:after,.k.s1:after{border-radius:50%}
-.t.s0:after,.k.s0:after{background:none;border:2px solid currentColor;border-radius:2px;opacity:.8}
-.t{--m:.2}
-.k{--m:.2}
-.k.s0:after,.t.s0:after{border-width:1.5px}
+@keyframes drop{from{opacity:0;transform:translateY(-12px) scale(.75)}}
+/* shape marks: triangle = right place, diamond = elsewhere, dot = absent */
+.t:after,.k:after{content:"";position:absolute;left:8%;top:8%;width:calc(var(--t,40px)*.22);height:calc(var(--t,40px)*.22);background:currentColor}
+.t.s2:after,.k.s2:after{clip-path:polygon(50% 0,100% 100%,0 100%)}
+.t.s1:after,.k.s1:after{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+.t.s0:after,.k.s0:after{border-radius:50%;transform:scale(.45);opacity:.9}
+.t:not(.s0):not(.s1):not(.s2):after,.k:not(.s0):not(.s1):not(.s2):after{display:none}
 
 #msg{
   flex:none;height:30px;margin:0 12px;display:flex;align-items:center;justify-content:center;text-align:center;
@@ -91,10 +82,9 @@ header{display:flex;align-items:center;gap:8px;padding:6px 12px 2px;flex:none}
 .k.wide svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
 .k.go{background:var(--acc);color:var(--acc-ink)}
 .k.s0{background:var(--abs);color:var(--abs-ink)}
-.k.s1{background:var(--gold);color:var(--gold-ink)}
+.k.s1{background:var(--lav);color:var(--lav-ink)}
 .k.s2{background:var(--acc);color:var(--acc-ink)}
-.k.s0:after,.k.s1:after,.k.s2:after{width:6px;height:6px;left:3px;top:3px}
-.k.s0:after{border-width:1.5px}
+.k:after{--t:30px;width:7px;height:7px;left:3px;top:3px}
 
 .btn{
   flex:1;min-height:50px;border-radius:14px;background:var(--panel);font-weight:700;font-size:15px;
@@ -141,12 +131,7 @@ header{display:flex;align-items:center;gap:8px;padding:6px 12px 2px;flex:none}
 #home{justify-content:center;gap:14px}
 .hbrand{text-align:center}
 .hbrand .demo{display:flex;justify-content:center;gap:6px;margin-bottom:14px}
-.hbrand .demo i{width:40px;height:40px;border-radius:9px;position:relative;font-style:normal;font-weight:800;font-size:22px;display:flex;align-items:center;justify-content:center;padding:5px 0 0 5px}
-.hbrand .demo i:after{content:"";position:absolute;left:5px;top:5px;width:7px;height:7px;background:currentColor}
-.demo .a{background:var(--acc);color:var(--acc-ink)}.demo .a:after{border-radius:2px}
-.demo .b{background:var(--gold);color:var(--gold-ink)}.demo .b:after{border-radius:50%}
-.demo .c{background:var(--abs);color:var(--abs-ink)}.hbrand .demo .c:after{background:none;border:1.5px solid currentColor;border-radius:2px}
-.demo .d{background:var(--acc);color:var(--acc-ink)}.demo .d:after{border-radius:2px}
+.hbrand .demo i{--t:40px;font-style:normal}
 .hbrand h1{font-size:38px;font-weight:800;color:var(--acc);line-height:1.1}
 .hbrand .sub{color:var(--dim);font-size:14px;margin-top:4px}
 .stat{background:var(--panel);border-radius:16px;padding:10px 14px;display:flex;align-items:center;gap:12px;min-height:66px}
@@ -193,9 +178,7 @@ header{display:flex;align-items:center;gap:8px;padding:6px 12px 2px;flex:none}
       <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
     </button>
     <div class="ttl"><span class="brand">Mot Tapi</span><span id="lvl">Niveau 1</span></div>
-    <button class="icon" id="bReset" aria-label="Recommencer">
-      <svg viewBox="0 0 24 24"><path d="M4 5v6h6M5 11a8 8 0 1 1 2 7"/></svg>
-    </button>
+    <div class="icon" style="background:none" aria-hidden="true"></div>
   </header>
   <div id="chal" hidden><svg viewBox="0 0 24 24"><path d="M5 3h2v18H5zM8 4h11l-3 4.500 3 4.500H8z"/></svg><span id="chalT"></span></div>
   <div id="goal"></div>
@@ -224,7 +207,7 @@ header{display:flex;align-items:center;gap:8px;padding:6px 12px 2px;flex:none}
 
   <section class="scr" id="home" hidden>
     <div class="hbrand">
-      <div class="demo" aria-hidden="true"><i class="a">M</i><i class="b">O</i><i class="c">T</i><i class="d">S</i></div>
+      <div class="demo" aria-hidden="true"><i class="t s2">M</i><i class="t s1">O</i><i class="t s0">T</i><i class="t s2">S</i></div>
       <h1>Mot Tapi</h1><div class="sub">Trouve le mot caché en 6 essais.</div>
     </div>
     <div class="stat" aria-label="Étoiles">
@@ -260,8 +243,8 @@ var KEY = 'mj:' + GAME + ':v1';
 var N = 20, MAXTRY = 6;
 
 /*DATA:BEGIN (generated by tools/mot-secret/build.js, do not edit by hand)*/
-var ANS="jnrj uaes dvkw vvyz bvhl xboka xwnvw kkrvm xwneu xhobh zdndl qtugki jbtekq nbeest jbcrrj hxdaea djbivej twxfnrj dqjyfet dnxjfit";
-var DICT={4:"abriacteagiraideaileaireamieangeanseaoutarmeaubeautoavisbaiebainbancbavebebebetebilebisebleublogboisbondbordboucboueboutbrasbrinbuisbusecafecagecalecanecapecasecavecerfchatchefchoucielcireciteclefclipcloucococodecoincotecoupcourcrancubecuircurecuvedaimdamedarddentdiredomedosedrapduelduneechoelanepeeetauetreetuiexilfacefaimfaitfardfauxfetefevefilefilmfilsflanflotfoiefoinfoisfondfortfourfuirgagegaingantgaregeaigitegnougoalgolfgonggoutgrisgruehaiehallhalohateideeirisjeanjoiejouejourjugejuinjupejurykilokoralaitlamelardlavelienlierlieulionlirelogeloupluneluxemainmaismalemaremarimarsmeremetsmidimielminemitemodemoismontmortmotomouemulenagenainnerfniernocenoirnoixnordnotenueenuitoeufogreonceondeorgeoserourspagepainpaixpapeparcpartpatepeauperepeurpiedpilepionpipeplanplatpoilpoispolepontportposeprixpucepullquairaceraierailramerangreinreverhumriderimerireriteriveroberolerondroserotirusesangscieseauseinsenssitesoiesoifsoinsoirsojasorttaietaxetaxiteletetethonthymtigetoittometourtractriotroutructubatubetuerurneuservaseveauveloventversvertvidevoeuvoievoirvoixvotezelezerozinczone",5:"abimeachatacieragentaideraigleaimeralbumalguealleealleramantamourancreangleanneeappelarbrearmeearretasileatoutavionavoiravrilbaguebalaiballebandebarbebarrebatirbidonbierebijoubilanblancbocalboireboitebombebornebotteboulebrisebruitbrumebuchebullecabricacaocadetcadrecalmecanalcanifcannecartecausecedercedrechairchampchantchaoschenechienchiotchosechuteciblecidreciterclowncoeurcoliscollecordecorpscotoncoudecourscraiecranecreercremecriercrisecroixcuirecyclecygnedansedattedebutdecordegatdelaidettediguedindedinerdoigtdorerdoutedramedureedurereclatecoleecranecriteffeteleveencreennuienvieepiceepineepouxessaietageetangetapeetudeevierexcesfablefaconfagotfairefarcefauvefermefichefiguefiletfillefixerfleurflutefoirefolieforetforgeformefossefouetfoulefoyerfreinfrerefrigofritefroidfrontfruitfuitefumeefumerfuseefusilgaffegamingardegazongemirgenougenregestegiletglaceglobegombogommegorgegraingreveguepeguidehachehainehalteharpeherbeherosheurehibouhiverhommehontehotelhuilehuttehyenehymneimageindexissuejambejaunejeterjeudijouerjouetjugerjurerkoalalacerlacetlainelancelapinlarmelassolaverleverlevrelignelistelitrelivrelogerlouerloyerlueurlundiluttelyceemaconmagiemairemallemardimargemarinmassematchmatinmelermelonmenermercimetalmetremetromixermoinemondemorsemotifmoulemoyenmuseenagernappenatteneigeneveunicheniecenoeudnoyaunoyernuagenuqueobeirobjetoceanodeuroffreombreoncleongleoperaorageordreorneroutilpagnepairepalmepandapannepaumepechepeinepellepepinperlepeserpharepianopiecepiegepincepisteplaceplageplaieplierplombpluieplumepochepoemepoidspoingpointpoirepolirpommeponeyporteposerpoucepouleprierpriseproiepuitspunirquartquetequeuerabotradioramerramperaserraterravinrayerrayonrecitreglereinerepasrestereverrhumerobotrocheroderromanrotirrougerouterubanrugbyruinesablesabotsalirsallesalonsalutsaucesaulesavonscenescoresemersignesingesiropsoeursoupesportstadestagestylosucresueursuitesujettabactabletachetalontantetapistartetassetatertempstenirtentetermeterretextethemetigretirertissutitretoiletonnetorsetracetraintraittributronctronetuyauunionusageusinevachevaguevalseveinevenirventeverrevestevetirvideovignevilleviservitrevivrevoilevolervoletvomirwagonzebre",6:"accentaccordacteuradulteagendaagneaualarmealcoolalerteamandeameneramitieamuserananasanimalanneauargentarmureaspectauteuravaleraveniravenueavocatbagagebaiserbalconballonbananebanquebarquebateaubattrebergerbeurrebilletblagueblousebouboubouclebougerbougiebourseboutonbriquebroderbrossebrulerbuffetbufflebureaucabanecabinecachercadeaucafardcahiercaissecalculcamioncampercanapecanardcarnetcartoncasquecassercendrecerclecerisechainechaisecharmechassechatoncheminchequechevalcheveucinemacirquecitronclasseclimatclochecochoncoffrecolerecollercombatcompascomptecontercopaincopiercopinecordoncornetcouchecoucoucoudrecoulercoupercourgecourircousincrayoncuissecuivredangerdanserdesertdessindestindetaildevoirdiabledjembedollardominodonnerdormirdouanedouchedragoneclairecorceecrireeleveremploienfantennemientreeentrerepauleepoqueequipeerreurespaceespritetireretoileeviterexamenfermerfeutrefigureflammeflaqueflechefleuvefloconfoncerfourmifraisegagnergaragegarcongateaugibiergiflergirafeglacongommergourdegoutergouttegoyavegrainegrangegriffegrottegroupeguerirguerrehanchehangarhasardhisserhuitrehumeurhurlerignameimiterindiceinvitejambonjardinjoueurjunglekimonolabourlacherlancerlanguelarcinlegumelettrelezardlimitelisserlivrerloutreluttermachermagnetmairiemaisonmaitremalademalicemanchemangermanguemaniocmaraismarchemariermarronmasquemefiermembremenacementirmentonmetiermeublemietteminuitminutemiroirmomentmontermontremoquermordremoteurmouchemoulinmourirmoutonmusclenarinenaturenavirenicherniveaunombrenommernumerooffriroignonoiseauopererorangeorteiloursonouvrirpagaiepaillepalaispanierpapayepapierparadepardonparentparfumparierparlerparolepatatepatronpavagepaysanpecherpedalependrepenserpercerpercheperdrepermispetalepetrirpeuplephoquepigeonpimentpinceepincerpiochepiquerpirateplaineplanteployerpoisonpoivrepolicepondreporcheposterpoudrepoumonpoutreprenompreterprinceprisonpriverprocesprojetpuiserpuzzleracineradeaurafaleraisinraisonrangerreagirregardregionregnerregretremuerrenardrendrerequinreseauresterretardretourrideaurincerrivagerocherroulerrucherrythmesablersaisirsaisonsaladesaluersamedisanglesautersavanesavoirsechersecretsentirserrerservirsieclesignalsillonsirenesoireesoleilsommetsonnersorghosortirsourcesourisstatuestudiosuivretalenttamtamtardertassertendretentertimbretissertomatetombertondretordretortuetracertresortricottroupetulipetunnelvaleurvalisevalleevaloirvantervendreventrevergerveriteverrouverserviandevioletviolonvisagevisitevisservoisinvolcanvoleurvoyageyaourtzigzag",7:"abeilleabricotaccueilacheteradresseajouterallumerampouleappelerarbitrearreterarrierearroserartisteasseoiratelierautobusautomneavancerbagarrebaignerbaisserbalafonbalancebalayerbaleinebiscuitblesserbloquerboissonbonheurbonjourboucherbouquetbranchebrillercabinetcailloucalepincarottecascadecerceaucerveauchagrinchaleurchambrechangerchansonchanterchapeaucharbonchargerchariotcharruechasserchateauchemisechiffonchiffrechoralecigogneciseauxciterneclaironclavierclochercoiffercolliercollinecolonnecompterconcertconfierconseilcorbeaucostumecouchercouloircouragecousinecouteaucouvertcouvrircrachercrapaudcravatecreusercrochetcuisinedallagedauphindeciderdessertdevenirdevinerdiamantdisputedocteurdossierdoublerdouleurdrapeaudresserecharpeechelleecouterecraserediteuremotionenleverenqueteenvoyerepinardepuiserequerreessayeressuyeretendreetudierevasionexempleexisterfacteurfacturefamillefatiguefenetrefermierfeuillefevrierficelleflamantflatterfleurirflotterfortunefossilefournirfrapperfrissonfromagefrottergaleriegalettegambadegardiengazellegencivegeneralglissergonflergorillegouffregraissegrandirgrattergreniergrillergrimpergrondergrossirguetterguitarehabiterhameconharicothauteurherbierhesiterheurterhonneurhopitalhorairehorizonhorlogeimposerinsecteinstantinviterirriterjanvierjoindrejonglerjournaljuilletjumellejusticekiosquelainagelaisserlampionlaurierlecteurlectureleopardlessivelibererlicornelisierelumierelunettelutteurmachinemagasinmaigrirmaillotmanettemanquermanteaumarchermariagemarmitemarquermarteaumassagematelasmedecinmelangemendiermessagemeuniermijoterminutermissionmitainemoineaumoissonmonnaiemorceaumurmuremusiquemysterenacellenoircirnourrirobligerobteniroccuperoctobreopinionorangeroreilleorgueiloublierouvrageouvrierpalettepalmierpanachepanneauparkingpassagepassionpaysagepecheurpeignerpeindrepelicanpelousepeluchepencherperdrixpinceaupiroguepiscineplacardplafondplaisirplancheplanterplongerplumeaupoigneepoignetpoinconpointerpoissonpommadepommierpompierpousserpoussinpouvoirprairiepresentprouverquitterrancunerapportrecettereciterrecolterefuserregalerreleverremplirrentrerreparerrepeterreponsereposerressortretenirretirerreussirrevenirricanerrisquerriviereriziererobinetrouillerouladesandalesecondesecouersemainesemblersentierserpentservicesifflersilencesoignersorciersouciersouliersoupconsourcilsourirespiraletableautabliertaillertambourtamisertapotertaureauteindretempeteterraintheatretonneautouchertournertournoitoussertrainertravailtraverstrempertressertrichertrompertroussetrouveruniversvaincrevanilleveillervendeurvillagevisitervitessevoisinevoiturevoyagervoyelle"};
+var ANS="jnrj dvkw uskj jayw uiej xboka xwnvw kkrvm xjekj myhbm xbpij jbcrrj jhutsw nbeest jhivkz qtugki djbivej dekynbw dqjyfet dnxjfit";
+var DICT={4:"abriacteagiraideaileaireamieanseaoutaubeautoavisbaiebainbancbavebebebetebilebisebleublogboisbondbordboucboueboutbrasbrinbuisbusecafecagecakecalecanecapecaricasecavecepecerfchatchefchoucielcimecireciteclanclefclicclipclouclubcococodecoincolaconecotecoupcourcoutcrancubecuircurecuvedaimdamedarddentdiredomedosedrapduelduneechoelanepeeetauetreetuiexilfacefaimfaitfardfauxfetefevefilefilmfilsflanflotfoiefoinfoisfondfortfourfuirgagegaingantgaregeaigitegnougoalgolfgonggoutgrisgruehaiehallhalohateideeirisjeanjoiejouejourjuinjupejurykilokoralaitlamelardlavelienlierlieulionlirelogeloupluneluxemainmaismalemaremarimarsmeremetsmidimielminemitemodemoismontmotomouemulenagenainnerfniernocenoirnoixnordnotenueenuitoeufogreonceondeorgeoserourspagepaiepainpaixpaonpapaparcparipartpatepavepayspeauperepeurpiedpilepionpipeplanplatpliepneupoilpoispolepontporeportposepotepoufprixpucepullpumaquairaceraierailramerangreinreverhumriderimerireriveroberolerondroserotirusescieseausenssitesoiesoifsoinsoirsojasorttaietaxetaxiteletetethonthymtigetoittometourtractriotroutructubatubeurneuservaseveauveloventversvertvidevoeuvoievoirvoixzelezerozinczone",5:"abimeachatacieragentaideraigleaimeralbumalguealleealleramourancreangleanneeappelarbrearmeearretatoutavionavoiravrilbaguebalaiballebandebarbebarrebatirbidonbijoubilanblancbocalboireboitebornebotteboulebrisebruitbrumebuchebullecabricacaocadetcadrecalmecanalcanifcannecarrecartecausecedercedrechairchampchantchaoschenechienchiotchosechuteciblecidreciterclowncoeurcoliscollecordecorpscotoncoudecourscraiecranecreercremecriercrisecuirecyclecygnedansedattedebutdecordegatdelaidettediguedindedinerdoigtdorerdoutedramedureedurereclatecoleecranecriteffeteleveencreennuienvieepiceepineepouxessaietageetangetapeetudeevierexcesfablefaconfagotfairefarcefauvefemmefermefichefiguefiletfillefixerflairfleurflutefoirefolieforetforgeformefossefouetfoulefoyerfreinfrerefrigofritefroidfrontfruitfuitefumeefumerfuseegaffegamingardegazongemirgenougenregestegiletglaceglobegombogommegorgegrainguepeguidehachehainehalteharpeherbeherosheurehibouhiverhommehontehotelhuilehuttehyenehymneimageindexissuejambejaunejeterjeudijouerjouetjugerjurerkoalalacerlacetlainelancelapinlarmelassolaverleverlevrelignelistelitrelivrelogerlouerloyerlueurlundiluttelyceemaconmagiemairemallemamanmardimargemarinmassematchmatinmelermelonmenermercimetalmetremetromixermondemorsemotifmoulemoyenmuseenagernappenatteneigeneveunicheniecenoeudnoyaunoyernuagenuqueobeirobjetoceanodeuroffreombreoncleongleoperaorageordreorneroutilpagnepairepalmepandapannepaumepechepeinepellepepinperlepeserpharepianopiecepiegepincepisteplaceplageplaieplierplombpluieplumepochepoemepoidspointpoirepolirpommeponeyporteposerpoucepoulepriseproiepuitspunirquartquetequeuerabotradioramerramperaserraterravinrayerrayonrecitreglereinerepasrestereverrhumerobotrocheroderromanrotirrougerouterubanrugbyruinesablesabotsalirsallesalonsalutsaucesaulesavonscenescoresemersignesingesiropsoeursoupesportstadestagestylosucresueursuitesujettabletachetalontangotantetapistarottartetassetatertaupetempstenirtentetenuetermeterretextethemetigretirertissutitretoiletonnetontetorsetotemtracetraintraittributronctronetuiletulletuyauunionusageusinevachevaguevalseveinevenirventeverrevestevetirvideovignevilleviservitrevivrevoilevolervoletvomirwagonzebre",6:"accentaccordacteuradulteagendaagneaualarmealerteamandeameneramitieamuserananasanimalanneauargentaspectauteuravaleraveniravenueavocatbagagebalconballonbamboubananebanquebarquebarrerbassinbateaubergerbesoinbeurrebidulebilletblagueblousebonbonbonnetbouboubouchebouclebougerbougiebourseboutonbriquebriserbroderbrossebrulerbuffetbufflebureaucabanecabinecachercadeaucafardcahiercaissecalculcamioncampercanapecanardcarnetcartoncasquecassercendrecerclecerisechainechaisecharmechassechatoncheminchequechevalcheveucinemacirquecitronclasseclimatclochecochoncoffrecolerecollercompascomptecontercopaincopiercopinecordoncornetcouchecoucoucoudrecoulercoupercourgecourircousincrayoncuissecuivredangerdanserdesertdessindestindetaildevoirdjembedollardominodonnerdormirdouchedragoneclairecorceecrireeleveremploienfantentreeentrerepauleepoqueequipeerreurespaceespritetireretoileeviterexamenfermerfeutrefigureflammeflaqueflechefleuvefloconfoncerfourmifraisegagnergaragegarcongateaugibiergirafeglacongommergourdegoutergouttegoyavegrainegrangegriffegrottegroupeguerirhanchehangarhasardhisserhuitrehumeurhurlerignameimiterindiceinvitejambonjardinjoueurjunglekimonolabourlacherlancerlanguelegumelettrelezardlimitelisserlivrerloutreluttermachermagnetmairiemaisonmaitremalademalicemanchemangermanguemaniocmaraismarchemariermarronmasquemasticmefiermembremenacementirmentonmetiermeublemietteminuitminutemiroirmodelemomentmontermontremoquermordremoteurmouchemoulinmoussemoutonmusclenarinenaturenavirenicherniveaunombrenommernumerooffriroignonoiseauopererorangeorteiloursonouvrirpagaiepaillepalaispanierpapayepapierparadepardonparentparfumparierparlerparolepatatepatronpavagepaysanpecherpedalependrepenserpercerpercheperdrepermispetalepetrirpeuplephoquepigeonpimentpinceepincerpiochepiquerpirateplaineplanteployerpoivrepolicepondreporcheposterpoudrepoumonpoutreprenompreterprincepriverprojetpuiserpuzzleracineradeaurafaleraisinraisonrangerreagirregardregionregnerregretremuerrenardrendrerequinreseauresterretardretourrideaurincerrivagerocherroulerrucherrythmesablersachetsaisirsaisonsaladesalivesaluersamedisanglesaumonsautersavanesavoirsechersecretsentirserrerservirsieclesignalsignersillonsirenesoireesoleilsommetsonnersorbetsorghosortiesortirsoupersourcesourisstablestatuestudiosucrersuivretalenttamtamtardertassertendretentertimbretissertomatetombertondretordretortuetracertresortricottroupetulipetunneltuteurvaleurvalisevalleevaloirvantervendreventrevergerveriteverrouverserviandevioletviolonvisagevisitevisservoisinvolcanvoyageyaourtzigzag",7:"abeilleabricotaccueilacheteradresseajouterallumerampouleappelerarbitrearreterarrierearroserartisteasseoiratelierautobusautomneavancerbaignerbaisserbalafonbalancebalayerbaleinebiscuitblesserbloquerboissonbonheurbonjourboucherbouquetbranchebrillercabinetcailloucalepincarottecascadecerceaucerveauchagrinchaleurchambrechangerchansonchanterchapeaucharbonchargerchariotcharruechasserchateauchemisechiffonchiffrechoralecigogneciseauxciterneclaironclavierclochercoiffercolliercollinecolonnecompterconcertconfierconseilcorbeaucostumecouchercouloircouragecousinecouteaucouvertcouvrircrapaudcravatecreusercrochetcuisinedallagedauphindeciderdessertdevenirdevinerdiamantdisputedocteurdossierdoublerdouleurdresserecharpeechelleecouterecraserediteuremotionenleverenqueteenvoyerepinardepuiserequerreessayeressuyeretendreetudierevasionexempleexisterfacteurfacturefamillefatiguefenetrefermierfeuillefevrierficelleflamantflatterfleurirflotterfortunefossilefournirfrapperfrissonfromagefrottergaleriegalettegambadegardiengazellegenciveglissergonflergorillegouffregraissegrandirgrattergreniergrillergrimpergrondergrossirguetterguitarehabiterhameconharicothauteurherbierhesiterheurterhonneurhopitalhorairehorizonhorlogeimposerinsecteinstantinviterirriterjanvierjoindrejonglerjournaljuilletjumellekiosquelainagelaisserlampionlaurierlecteurlectureleopardlessivelibererlicornelisierelumierelunettelutteurmachinemagasinmaigrirmaillotmanettemanquermanteaumarchermariagemarmitemarquermarteaumassagemasseurmatelasmatineemedecinmelangememoiremendiermessagemesurermeuniermijotermineraiminutermissionmitainemoineaumoissonmonnaiemontagemorceaumurmuremusiquemysterenacellenoircirnourrirobligerobteniroccuperoctobreopinionorangeroreilleorgueiloublierouvrageouvrierpalettepalmierpanachepanneauparkingpassagepassionpaysagepecheurpeignerpeindrepelicanpelousepeluchepencherperdrixpinceaupiroguepiscineplacardplafondplaisirplancheplanterplongerplumeaupoigneepoignetpoinconpointerpoissonpommadepommierpompierpousserpoussinpouvoirprairiepresentprouverquitterrancunerapportrecettereciterrecolterefuserregalerreleverremplirrentrerreparerrepeterreponsereposerressortretenirretirerreussirrevenirricanerrisquerriviereriziererobinetrouillerouladesandalesecondesecouersemainesemblersentierserpentservicesifflersilencesoignersouciersouliersoupconsourcilsourirespiraletableautabliertaillertambourtamisertapotertaureauteindretempeteterraintheatretonneautouchertournertournoitoussertrainertravailtraverstrempertressertrichertrompertroussetrouveruniversvaincrevanilleveillervendeurvillagevisitervitessevoisinevoiturevoyagervoyelle"};
 /*DATA:END*/
 
 var $ = function (id) { return document.getElementById(id); };
@@ -297,7 +280,7 @@ function emit(msg) {
 }
 
 // ---- persistence (always guarded: the game works without storage) ------------------
-var save = { level: 1, max: 1, stars: [], best: [], cur: null, chal: null };
+var save = { max: 1, stars: [], best: [], cur: null, chal: null };
 function nat(v, hi) { v = v | 0; return v < 0 ? 0 : v > hi ? hi : v; }
 function totalStars() { var t = 0; for (var i = 0; i < N; i++) t += save.stars[i] || 0; return t; }
 // A saved game is only trusted if every guess is a possible one.
@@ -323,7 +306,6 @@ function loadSave() {
     var s = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (s && typeof s === 'object') {
       save.max = Math.max(1, nat(s.max, N));
-      save.level = Math.min(Math.max(1, nat(s.level, N)), save.max);
       if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = nat(s.stars[i], 3);
       if (Array.isArray(s.best)) for (i = 0; i < N && i < s.best.length; i++) save.best[i] = nat(s.best[i], MAXTRY);
       if (s.cur && typeof s.cur === 'object') {
@@ -548,7 +530,6 @@ function finish(won) {
       save.stars[l] = Math.max(save.stars[l], g.stars);
       save.best[l] = save.best[l] ? Math.min(save.best[l], tries) : tries;
       if (l + 2 > save.max) save.max = Math.min(N, l + 2);
-      save.level = Math.min(N, l + 2);
       emit({ event: 'level_complete', level: l + 1, score: tries, stars: g.stars });
     }
   }
@@ -566,8 +547,8 @@ function showResult() {
     title = chal ? 'Défi relevé !' : tries === 1 ? 'Du premier coup !' : 'Bravo !';
     sub = 'Trouvé en ' + plural(tries, 'essai');
   } else {
-    title = chal ? 'Défi perdu' : 'Raté…';
-    sub = 'Le mot était';
+    title = chal ? 'Défi perdu' : 'Pas cette fois';
+    sub = chal ? 'Le mot reste secret.' : 'Six essais, le mot reste secret.';
   }
   $('wTitle').textContent = title;
   $('wSub').textContent = sub;
@@ -575,21 +556,22 @@ function showResult() {
   sh.hidden = !(g.won && !chal);
   sh.innerHTML = '';
   for (i = 0; i < 3; i++) sh.innerHTML += '<svg viewBox="0 0 24 24" class="' + (i < g.stars ? 'on' : '') + '"><use href="#star"/></svg>';
-  $('wWord').innerHTML = g.word.split('').map(function (c) { return '<b>' + c + '</b>'; }).join('');
-  if (g.won && !chal) {
-    rec = g.stars < 3 ? '3 étoiles en 3 essais ou moins' : '';
-  } else if (!g.won && !chal) rec = 'Tu y es presque. Retente !';
+  $('wWord').hidden = !g.won;   // a lost game never reveals the word
+  $('wWord').innerHTML = g.won ? g.word.split('').map(function (c) { return '<b>' + c + '</b>'; }).join('') : '';
+  if (g.won && !chal) rec = g.stars < 3 ? '3 étoiles en 3 essais ou moins' : '';
   $('wRec').textContent = rec;
   var c = $('wChal');
   c.hidden = !chal;
   if (chal) {
-    c.textContent = g.won ? 'Tu fais aussi bien que le défi.' : 'Il fallait ' + plural(g.target, 'essai') + ' ou moins.';
+    c.textContent = g.won ? 'Objectif atteint : ' + plural(tries, 'essai') + ' pour ' + g.target + ' permis.' : 'Il fallait ' + plural(g.target, 'essai') + ' ou moins.';
     c.className = 'cres' + (g.won ? '' : ' lost');
   }
   var last = g.lvl + 1 >= N;
   $('bNext').textContent = g.won && !chal ? (last ? 'Niveaux' : 'Suivant') : chal ? 'Accueil' : 'Niveaux';
   $('bAgain').textContent = g.won ? 'Rejouer' : 'Réessayer';
-  $('bShare').hidden = !g.won;
+  document.querySelector('.row2').hidden = chal;
+  $('bAgain').hidden = chal;      // a challenge is played once per opening
+  $('bShare').hidden = !g.won || chal;
   $('bShare').textContent = 'Partager';
   $('bChal').hidden = !g.won;
   $('bChal').textContent = chal ? 'Renvoyer le défi' : 'Défier un ami';
@@ -599,7 +581,7 @@ function showResult() {
   for (i = 0; i < old.length; i++) w.removeChild(old[i]);
   w.hidden = false;
   if (reduced || !g.won) return;
-  var cols = ['#4FD1B5', '#FFC53D', '#F4F1E8'];
+  var cols = ['#FF8A5B', '#B9A2FF', '#F4F1E8'];
   for (i = 0; i < 22; i++) {
     var b = document.createElement('div');
     b.className = 'bit';
@@ -614,17 +596,21 @@ function showResult() {
 function starsText(s) { var st = ''; while (s--) st += '⭐'; return st; }
 function shapes() {
   return g.guesses.map(function (gs) {
-    return evalGuess(gs, g.word).map(function (m) { return m === 2 ? '■' : m === 1 ? '●' : '□'; }).join('');
+    return evalGuess(gs, g.word).map(function (m) { return m === 2 ? '▲' : m === 1 ? '◆' : '·'; }).join('');
   }).join('\n');
 }
 function shareText() {
   return NAME + ' · Niveau ' + (g.lvl + 1) + ' · ' + starsText(starsFor(g.guesses.length)) + '\n' + shapes();
 }
-// The link base: MJ_CONFIG.shareBaseUrl, else the current address if it is http(s); otherwise no link.
+// The link base: origin + path of MJ_CONFIG.shareBaseUrl, else of the current address if it is http(s); otherwise no link.
+// Never the query string (the host app may carry a token or an id in it).
 function shareBase() {
-  var b = window.MJ_CONFIG && window.MJ_CONFIG.shareBaseUrl;
-  if (typeof b !== 'string' || !b) b = /^https?:/i.test(String(location.href)) ? String(location.href) : '';
-  return b.split('#')[0];
+  var raw = window.MJ_CONFIG && window.MJ_CONFIG.shareBaseUrl;
+  if (typeof raw !== 'string' || !raw) raw = String(location.href);
+  try {
+    var u = new URL(raw);
+    return /^https?:$/.test(u.protocol) ? u.origin + u.pathname : '';
+  } catch (e) { return ''; }
 }
 // Fragment: letters, digits and hyphens only.
 function challengeLink() {
@@ -696,7 +682,7 @@ function renderHome() {
   var t = totalStars();
   $('hTot').textContent = t + '/' + (N * 3);
   $('hBar').style.width = Math.round(t * 100 / (N * 3)) + '%';
-  $('bGo').textContent = 'Continuer · Niveau ' + save.level;
+  $('bGo').textContent = 'Continuer · Niveau ' + firstOpen();
 }
 var LOCK = '<svg viewBox="0 0 24 24"><path d="M7 10V8a5 5 0 0 1 10 0v2h1.500v10h-13V10zm2.500 0h5V8a2.500 2.500 0 0 0-5 0z"/></svg>';
 function renderLevels() {
@@ -704,7 +690,7 @@ function renderLevels() {
   var h = '';
   for (var i = 0; i < N; i++) {
     var n = i + 1, locked = n > save.max, s = save.stars[i];
-    h += '<button class="cell' + (s ? ' ok' : '') + (n === save.level ? ' cur' : '') + '" data-level="' + n + '"' + (locked ? ' disabled' : '') +
+    h += '<button class="cell' + (s ? ' ok' : '') + (n === firstOpen() ? ' cur' : '') + '" data-level="' + n + '"' + (locked ? ' disabled' : '') +
       ' aria-label="Niveau ' + n + (locked ? ', verrouillé' : ', ' + s + ' étoile' + (s > 1 ? 's' : '')) + '">' +
       '<span class="n">' + (locked ? LOCK : n) + '</span><span class="s">' +
       '<svg viewBox="0 0 24 24" class="' + (s > 0 ? 'on' : '') + '"><use href="#star"/></svg>' +
@@ -712,6 +698,11 @@ function renderLevels() {
       '<svg viewBox="0 0 24 24" class="' + (s > 2 ? 'on' : '') + '"><use href="#star"/></svg></span></button>';
   }
   $('grid').innerHTML = h;
+}
+// "Continuer" always points at the first level not yet finished (replaying an old level does not move it).
+function firstOpen() {
+  for (var i = 0; i < N; i++) if (!save.stars[i]) return Math.min(i + 1, save.max);
+  return N;
 }
 // Back to the normal run (leaves a challenge without saving it).
 function startNormal(n) {
@@ -721,18 +712,17 @@ function startNormal(n) {
 function playLevel(n) {
   save.chal = null;
   if (save.cur && save.cur.level !== n) save.cur = null;
-  save.level = n;
   store();
   startNormal(n);
   show('game');
 }
-function goContinue() { playLevel(save.level); }
-function restart() {
-  if (!g) return;
-  var t = g.target;
-  if (t) save.chal = null; else save.cur = null;
+function goContinue() { playLevel(firstOpen()); }
+// After a loss or a win: a fresh game of the same level (never offered in the middle of a game).
+function again() {
+  if (!g || !g.over || g.target) return;
+  save.cur = null;
   store();
-  startGame(g.lvl, null, t);
+  startGame(g.lvl, null, 0);
   if (screen !== 'game') show('game');
 }
 
@@ -784,22 +774,21 @@ onTap($('grid'), function (e) {
   if (c && !c.disabled) playLevel(+c.getAttribute('data-level'));
 });
 onTap($('bMap'), function () { leaveToLevels(); });
-onTap($('bReset'), restart);
 onTap($('bGo'), goContinue);
 onTap($('bLevels'), function () { show('levels'); });
 onTap($('bLBack'), function () { show('home'); });
 onTap($('bResume'), goContinue);
 function leaveToLevels() {
-  if (g && g.target) { save.chal = null; store(); startNormal(save.level); }
+  if (g && g.target) { save.chal = null; store(); startNormal(firstOpen()); }
   show('levels');
 }
 onTap($('bNext'), function () {
   if (g.target) {   // challenge over: back to the normal run
-    startNormal(save.level); show('home');
+    startNormal(firstOpen()); show('home');
   } else if (g.won && g.lvl + 1 < N) { playLevel(g.lvl + 2); }
   else show('levels');
 });
-onTap($('bAgain'), restart);
+onTap($('bAgain'), again);
 onTap($('bShare'), function () { sendText(shareText(), 'result', $('bShare')); });
 onTap($('bChal'), function () { sendText(challengeText(), 'challenge', $('bChal')); });
 document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
@@ -815,7 +804,7 @@ if (save.chal) {   // a challenge in progress is resumed where it was
   show('game');
 } else {
   save.chal = null;
-  startNormal(save.level);
+  startNormal(firstOpen());
   show('home');
 }
 if (/^#defi-/.test(location.hash)) openChallenge();
@@ -840,7 +829,7 @@ window.__game = {
       keys: keyStates(),
       msg: lastMsg,
       challenge: g.target ? { level: g.lvl + 1, target: g.target } : null,
-      save: { level: save.level, max: save.max, stars: save.stars.slice(), best: save.best.slice() },
+      save: { level: firstOpen(), max: save.max, stars: save.stars.slice(), best: save.best.slice() },
       total: totalStars()
     };
   },

@@ -49,6 +49,10 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
     }
   }, { save: opts.save || null, raw: opts.raw === undefined ? null : opts.raw, key: KEY, config: opts.config || null, share: opts.share || '', nostore: !!opts.nostore });
   const page = await context.newPage();
+  // the game ignores two taps closer than 100 ms: locator taps are spaced, raw touchscreen taps are not
+  const loc = page.locator.bind(page);
+  let lastTap = 0;
+  page.locator = (sel, o) => { const l = loc(sel, o), t = l.tap.bind(l); l.tap = async x => { const w = 105 - (Date.now() - lastTap); if (w > 0) await page.waitForTimeout(w); const r = await t(x); lastTap = Date.now(); return r; }; return l; };
   page.on('console', m => { if (m.type() === 'error') problems.push('console.error: ' + m.text()); });
   page.on('pageerror', e => problems.push('pageerror: ' + e.message));
   page.on('request', r => { if (r.url().split('#')[0] !== URL) problems.push('request: ' + r.url()); });
@@ -119,7 +123,7 @@ async function test(name, fn) {
   }
 }
 const stars = (n, v) => new Array(n).fill(v);
-const OPEN_SAVE = { seed: 3, att: 0, level: 1, max: 20, stars: stars(20, 0), best: stars(20, 0), cur: null };   // every level unlocked
+const OPEN_SAVE = { seed: 3, att: 0, max: 20, stars: [1, 1, 1, ...stars(17, 0)], best: stars(20, 0), cur: null };   // levels 1-3 done: "Continuer" points at 4   // every level unlocked
 
 // Layout of what is on screen: page scroll, tap targets, bounds, clipped text.
 const measure = page => page.evaluate(() => {
@@ -511,7 +515,7 @@ function checkFit(m, label) {
 
   await test('challenge link: opens a locked level with one goal, equal score wins, nothing saved is touched', async () => {
     const save = { seed: 5, att: 3, level: 2, max: 2, stars: [3, ...stars(19, 0)], best: [900, ...stars(19, 0)], cur: null };
-    const { context, page } = await open({ width: 360, height: 640 }, { save, hash: '#defi-9-1000' });
+    const { context, page } = await open({ width: 360, height: 640 }, { save, hash: '#defi-9-1000', share: 'ok', config: { shareBaseUrl: 'https://exemple.test/jeux/cinq' } });
     await page.evaluate(() => window.__game.freeze(true));
     const before = await stored(page);
     let s = await state(page);
@@ -529,15 +533,24 @@ function checkFit(m, label) {
     assert.equal(s.game.score, 1000);
     assert.deepEqual(s.game.challenge, { target: 1000, won: true });
     assert.match(await page.locator('#rTitle').textContent(), /Défi relevé/);
-    for (const id of ['#bRNext', '#bShare', '#bChal']) assert.equal(await page.locator(id).isHidden(), true, id);
+    for (const id of ['#bRNext', '#bShare']) assert.equal(await page.locator(id).isHidden(), true, id);
     assert.equal(await page.locator('#bHome').isVisible(), true);
     const res = await events(page, 'challenge_result');
     assert.deepEqual(res, [{ source: 'mini-jeu', game: 'cinq-sur-cinq', event: 'challenge_result', level: 9, score: 1000, target: 1000, won: true }]);
     assert.equal((await events(page, 'level_complete')).length, 0);
     assert.equal(await stored(page), before, 'progress must not change');
     await shot(page, 'challenge-won');
-    // lost: replay and miss
-    await page.locator('#bAgain').tap();
+    // R3: one play per opening: no replay, the result event left once, "Renvoyer le défi" only because it was won
+    assert.equal(await page.locator('#bAgain').isHidden(), true);
+    assert.equal(await page.locator('#bChal').isVisible(), true);
+    assert.match(await page.locator('#bChal').textContent(), /Renvoyer le défi/);
+    await page.waitForTimeout(300);
+    assert.equal((await events(page, 'challenge_result')).length, 1);
+    await page.locator('#bChal').tap();
+    assert.match((await shared(page))[0], /#defi-9-1000$/);
+    // lost: open the link again
+    await page.evaluate(() => { location.hash = '#defi-9-1000'; });
+    await page.waitForFunction(() => window.__game.state().screen === 'game');
     s = await state(page);
     assert.deepEqual(s.game.challenge, { target: 1000, won: null }); assert.equal(s.game.index, 0);
     await playHooks(page, [true, true, true, false, true]);
@@ -545,6 +558,8 @@ function checkFit(m, label) {
     assert.match(await page.locator('#rTitle').textContent(), /Défi perdu/);
     const res2 = await events(page, 'challenge_result');
     assert.equal(res2.length, 2); assert.equal(res2[1].won, false); assert.equal(res2[1].target, 1000); assert.ok(res2[1].score < 1000);
+    assert.equal(await page.locator('#bAgain').isHidden(), true);
+    assert.equal(await page.locator('#bChal').isHidden(), true, 'a lost challenge is not sent back');
     assert.equal(await stored(page), before);
     await page.locator('#bHome').tap();
     s = await state(page);
@@ -554,7 +569,7 @@ function checkFit(m, label) {
   });
 
   await test('challenge link while a game is running: the saved game and progress are untouched', async () => {
-    const { context, page } = await open({ width: 360, height: 640 }, { save: OPEN_SAVE });
+    const { context, page } = await open({ width: 360, height: 640 }, { save: { ...OPEN_SAVE, stars: [1, 1, ...stars(18, 0)] } });
     await fresh(page, 3, 9);
     await playHooks(page, [true, false]);
     const before = await stored(page);
@@ -574,7 +589,7 @@ function checkFit(m, label) {
   });
 
   await test('malformed challenge fragments are ignored silently', async () => {
-    const hashes = ['#defi-', '#defi-0-5', '#defi-21-5', '#defi-5-0', '#defi-5-1001', '#defi-5-99999', '#defi-a-b', '#defi-5-640-x', '#defi--5-6',
+    const hashes = ['#defi-', '#defi-0-5', '#defi-21-5', '#defi-5-0', '#defi-5-99', '#defi-5-50', '#defi-5-1001', '#defi-5-99999', '#defi-a-b', '#defi-5-640-x', '#defi--5-6',
       '#defi-5-6.5', '#defi-005-640x', '#defi-3', '#defi-%00-1', '#defi-<b>-1', '#defi-1e3-5', '#nimportequoi'];
     for (const hash of hashes) {
       const { context, page } = await open({ width: 360, height: 640 }, { hash });
@@ -616,6 +631,154 @@ function checkFit(m, label) {
     await page.locator('.cell[data-n="2"]').tap();
     assert.equal((await state(page)).game.level, 2);
     await context.close();
+  });
+
+  await test('R4: the shared link is origin + pathname + fragment only, never the query string (http address with ?token=)', async () => {
+    const context = await browser.newContext({ ...MOBILE, viewport: { width: 360, height: 640 } });
+    await context.route('https://exemple.test/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: fs.readFileSync(FILE, 'utf8') }));
+    await context.addInitScript(() => {
+      window.__shared = [];
+      Object.defineProperty(navigator, 'share', { configurable: true, value: async d => { window.__shared.push(d.text); } });
+    });
+    const page = await context.newPage();
+    page.on('pageerror', e => problems.push('pageerror: ' + e.message));
+    await page.goto('https://exemple.test/jeux/cinq/index.html?token=SECRET123&n=7');
+    await page.waitForFunction(() => !!window.__game);
+    await fresh(page, 1);
+    await playHooks(page, [true, true, true, true, true]);
+    await page.waitForTimeout(450);
+    await page.locator('#bChal').tap();
+    const sh = await shared(page);
+    assert.equal(sh.length, 1);
+    assert.ok(sh[0].endsWith('https://exemple.test/jeux/cinq/index.html#defi-1-1000'), sh[0]);
+    assert.ok(!/token|SECRET|\?|n=7/.test(sh[0]), sh[0]);
+    await context.close();
+    // a configured base with a query is cleaned too
+    const o = await open({ width: 360, height: 640 }, { share: 'ok', config: { shareBaseUrl: 'https://exemple.test/a/b?token=ZZZ#frag' } });
+    await fresh(o.page, 1);
+    await playHooks(o.page, [true, true, true, true, true]);
+    await o.page.waitForTimeout(450);
+    await o.page.locator('#bChal').tap();
+    const t = (await shared(o.page))[0];
+    assert.ok(t.endsWith('https://exemple.test/a/b#defi-1-1000') && !/ZZZ|token/.test(t), t);
+    await o.context.close();
+  });
+
+  await test('R5: nothing in the DOM tells which answer is right before the player answers (all 100 questions)', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { save: OPEN_SAVE, share: 'ok' });
+    for (let n = 1; n <= 20; n++) {
+      await fresh(page, n);
+      for (let q = 0; q < 5; q++) {
+        const r = await page.evaluate(() => {
+          const btns = [...document.querySelectorAll('#ans .a')];
+          const sig = b => JSON.stringify([b.className, b.disabled, [...b.attributes].map(a => a.name).sort(), [...b.querySelectorAll('*')].map(e => e.outerHTML.replace(/>[^<]*</g, '><'))]);   // markup identical once the label text is removed
+          const g = window.__game.state().game;
+          return { sigs: [...new Set(btns.map(sig))].length, ds: btns.map(b => b.getAttribute('data-d')).join(''), html: document.documentElement.outerHTML, ans: document.getElementById('ans').outerHTML, g };
+        });
+        const q0 = DATA[n - 1].qs[q];
+        assert.equal(r.sigs, 1, `answer buttons differ before answering: ${q0.q}`);
+        assert.equal(r.ds, '0123');
+        assert.ok(!/class="[^"]*\b(right|wrong|dim)\b/.test(r.html.split('<script>')[0].replace(/<style[\s\S]*?<\/style>/, '')), 'a revealed class is present');
+        // the DOM (outside the script) holds each option text exactly once, as the label of its button, and no attribute carries a text
+        const dom = r.html.split('<script>')[0];
+        for (const t of [q0.a, ...q0.w]) {
+          const esc = t.replace(/&/g, '&amp;');
+          assert.equal(dom.split('>' + esc + '<').length - 1, 1, 'option text count: ' + t);
+          assert.ok(!new RegExp('="[^"]*' + esc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[^"]*"').test(r.ans), 'text in an attribute: ' + t);
+        }
+        await page.evaluate(() => { window.__game.answer(0); window.__game.next(); });
+      }
+    }
+    await context.close();
+  });
+
+  await test('R6: "Continuer" points at the first unfinished level; replaying an old level moves nothing', async () => {
+    const save = { seed: 2, att: 0, max: 4, stars: [3, 2, 0, 0, ...stars(16, 0)], best: stars(20, 0), cur: null };
+    const { context, page } = await open({ width: 360, height: 640 }, { save });
+    assert.match(await page.locator('#bGo').textContent(), /Continuer · Niveau 3/);
+    await page.locator('#bLevels').tap();
+    assert.equal(await page.locator('.cell.cur').getAttribute('data-n'), '3');
+    await page.locator('.cell[data-n="1"]').tap();
+    await playHooks(page, [true, true, true, true, true]);
+    assert.equal((await state(page)).game.won, true);
+    await page.evaluate(() => window.__game.loadLevel(1));
+    await playHooks(page, [false, false, false, true, true]);   // lost replay of level 1
+    assert.equal((await state(page)).game.won, false);
+    await page.evaluate(() => window.__game.loadLevel(1));
+    await page.locator('#bMap').tap();   // leave mid-game
+    await page.locator('#bGBack').tap();
+    assert.match(await page.locator('#bGo').textContent(), /Continuer · Niveau 3/);
+    assert.equal((await state(page)).level, 3);
+    // finishing level 3 moves it to 4; a win on level 2 afterwards does not move it back
+    await page.locator('#bGo').tap();
+    assert.equal((await state(page)).game.level, 3);
+    await playHooks(page, [true, true, true, true, true]);
+    await page.locator('#bRNext').tap();
+    assert.equal((await state(page)).game.level, 4);
+    await page.evaluate(() => window.__game.loadLevel(2));
+    await playHooks(page, [true, true, true, true, true]);
+    await reload(page);
+    await page.waitForFunction(() => !!window.__game);
+    assert.match(await page.locator('#bGo').textContent(), /Continuer · Niveau 4/);
+    await context.close();
+  });
+
+  await test('R7: the shared text marks right and wrong with distinct shapes, not colours alone', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { share: 'ok' });
+    await fresh(page, 1);
+    await playHooks(page, [true, false, true, true, false]);
+    await page.waitForTimeout(450);
+    await page.locator('#bShare').tap();
+    const t = (await shared(page))[0];
+    assert.ok(t.includes('✅❌✅✅❌'), t);   // check mark vs cross: two different glyphs, readable without colour
+    assert.ok(!/[🟩🟥🟨🟦🟪⬛⬜🟧🟫]/u.test(t), 'coloured squares in the share text');
+    await context.close();
+  });
+
+  await test('double taps: a tap never answers the next question, nor reaches the screen that replaces the button', async () => {
+    const { context, page } = await open({ width: 360, height: 640 });
+    await fresh(page, 5);
+    const centre = sel => page.evaluate(q => { const r = document.querySelector(q).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }, sel);
+    const tapAt = ([x, y]) => page.touchscreen.tap(x, y);
+    const A = [0, 1, 2, 3].map(d => `#ans .a[data-d="${d}"]`);
+    // 1. two taps on the same answer: one answer only
+    const a0 = await centre(A[0]);
+    await tapAt(a0); await tapAt(a0);
+    let g = (await state(page)).game;
+    assert.equal(g.results.length, 1); assert.equal(g.index, 0);
+    // 2. "Suivante" then at once a tap on an answer: the new question stays unanswered
+    const nx = await centre('#bNext');
+    await page.waitForTimeout(150);
+    await tapAt(nx); await tapAt(await centre(A[1]));
+    g = (await state(page)).game;
+    assert.equal(g.index, 1); assert.equal(g.answered, false); assert.equal(g.results.length, 1);
+    // 3. a tap on an answer then at once on "Suivante": still on the revealed question
+    await page.waitForTimeout(150);
+    await tapAt(await centre(A[2]));
+    await tapAt(nx);
+    g = (await state(page)).game;
+    assert.equal(g.index, 1); assert.equal(g.answered, true); assert.equal(g.results.length, 2);
+    // 4. the last "Résultat" tap followed by taps all over the result card changes nothing
+    for (let q = 0; q < 3; q++) { await page.evaluate(() => { window.__game.next(); window.__game.answer(0); }); }
+    const before = await state(page);
+    assert.equal(before.game.finished, true);
+    await page.waitForTimeout(150);
+    await tapAt(nx);
+    for (const y of [330, 420, 470]) await tapAt([180, y]);   // where the card buttons appear, within the guard window
+    const after = await state(page);
+    assert.equal(after.screen, 'result');
+    assert.equal(after.att, before.att);
+    assert.equal(after.game.level, 5);
+    assert.deepEqual((await msgs(page)).filter(m => m.event === 'share'), []);
+    // 5. a press that starts on one element and ends on another does nothing
+    await page.waitForTimeout(150);
+    await context.close();
+    const o = await open({ width: 360, height: 640 });
+    await fresh(o.page, 2);
+    await o.page.evaluate(() => { const a = document.querySelector('#ans .a[data-d="0"]'), b = document.querySelector('#ans .a[data-d="1"]');
+      a.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); b.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })); });
+    assert.equal((await state(o.page)).game.answered, false);
+    await o.context.close();
   });
 
   const heaviest = (() => {   // the level whose questions and answers are the longest

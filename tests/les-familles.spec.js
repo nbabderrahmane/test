@@ -21,11 +21,16 @@ const DATA = require('../tools/les-familles/data');
 const VERIFY = require('../tools/les-familles/verify');
 const BUILD = require('../tools/les-familles/build');
 const NAME = 'Qui va où';
-const EMOJI = ['🟨', '🟩', '🟦', '🟪'];
+const SHAPES = ['\u271A', '\u2665', '\u2726', '\u25B2'];   // plus, heart, star, triangle
 
 const fam = (n, f) => DATA.GRIDS[n - 1][f][1];                 // the 3 words of family f of grid n
 const famName = (n, f) => DATA.TAGS[DATA.GRIDS[n - 1][f][0]];
 const allWords = n => DATA.GRIDS[n - 1].flatMap(f => f[1]);
+// a saved game in progress for level 3: stored with words, never with tile numbers
+const savedCur = () => {
+  const w = allWords(3), k = ws => ws.slice().sort().join('|');
+  return { n: 3, roll: 0, err: 1, order: w.slice().reverse(), found: [2], tried: [k([w[0], w[3], w[6]])], sel: [w[0]] };
+};
 
 let browser;
 const problems = [];   // console errors, page errors, unexpected requests (all pages)
@@ -55,8 +60,12 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
   const page = await context.newPage();
   page.on('console', m => { if (m.type() === 'error') problems.push('console.error: ' + m.text()); });
   page.on('pageerror', e => problems.push('pageerror: ' + e.message));
-  page.on('request', r => { if (r.url().split('#')[0] !== URL) problems.push('request: ' + r.url()); });
-  await page.goto(URL + (opts.hash || ''));
+  const own = opts.httpUrl ? opts.httpUrl.split('?')[0] : URL;
+  page.on('request', r => { if (r.url().split('#')[0].split('?')[0] !== own) problems.push('request: ' + r.url()); });
+  if (opts.httpUrl) {   // serve the game from a fake http(s) address (with a query string) to test the link base
+    await page.route(own + '**', route => route.fulfill({ status: 200, contentType: 'text/html', body: fs.readFileSync(FILE, 'utf8') }));
+    await page.goto(opts.httpUrl + (opts.hash || ''));
+  } else await page.goto(URL + (opts.hash || ''));
   await page.waitForFunction(() => !!window.__game);
   return { context, page };
 }
@@ -271,7 +280,7 @@ function checkFit(m, tag) {
   });
 
   // ---------------------------------------------------------------- mistakes, failure
-  await test('mistakes: "pas ensemble", "presque", duplicates, the fourth selection, clear, three errors then the fourth ends the game', async () => {
+  await test('mistakes: "pas ensemble", "deux sur trois", duplicates, the fourth selection, clear, three errors then the fourth ends the game', async () => {
     const { context, page } = await open();
     await load(page, 6);
     const A = fam(6, 0), B = fam(6, 1), C = fam(6, 2), D = fam(6, 3);
@@ -297,9 +306,9 @@ function checkFit(m, tag) {
     await tapWords(page, [D[2]], false);                          // un-select by tapping again
     assert.equal((await state(page)).selected.length, 2);
     await tapButton(page, '#bClear');
-    await tapWords(page, [A[0], A[1], B[0]]);                     // two of one family: "presque"
+    await tapWords(page, [A[0], A[1], B[0]]);                     // two of one family
     s = await state(page);
-    assert.equal(s.errors, 2); assert.match(s.msg, /presque/i);
+    assert.equal(s.errors, 2); assert.match(s.msg, /deux sur trois/i);
     await shot(page, 'close');
     await tapButton(page, '#bClear');
     await tapWords(page, [A[1], B[1], C[1]]);
@@ -310,7 +319,11 @@ function checkFit(m, tag) {
     await tapWords(page, [D[0], D[1], A[2]]);                     // fourth error
     s = await state(page);
     assert.equal(s.status, 'lost'); assert.equal(s.errors, 4); assert.equal(s.tiles.length, 0);
-    assert.equal(await page.locator('.band.rev').count(), 4, 'the families are shown');
+    // R2: a lost level does not give the solution away
+    assert.equal(await page.locator('.band').count(), 0, 'no family is revealed');
+    assert.equal(await page.locator('.tile').count(), 12);
+    const app = await page.evaluate(() => document.getElementById('app').innerHTML);
+    [0, 1, 2, 3].forEach(f => assert.ok(!app.includes(famName(6, f)), 'the name of a family leaks after a loss: ' + famName(6, f)));
     assert.ok(await page.locator('#bOk').isDisabled());
     await page.locator('#win').waitFor({ state: 'visible' });
     assert.equal((await page.locator('#wTitle').textContent()).trim(), 'Dommage');
@@ -321,7 +334,8 @@ function checkFit(m, tag) {
     let st = JSON.parse(await stored(page));
     assert.equal(st.cur, null); assert.equal(st.max, 1, 'a lost level unlocks nothing'); assert.equal(st.stars[5], 0);
     const oldOrder = s.order;
-    await page.locator('#bAgain').tap();                          // Rejouer: fresh game, another layout
+    assert.equal((await page.locator('#bAgain').textContent()).trim(), 'Réessayer');
+    await page.locator('#bAgain').tap();                          // fresh game, another layout
     s = await state(page);
     assert.equal(s.errors, 0); assert.equal(s.status, 'play'); assert.equal(s.tiles.length, 12);
     assert.notDeepEqual(s.order, oldOrder, 'a replay mixes the tiles again');
@@ -407,17 +421,19 @@ function checkFit(m, tag) {
   });
 
   await test('corrupted or absent saves: the game starts clean (level 1) and keeps working', async () => {
-    const good = { n: 3, roll: 0, err: 1, order: [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0], found: [2], tried: ['0-3-6'], sel: [0] };
+    const good = savedCur();
     const cases = [
       ['not json {{', 1],
       ['null', 1], ['[]', 1], ['42', 1], ['"text"', 1],
       [JSON.stringify({ max: 'x', stars: 'y', cur: { n: 99 } }), 1],
       [JSON.stringify({ max: 999, stars: [9, -1, 'a', null, 1.5], cur: 7 }), 1],
-      [JSON.stringify({ max: 3, stars: new Array(20).fill(3), cur: { ...good, order: [0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] } }), 20],
-      [JSON.stringify({ max: 3, stars: [], cur: { ...good, err: 7 } }), 3],
-      [JSON.stringify({ max: 3, stars: [], cur: { ...good, sel: [6] } }), 3],      // selection inside a found family
-      [JSON.stringify({ max: 3, stars: [], cur: { ...good, found: [0, 1, 2] } }), 3],
-      [JSON.stringify({ max: 3, stars: [], cur: { ...good, tried: [{ a: 1 }] } }), 3],
+      [JSON.stringify({ max: 3, stars: new Array(20).fill(3), cur: { ...good, order: allWords(3).slice(1).concat(['mangue']) } }), 20],
+      [JSON.stringify({ max: 3, stars: [3, 3], cur: { ...good, err: 7 } }), 3],
+      [JSON.stringify({ max: 3, stars: [3, 3], cur: { ...good, sel: [fam(3, 2)[0]] } }), 3],      // selection inside a found family
+      [JSON.stringify({ max: 3, stars: [3, 3], cur: { ...good, found: [0, 1, 2] } }), 3],
+      [JSON.stringify({ max: 3, stars: [3, 3], cur: { ...good, tried: ['0-3-6'] } }), 3],
+      [JSON.stringify({ max: 3, stars: [3, 3], cur: { ...good, order: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] } }), 3],
+      [JSON.stringify({ max: 3, stars: [3, 3], cur: { ...good, tried: [{ a: 1 }] } }), 3],
     ];
     for (const [raw, expectedNext] of cases) {
       const { context, page } = await open({ width: 360, height: 640 }, { save: raw });
@@ -465,7 +481,9 @@ function checkFit(m, tag) {
     let shared = await page.evaluate(() => window.__shared);
     assert.equal(shared.length, 1);
     assert.deepEqual(s.found.map(f => f.color), [2, 0, 3, 1]);
-    const colors = s.found.map(f => EMOJI[f.color]).join('');
+    const colors = s.found.map(f => SHAPES[f.color]).join(' ');
+    assert.equal(new Set(colors.split(' ')).size, 4, 'four distinct shapes');
+    assert.ok(!/[\u{1F7E5}-\u{1F7EB}]/u.test(shared[0]), 'no coloured squares');
     assert.equal(shared[0], `${NAME} · Niveau 4 · ⭐⭐ ${colors}`);
     assert.equal(s.found.length, 4);
     allWords(4).forEach(w => assert.ok(!shared[0].includes(w), 'the shared text leaks ' + w));
@@ -500,7 +518,7 @@ function checkFit(m, tag) {
       return { t, ev };
     };
     let r = await run({ config: { shareBaseUrl: 'https://jeux.example.org/les-familles/' } });
-    assert.match(r.t, /^Qui va où · Niveau 4 en 1 erreur\. À toi de faire mieux ! https:\/\/jeux\.example\.org\/les-familles\/#defi-4-1$/);
+    assert.match(r.t, /^Qui va où · Niveau 4 en 1 erreur\. Fais aussi bien, ou mieux ! https:\/\/jeux\.example\.org\/les-familles\/#defi-4-1$/);
     assert.match(r.t.split('#')[1], /^defi-[A-Za-z0-9-]+$/);
     assert.deepEqual(r.ev.map(e => e.kind), ['challenge']);
     allWords(4).forEach(w => assert.ok(!r.t.includes(w)));
@@ -525,34 +543,44 @@ function checkFit(m, tag) {
     for (let f = 0; f < 3; f++) await tapWords(page, fam(7, f));
     await page.locator('#win').waitFor({ state: 'visible' });
     assert.equal((await page.locator('#wTitle').textContent()).trim(), 'Défi relevé !');
-    assert.ok(await page.locator('#bNext').isHidden() && await page.locator('#rowS').isHidden());
+    // R3: no retry; only "Renvoyer le défi" (met) and "Accueil"
+    assert.ok(await page.locator('#bNext').isHidden() && await page.locator('#bShare').isHidden() && await page.locator('#bAgain').isHidden());
+    assert.equal((await page.locator('#bChal').textContent()).trim(), 'Renvoyer le défi');
+    assert.equal((await page.locator('#bBack').textContent()).trim(), 'Accueil');
+    assert.equal(await page.locator('#bRestart').count(), 0);
     assert.equal(await stored(page), null, 'a challenge never writes the save');
     assert.deepEqual((await events(page, 'challenge_result')).map(e => [e.level, e.score, e.target, e.won]), [[7, 1, 1, true]]);
     assert.equal((await events(page, 'level_complete')).length, 0);
     await shot(page, 'challenge-won');
-    await page.locator('#bAgain').tap();                                // replay the challenge
-    s = await state(page);
-    assert.equal(s.mode, 'chal'); assert.equal(s.errors, 0); assert.deepEqual(s.challenge, { target: 1 });
-    await play(page, [fam(7, 0)[0], fam(7, 1)[0], fam(7, 2)[0]]);       // missed: 2 errors for a goal of 1
+    // opening the link again is a new opening: missed (2 errors for a goal of 1), then lost (4 errors)
+    const reopen = async hash => {
+      await page.locator('#bBack').tap();
+      await page.evaluate(h => { location.hash = h; }, hash);
+      await page.waitForFunction(() => window.__game.state().mode === 'chal' && window.__game.state().errors === 0);
+    };
+    await reopen('#defi-7-1');
+    await play(page, [fam(7, 0)[0], fam(7, 1)[0], fam(7, 2)[0]]);
     await play(page, [fam(7, 0)[1], fam(7, 1)[1], fam(7, 2)[1]]);
     for (let f = 0; f < 3; f++) await play(page, fam(7, f));
     await page.locator('#win').waitFor({ state: 'visible' });
     assert.equal((await page.locator('#wTitle').textContent()).trim(), 'Défi manqué');
-    await page.locator('#bAgain').tap();                                // lost: four errors
+    assert.ok(await page.locator('#bChal').isHidden() && await page.locator('#bAgain').isHidden() && await page.locator('#bShare').isHidden(), 'a missed challenge cannot be retried or resent');
+    await reopen('#defi-7-1');
     for (let i = 0; i < 3; i++) await play(page, [fam(7, 0)[i], fam(7, 1)[i], fam(7, 2)[i]]);
     await play(page, [fam(7, 0)[0], fam(7, 0)[1], fam(7, 1)[2]]);
     assert.equal((await state(page)).status, 'lost');
     await page.locator('#win').waitFor({ state: 'visible' });
+    assert.ok(await page.locator('#bAgain').isHidden() && await page.locator('#bChal').isHidden());
     const res = (await events(page, 'challenge_result')).map(e => [e.score, e.won]);
-    assert.deepEqual(res, [[1, true], [2, false], [4, false]]);
+    assert.deepEqual(res, [[1, true], [2, false], [4, false]], 'one challenge_result per opening');
     assert.equal(await stored(page), null);
     await page.locator('#bBack').tap();                                 // "Accueil"
     assert.equal((await state(page)).screen, 'home');
     await context.close();
 
     // a game in progress and the progress of the player are left byte for byte as they were
-    const cur = { n: 3, roll: 0, err: 1, order: [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0], found: [2], tried: ['0-3-6'], sel: [0] };
-    const raw = JSON.stringify({ max: 5, stars: [3, 2, 3, 1], cur });
+    const cur = savedCur();
+    const raw = JSON.stringify({ max: 3, stars: [3, 2], cur });
     ({ context, page } = await open({ width: 360, height: 640 }, { save: raw, hash: '#defi-9-0' }));
     s = await state(page);
     assert.equal(s.level, 9); assert.equal(s.mode, 'chal');
@@ -621,6 +649,128 @@ function checkFit(m, tag) {
     const anim = await page.evaluate(() => getComputedStyle(document.querySelector('.band')).animationName);
     assert.equal(anim, 'none');
     await context.close();
+  });
+
+  // ---------------------------------------------------------------- review decisions (R1-R9)
+  await test('R1: no restart during a game; leaving and coming back keeps the game and its errors', async () => {
+    const { context, page } = await open();
+    assert.equal(await page.locator('#bRestart').count(), 0);
+    assert.ok(!/Recommencer/.test(await page.evaluate(() => document.body.innerText)), 'no "Recommencer" anywhere');
+    await load(page, 6);
+    await tapWords(page, [fam(6, 0)[0], fam(6, 1)[0], fam(6, 2)[0]]);
+    await tapButton(page, '#bClear');
+    await tapWords(page, fam(6, 3));
+    const before = await state(page);
+    assert.equal(before.errors, 1);
+    await page.locator('#bMap').tap();                              // levels, then the same level again
+    await page.locator('[data-level="6"]').tap();
+    let s = await state(page);
+    assert.equal(s.errors, 1); assert.deepEqual(s.order, before.order); assert.equal(s.found.length, 1);
+    await page.locator('#bMap').tap();
+    await page.locator('#bLBack').tap();                            // home, then "Continuer"
+    assert.match(await page.locator('#bGo').textContent(), /Niveau 1$/, 'level 1 is the first unfinished one');
+    await context.close();
+  });
+
+  await test('R4: the shared link is origin + pathname + #defi-..., never the query string of the address', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { share: 'capture', httpUrl: 'https://jeux.test/les-familles/index.html?token=SECRET123&n=42' });
+    await load(page, 4);
+    for (let f = 0; f < 3; f++) await play(page, fam(4, f));
+    await page.locator('#win').waitFor({ state: 'visible' });
+    await page.locator('#bChal').tap();
+    const t = (await page.evaluate(() => window.__shared))[0];
+    assert.match(t, / https:\/\/jeux\.test\/les-familles\/index\.html#defi-4-0$/);
+    assert.ok(!/SECRET|token|\?|n=42/.test(t), 'the query string leaked: ' + t);
+    await page.locator('#bShare').tap();
+    assert.ok(!/SECRET|token|https?:/.test((await page.evaluate(() => window.__shared))[1]), 'the result text carries no address');
+    await context.close();
+  });
+
+  await test('R5: nothing readable by a player tells the families (DOM, attributes, storage, texts)', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { share: 'capture' });
+    for (let n = 1; n <= 20; n++) {
+      await load(page, n);
+      const dom = await page.evaluate(() => ({
+        app: document.getElementById('app').innerHTML,
+        tiles: [...document.querySelectorAll('.tile')].map(e => ({ attrs: [...e.attributes].map(a => a.name), i: e.getAttribute('data-i'), w: e.getAttribute('data-w') })),
+        ids: [...document.querySelectorAll('[id]')].map(e => e.id),
+      }));
+      dom.tiles.forEach((t, k) => {
+        assert.deepEqual(t.attrs.sort(), ['aria-pressed', 'class', 'data-i', 'data-w'], `level ${n}: unexpected tile attributes`);
+        assert.equal(t.i, String(k), `level ${n}: data-i must only be the place of the tile`);
+      });
+      // the place says nothing: across levels, the first three tiles are not systematically one family
+      [0, 1, 2, 3].forEach(f => assert.ok(!dom.app.includes(famName(n, f)), `level ${n}: family name in the DOM`));
+      const ord = dom.tiles.map(t => t.w);
+      assert.deepEqual(ord, (await state(page)).order, 'DOM order is the shuffled order');
+      const cur = JSON.parse(await stored(page)).cur;
+      assert.deepEqual(cur.order, ord, 'the save keeps words in the shuffled order, no numbers');
+      assert.ok(cur.order.every(x => typeof x === 'string') && !('families' in cur));
+    }
+    // a lost, a won game and the texts: no family name
+    await load(page, 12);
+    for (let f = 0; f < 3; f++) await play(page, fam(12, f));
+    await page.locator('#win').waitFor({ state: 'visible' });
+    await page.locator('#bShare').tap(); await page.locator('#bChal').tap();
+    (await page.evaluate(() => window.__shared)).forEach(t => [0, 1, 2, 3].forEach(f => assert.ok(!t.includes(famName(12, f)))));
+    await context.close();
+  });
+
+  await test('R6: "Continuer" points to the first unfinished level; replaying an old level does not move it', async () => {
+    const { context, page } = await open();
+    await page.locator('#bGo').tap();
+    await solveByTaps(page, 1);
+    await page.locator('#win').waitFor({ state: 'visible' });
+    await page.locator('#bNext').tap();
+    await solveByTaps(page, 2);
+    await page.locator('#win').waitFor({ state: 'visible' });
+    await page.locator('#bBack').tap();
+    assert.equal((await state(page)).max, 3);
+    await page.locator('[data-level="1"]').tap();                   // replay level 1, one mistake, leave
+    await tapWords(page, [fam(1, 0)[0], fam(1, 1)[0], fam(1, 2)[0]]);
+    await page.locator('#bMap').tap();
+    await page.locator('#bLBack').tap();
+    assert.match(await page.locator('#bGo').textContent(), /Continuer · Niveau 3/);
+    await page.reload();
+    await page.waitForFunction(() => !!window.__game);
+    assert.match(await page.locator('#bGo').textContent(), /Continuer · Niveau 3/);
+    await page.locator('#bGo').tap();
+    assert.equal((await state(page)).level, 3);
+    await context.close();
+  });
+
+  await test('R7/R8: own palette (warm hues, no yellow/green/blue/violet), distinct shapes, no "presque", no emoji squares', async () => {
+    const html = fs.readFileSync(FILE, 'utf8');
+    const cols = [0, 1, 2, 3].map(i => new RegExp('--c' + i + ':(#[0-9A-Fa-f]{6})').exec(html)[1]);
+    cols.forEach(c => {
+      const [r, g, b] = [1, 3, 5].map(k => parseInt(c.slice(k, k + 2), 16) / 255);
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+      let h = d === 0 ? 0 : mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      h *= 60;
+      assert.ok(h <= 45 || h >= 320, `${c} has hue ${Math.round(h)}: only warm hues allowed`);
+    });
+    assert.equal(new Set(cols).size, 4);
+    assert.ok(!/presque/i.test(html) && /Deux sur trois/.test(html));
+    assert.ok(!/[\u{1F7E5}-\u{1F7EB}]/u.test(html), 'coloured emoji squares in the file');
+    assert.ok(!/À toi de faire mieux/.test(html));
+    const { context, page } = await open();
+    await load(page, 1);
+    const shapes = await page.evaluate(() => { for (let f = 0; f < 3; f++) { /* no solution here: just count the symbols of the bands later */ } return 0; });
+    for (let f = 0; f < 3; f++) await play(page, fam(1, f));
+    const paths = await page.evaluate(() => [...document.querySelectorAll('.band svg path')].map(p => p.getAttribute('d')));
+    assert.equal(paths.length, 4); assert.equal(new Set(paths).size, 4, 'each family has its own shape');
+    await context.close();
+  });
+
+  await test('R9: no family reused as a whole, at most one word in common between two grids, no unused word in the table', async () => {
+    for (let i = 0; i < 20; i++) for (let j = i + 1; j < 20; j++) {
+      const common = allWords(i + 1).filter(w => allWords(j + 1).includes(w));
+      assert.ok(common.length <= 1, `grids ${i + 1} and ${j + 1} share ${common}`);
+    }
+    const used = new Set(DATA.GRIDS.flatMap(g => g.flatMap(f => f[1])));
+    assert.deepEqual(Object.keys(DATA.WORDS).filter(w => !used.has(w)), []);
+    // the three grids flagged by the review no longer have another legitimate split
+    for (const n of [9, 10, 12]) assert.equal(VERIFY.analyse(DATA.GRIDS[n - 1]).solutions.length, 1);
   });
 
   // ---------------------------------------------------------------- layout

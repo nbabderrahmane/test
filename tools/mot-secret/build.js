@@ -13,11 +13,12 @@ const path = require('node:path');
 
 // The 20 levels: [answer, one-line reason it is easy or hard]. Lengths: 4 (1-5), 5 (6-11), 6 (12-16), 7 (17-20).
 const ANSWERS = [
-  'chat', 'lune', 'pain', 'soif', 'exil',
-  'table', 'plage', 'fleur', 'nuage', 'arbre', 'etang',
-  'bateau', 'jardin', 'miroir', 'chemin', 'tunnel',
-  'cuisine', 'chapeau', 'musique', 'mystere',
+  'chat', 'pain', 'cafe', 'pont', 'cuve',
+  'table', 'plage', 'fleur', 'carte', 'fruit', 'cycle',
+  'chemin', 'pigeon', 'miroir', 'saison', 'bateau',
+  'cuisine', 'prairie', 'musique', 'mystere',
 ];
+const MIN_CANDIDATES = 30;   // R9: admitted words with the same length and first letter, per level
 const ROOT = path.join(__dirname, '..', '..');
 const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/œ/g, 'oe').replace(/æ/g, 'ae').toLowerCase();
 
@@ -31,10 +32,14 @@ raw.split('\n').forEach(l => {
     if (/^[a-z]{4,7}$/.test(n)) set.add(n); else dropped++;
   });
 });
-ANSWERS.forEach(a => set.add(a));   // an answer must always be admitted
+const blocked = new Set(fs.readFileSync(path.join(__dirname, 'bloques.txt'), 'utf8').split('\n').filter(l => !l.startsWith('#')).join(' ').split(/\s+/).filter(Boolean).map(norm));
+blocked.forEach(w => set.delete(w));
+ANSWERS.forEach(a => { if (blocked.has(a)) throw new Error('blocked answer ' + a); set.add(a); });   // an answer must always be admitted
 const words = [...set].sort();
 const byLen = { 4: [], 5: [], 6: [], 7: [] };
 words.forEach(w => byLen[w.length].push(w));
+const cand = a => words.filter(w => w.length === a.length && w[0] === a[0]).length;
+ANSWERS.forEach((a, i) => { if (cand(a) < MIN_CANDIDATES) throw new Error('level ' + (i + 1) + ' ' + a + ': only ' + cand(a) + ' candidates'); });
 fs.writeFileSync(path.join(__dirname, 'mots-admis.txt'), words.join('\n') + '\n');
 fs.writeFileSync(path.join(__dirname, 'niveaux.json'), JSON.stringify({ answers: ANSWERS }, null, 1) + '\n');
 
@@ -44,12 +49,16 @@ const doc = ['# Mot Tapi (`mot-secret`) - contenu à valider',
   '',
   '**À valider par un humain avant publication.** Généré par `tools/mot-secret/build.js` à partir de `tools/mot-secret/mots.txt` : ne pas éditer à la main.',
   '',
-  'Règles : noms communs au singulier et verbes à l\'infinitif, accents ignorés à la saisie (les mots sont écrits ci-dessous sans accent, comme dans le jeu). Aucun mot politique, religieux ou conflictuel n\'a été retenu. Les mots ont été écrits de mémoire par le modèle : aucune source externe, aucun dictionnaire n\'a été consulté.',
+  'Règles : noms communs au singulier et verbes à l\'infinitif, accents ignorés à la saisie (les mots sont écrits ci-dessous sans accent, comme dans le jeu).',
+  '',
+  'Ce que le script vérifie : longueurs 4 à 7, lettres a-z, pas de doublon, chaque réponse est admise, au moins ' + MIN_CANDIDATES + ' mots admis de même longueur et même première lettre par niveau, et aucun mot de `tools/mot-secret/bloques.txt` (religion, politique, violence, alcool, justice : ' + blocked.size + ' mots écartés ; liste non exhaustive).',
+  '',
+  'Ce qui n\'est PAS vérifié : l\'orthographe et le caractère « courant » des mots. Ils ont été écrits de mémoire par le modèle, sans dictionnaire (aucun n\'a pu être obtenu). Une relecture humaine de toute la liste est nécessaire, y compris pour les mots sensibles non repérés.',
   '',
   '## Les 20 niveaux (mot à trouver)',
   '',
-  '| Niveau | Longueur | Lettre donnée | Mot |', '|---|---|---|---|'];
-ANSWERS.forEach((a, i) => doc.push('| ' + (i + 1) + ' | ' + a.length + ' | ' + up(a[0]) + ' | ' + up(a) + ' |'));
+  '| Niveau | Longueur | Lettre donnée | Mot | Candidats admis |', '|---|---|---|---|---|'];
+ANSWERS.forEach((a, i) => doc.push('| ' + (i + 1) + ' | ' + a.length + ' | ' + up(a[0]) + ' | ' + up(a) + ' | ' + cand(a) + ' |'));
 doc.push('', '## Mots admis comme essais (' + words.length + ')', '',
   'Un essai doit figurer dans cette liste pour être accepté. Elle est volontairement compacte : un mot courant absent est refusé (« Mot inconnu »). Les formes conjuguées, les pluriels et les adjectifs n\'y sont pas.', '');
 [4, 5, 6, 7].forEach(n => doc.push('### ' + n + ' lettres (' + byLen[n].length + ')', '', byLen[n].join(' '), ''));

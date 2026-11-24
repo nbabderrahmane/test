@@ -34,16 +34,16 @@ const SHORT_CAP = 2;
 // measured difficulty never goes down from one world to the next).
 //   colors = [fewest, most] colours; m = target median of the composite difficulty.
 const WORLDS = [
-  { name: 'Le Tiroir',    mech: 'bases',                       cap: 4, empty: 2, short: 0, mystery: false, colors: [2, 7],  m: 30 },
-  { name: 'Le Grenier',   mech: 'tube haut',                   cap: 5, empty: 2, short: 0, mystery: false, colors: [4, 7],  m: 31 },
-  { name: 'La Brume',     mech: 'billes mystère',              cap: 4, empty: 2, short: 0, mystery: true,  colors: [5, 8],  m: 38 },
-  { name: 'La Cave',      mech: 'tube court',                  cap: 4, empty: 1, short: 1, mystery: false, colors: [5, 8],  m: 46 },
-  { name: "L'Étagère",    mech: 'plus de couleurs',            cap: 4, empty: 2, short: 0, mystery: false, colors: [7, 10], m: 55 },
-  { name: 'Le Placard',   mech: 'un seul tube vide',           cap: 4, empty: 1, short: 0, mystery: false, colors: [4, 7],  m: 62 },
-  { name: 'Le Garage',    mech: 'court + mystère',             cap: 4, empty: 1, short: 1, mystery: true,  colors: [7, 10], m: 66 },
-  { name: 'Le Hangar',    mech: 'un seul vide + mystère',      cap: 4, empty: 1, short: 0, mystery: true,  colors: [6, 9],  m: 68 },
-  { name: "L'Atelier",    mech: 'haut + un seul vide',         cap: 5, empty: 1, short: 0, mystery: false, colors: [5, 8],  m: 83 },
-  { name: 'Pile Poil',    mech: 'tout ensemble',               cap: 5, empty: 1, short: 1, mystery: true,  colors: [7, 10], m: 95 },
+  { name: 'Le Tiroir',    mech: 'bases',                       cap: 4, empty: 2, short: 0, mystery: false, colors: [2, 7],  m: 30, att: 85 },
+  { name: 'Le Grenier',   mech: 'tube haut',                   cap: 5, empty: 2, short: 0, mystery: false, colors: [4, 7],  m: 31, att: 85 },
+  { name: 'La Brume',     mech: 'billes mystère',              cap: 4, empty: 2, short: 0, mystery: true,  colors: [5, 8],  m: 37, att: 60 },
+  { name: 'La Cave',      mech: 'tube court',                  cap: 4, empty: 1, short: 1, mystery: false, colors: [5, 8],  m: 46, att: 55 },
+  { name: "L'Étagère",    mech: 'plus de couleurs',            cap: 4, empty: 2, short: 0, mystery: false, colors: [7, 10], m: 55, att: 55 },
+  { name: 'Le Placard',   mech: 'un seul tube vide',           cap: 4, empty: 1, short: 0, mystery: false, colors: [4, 7],  m: 59, att: 50 },
+  { name: 'Le Garage',    mech: 'court + mystère',             cap: 4, empty: 1, short: 1, mystery: true,  colors: [7, 10], m: 64, att: 45 },
+  { name: 'Le Hangar',    mech: 'un seul vide + mystère',      cap: 4, empty: 1, short: 0, mystery: true,  colors: [6, 8],  m: 70, att: 40 },
+  { name: "L'Atelier",    mech: 'haut + un seul vide',         cap: 5, empty: 1, short: 0, mystery: false, colors: [5, 8],  m: 81, att: 30 },
+  { name: 'Pile Poil',    mech: 'tout ensemble',               cap: 5, empty: 1, short: 1, mystery: true,  colors: [7, 10], m: 93, att: 20 },
 ];
 // World 1: levels 1 to 5 can be small (height 3, so that the first steps stay gentle), levels 4 to 10 climb slowly (a random player loses
 // more and more often as colours are added, so 6 colours is already a lot for a first world).
@@ -51,8 +51,11 @@ const W1_COLORS = [2, 3, 4, 4, 5, 5, 5, 6, 6, 6];
 const W1_TARGETS = [5, 8, 10, 12, 15, 18, 21, 24, 27, 30];
 const DAILY_COUNT = 120;
 const DAILY_COLORS = [6, 7, 8];
-const DAILY_BAND = [0.30, 0.55];          // random-player win rate of a daily level (spec: 25 % to 60 %)
+const DAILY_BAND = [0.31, 0.54];          // random-player win rate of a daily level; the test accepts 28 % to 57 %
 const GAMES = 400;                        // random games per win-rate measurement
+const ATT_GAMES = 200;                    // attentive-player games per measurement
+const ATT_FLOOR = 0.10;                   // every level: the attentive player wins at least 10 % (spec decision 10)
+const TWO_MAX = 0.25;                     // mystery levels: share of two-move openings that lose the level
 const FATAL_MAX = 0.25;                   // share of first moves that may lose the level
 
 function mulberry32(a) {
@@ -187,11 +190,12 @@ function makeSearcher(caps) {
   return { search, heuristic };
 }
 
-// Status of a position: 'yes' (solvable), 'no' (proved unsolvable: the whole reachable space was
-// explored) or 'unknown' (node budget exhausted). Weighted search, only the status matters.
+// Status of a position: 'yes' (solvable), 'no' (unsolvable: the search ran out of positions without
+// any pruning heuristic, only the symmetry of equal empty tubes, so it covered every reachable
+// position) or 'unknown' (node budget exhausted). Weighted search: only the status matters.
 function status(tubesArr, caps, budget, weight) {
   const start = tubesArr.map(t => t.map(c => String.fromCharCode(97 + c)).join(''));
-  const r = makeSearcher(caps).search(start, weight || 3, budget || 150000);
+  const r = makeSearcher(caps).search(start, weight || 3, budget || 150000, true);
   return r.moves ? 'yes' : r.exhausted ? 'no' : 'unknown';
 }
 // First legal moves of a position and how many of them lose the level for good.
@@ -404,8 +408,18 @@ function makePool(spec) {
     const fm = firstMoves(tubes, caps, 60000);
     if (fm.unknown || fm.fatal / fm.legal > spec.maxFatal) continue;
     const par = sol.moves.length;
+    if (spec.mystery) {                       // decision 11: the second move must not be a gamble either
+      const sm = secondMoves(tubes, caps, 30000);
+      if (sm.unknown || sm.fatal / sm.pairs > TWO_MAX) continue;
+    }
+    // decision 10: a level the attentive player can win (cheap first look, then the real measurement)
+    const arnd = mulberry32(spec.seed + attempts * 6007);
+    const first = attentiveWinRate(tubes, caps, par, spec.mystery, arnd, 50);
+    if (first < spec.attMin - 0.12) continue;
+    const att = (first * 50 + attentiveWinRate(tubes, caps, par, spec.mystery, arnd, ATT_GAMES - 50) * (ATT_GAMES - 50)) / ATT_GAMES;
+    if (att < spec.attMin) continue;
     const win = naiveWinRate(tubes, caps, par, mulberry32(spec.seed ^ (attempts * 2654435761)), GAMES);
-    pool.push({ tubes, caps, moves: sol.moves, par, optimal: sol.optimal, fatal: fm.fatal / fm.legal, win, d: difficulty(par, win) });
+    pool.push({ tubes, caps, moves: sol.moves, par, optimal: sol.optimal, fatal: fm.fatal / fm.legal, win, att, d: difficulty(par, win) });
   }
   return { id: spec.id, attempts, pool };
 }
@@ -473,7 +487,8 @@ function poolSpecs() {
     const W = WORLDS[w], tubesN = colors + empty + W.short;
     const heavy = tubesN >= 12 || (cap === 5 && tubesN >= 10);
     specs.push({ id: `P${w}:${colors}:${cap}:${empty}`, kind: 'pool', world: w, colors, cap, empty, short: W.short, mystery: W.mystery,
-      maxFatal: W.mystery ? 0 : FATAL_MAX, tries: tries || (heavy || (empty + W.short < 2 && W.mystery && colors >= 8) ? 16 : tubesN >= 9 ? 24 : 30),
+      maxFatal: W.mystery ? 0 : FATAL_MAX, attMin: Math.max(ATT_FLOOR + 0.05, W.att / 100),
+      tries: tries || (heavy || (empty + W.short < 2 && W.mystery && colors >= 8) ? 16 : tubesN >= 9 ? 24 : 30),
       maxAttempts: 300000, seed: BASE_SEED + 1000 * w + 31 * colors + cap + 7 * empty });
   };
   add(0, 2, 3, 1, 12); add(0, 3, 3, 2, 12); add(0, 4, 3, 2, 12); add(0, 5, 3, 2, 12);
@@ -501,7 +516,7 @@ function allowed(w, i) {
 }
 
 // ---- selection (sequential, uses the pools) -------------------------------------
-const STEP = 1.17, STEP_ABS = 2.9;             // generator margins; the check allows 1.25 and +3
+const STEP = 1.17, STEP_ABS = 3.4;             // generator margins; the check allows 1.25 and +3
 function select(results) {
   const warnings = [], used = new Set(), byId = {};
   results.forEach(r => { byId[r.id] = r; });
@@ -519,8 +534,8 @@ function select(results) {
       cands = cands.filter(x => x.c.fatal <= maxFatal && !used.has(canon(x.c)));
       const rules = [
         x => last ? (x.c.d > maxD + 3 && x.c.par > maxPar)
-          : rising ? (x.c.d > prevD + 0.5 && x.c.d <= Math.max(prevD * STEP, prevD + STEP_ABS))
-            : (i === 0 && w === 0) || x.c.d < prevD - 1,
+          : rising ? (x.c.d >= prevD + (prevD < 15 ? 1 : 2) && x.c.d <= Math.max(prevD * STEP, prevD + STEP_ABS))
+            : (i === 0 && w === 0) || x.c.d < prevD - 2,
       ];
       let pickFrom = cands.filter(rules[0]), relaxed = false;
       if (!pickFrom.length) {
@@ -534,7 +549,7 @@ function select(results) {
       const ch = pickFrom[0].c;
       used.add(canon(ch));
       levels.push({ par: ch.par, cap: Math.max.apply(null, ch.caps), caps: ch.caps, mystery: W.mystery, tubes: ch.tubes, moves: ch.moves, optimal: ch.optimal });
-      meta.push({ d: ch.d, win: ch.win, fatal: ch.fatal, world: w, i });
+      meta.push({ d: ch.d, win: ch.win, att: ch.att, fatal: ch.fatal, world: w, i });
       worldD.push(ch.d); worldPar.push(ch.par);
       prevD = ch.d;
     }
@@ -568,7 +583,11 @@ function check(res) {
     }
     if (Math.max.apply(null, d) !== d[19] || Math.max.apply(null, p) !== p[19]) out.push(`world ${w + 1}: level 20 is not the hardest`);
   }
-  for (let w = 1; w < 10; w++) if (meds[w] < meds[w - 1] || meds[w] > 1.3 * meds[w - 1]) out.push(`worlds ${w}-${w + 1}: median ${meds[w - 1].toFixed(1)} -> ${meds[w].toFixed(1)}`);
+  const am = [];
+  for (let w = 0; w < 10; w++) am.push(median(res.meta.slice(w * 20, w * 20 + 20).map(x => x.att)));
+  for (let w = 1; w < 10; w++) if (am[w] < am[w - 1] * 2 / 3) out.push(`worlds ${w}-${w + 1}: attentive median ${(100 * am[w - 1]).toFixed(0)} % -> ${(100 * am[w]).toFixed(0)} % (drops by more than a third)`);
+  if (am[9] < 0.15) out.push(`world 10: attentive median ${(100 * am[9]).toFixed(0)} % (< 15 %)`);
+  for (let w = 1; w < 10; w++) if (meds[w] < meds[w - 1] + 2 || meds[w] > 1.3 * meds[w - 1]) out.push(`worlds ${w}-${w + 1}: median ${meds[w - 1].toFixed(1)} -> ${meds[w].toFixed(1)}`);
   return out;
 }
 
@@ -582,15 +601,15 @@ function renderBlock(res) {
     `/*LEVELS:END*/`;
 }
 function table(res) {
-  const out = ['| Monde | Nom | Mécaniques | Hauteur | Vides | Couleurs | Solution min / médiane / max | Difficulté médiane | Victoire au hasard (moy.) | Premiers coups fatals (max) |', '|---|---|---|---|---|---|---|---|---|---|'];
+  const out = ['| Monde | Nom | Mécaniques | Hauteur | Vides | Couleurs | Solution min / médiane / max | Difficulté médiane | Victoire au hasard (moy.) | Victoire du joueur attentif (médiane) | Premiers coups fatals (max) |', '|---|---|---|---|---|---|---|---|---|---|---|'];
   WORLDS.forEach((w, wi) => {
     const ls = res.levels.slice(wi * 20, wi * 20 + 20), m = res.meta.slice(wi * 20, wi * 20 + 20);
     const pars = ls.map(l => l.par), cols = ls.map(l => new Set(l.tubes.flat()).size);
     const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
-    out.push(`| ${wi + 1} | ${w.name} | ${w.mech} | ${wi === 0 ? '4 (3 aux niveaux 1 à 4)' : w.cap} | ${w.empty}${w.short ? ' + 1 tube court' : ''} | ${Math.min(...cols)}-${Math.max(...cols)} | ${Math.min(...pars)} / ${median(pars)} / ${Math.max(...pars)} | ${median(m.map(x => x.d)).toFixed(0)} | ${(100 * avg(m.map(x => x.win))).toFixed(0)} % | ${(100 * Math.max(...m.map(x => x.fatal))).toFixed(0)} % |`);
+    out.push(`| ${wi + 1} | ${w.name} | ${w.mech} | ${wi === 0 ? '4 (3 aux niveaux 1 à 4)' : w.cap} | ${w.empty}${w.short ? ' + 1 tube court' : ''} | ${Math.min(...cols)}-${Math.max(...cols)} | ${Math.min(...pars)} / ${median(pars)} / ${Math.max(...pars)} | ${median(m.map(x => x.d)).toFixed(0)} | ${(100 * avg(m.map(x => x.win))).toFixed(0)} % | ${(100 * median(m.map(x => x.att))).toFixed(0)} % | ${(100 * Math.max(...m.map(x => x.fatal))).toFixed(0)} % |`);
   });
   const dp = res.daily.map(l => l.par), dm = res.dailyMeta;
-  out.push(`| Jour (120) | | 4 de haut, 2 vides | 4 | 2 | ${Math.min(...res.daily.map(l => new Set(l.tubes.flat()).size))}-${Math.max(...res.daily.map(l => new Set(l.tubes.flat()).size))} | ${Math.min(...dp)} / ${median(dp)} / ${Math.max(...dp)} | ${median(dm.map(x => x.d)).toFixed(0)} | ${(100 * Math.min(...dm.map(x => x.win))).toFixed(0)}-${(100 * Math.max(...dm.map(x => x.win))).toFixed(0)} % | ${(100 * Math.max(...dm.map(x => x.fatal))).toFixed(0)} % |`);
+  out.push(`| Jour (120) | | 4 de haut, 2 vides | 4 | 2 | ${Math.min(...res.daily.map(l => new Set(l.tubes.flat()).size))}-${Math.max(...res.daily.map(l => new Set(l.tubes.flat()).size))} | ${Math.min(...dp)} / ${median(dp)} / ${Math.max(...dp)} | ${median(dm.map(x => x.d)).toFixed(0)} | ${(100 * Math.min(...dm.map(x => x.win))).toFixed(0)}-${(100 * Math.max(...dm.map(x => x.win))).toFixed(0)} % | n/a | ${(100 * Math.max(...dm.map(x => x.fatal))).toFixed(0)} % |`);
   out.push('', 'Difficulté par niveau : ' + res.meta.map(x => x.d.toFixed(0)).join(' '));
   return out.join('\n');
 }

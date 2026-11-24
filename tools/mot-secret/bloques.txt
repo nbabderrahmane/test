@@ -1,0 +1,5 @@
+# Mots exclus de la liste admise (religion, politique, violence, alcool/tabac, sexe, justice). Appliqué par build.js.
+# La liste n'est pas exhaustive : une relecture humaine reste nécessaire.
+pape moine prier croix ange diable rite eglise noel pretre messe dieu asile vote greve drapeau douane general
+prison proces justice juge gendarme impot guerre arme armure fusil bombe combat ennemi tuer mort mourir battre
+gifler baiser alcool biere tabac sorcier sang bagarre larcin cracher poing poison amant sein soldat voleur

@@ -10,6 +10,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { chromium } = require('playwright');
+const http = require('node:http');
 
 const FILE = process.env.GAME_FILE || path.join(__dirname, '..', 'games', 'mot-secret', 'index.html');
 const URL = pathToFileURL(FILE).href;
@@ -47,8 +48,9 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
   const page = await context.newPage();
   page.on('console', m => { if (m.type() === 'error') problems.push('console.error: ' + m.text()); });
   page.on('pageerror', e => problems.push('pageerror: ' + e.message));
-  page.on('request', r => { if (r.url().split('#')[0] !== URL) problems.push('request: ' + r.url()); });
-  await page.goto(URL + (opts.hash || ''));
+  const base = opts.url || URL;
+  page.on('request', r => { const u = r.url().split('#')[0]; if (u !== base && !(opts.url && /\/favicon\.ico$/.test(u))) problems.push('request: ' + r.url()); });
+  await page.goto(base + (opts.hash || ''));
   await page.waitForFunction(() => !!window.__game);
   return { context, page };
 }
@@ -73,6 +75,13 @@ async function tapKeys(page, text) {
 }
 // types the letters after the first one, then Enter
 const tapWord = (page, word) => tapKeys(page, word.slice(1) + '\n');
+// does the page (outside scripts) show or carry the word, in text or in any attribute?
+const visibleTextHas = (page, word) => page.evaluate(w => {
+  const c = document.body.cloneNode(true);
+  c.querySelectorAll('script').forEach(x => x.remove());
+  const all = c.innerHTML.toLowerCase() + ' ' + c.textContent.toLowerCase();
+  return all.includes(w);
+}, word);
 const tapBtn = (page, id) => page.locator('#' + id).tap();
 // admitted words of the right length that start with the same letter as the answer, other than it
 const wrongs = (n, count = 6) => {
@@ -106,6 +115,15 @@ async function test(name, fn) {
       assert.ok(ADMIT_SET.has(a), a + ' must be admitted');
     });
     assert.equal(new Set(ANSWERS).size, 20);
+    // R9: at least 30 admitted words with the same length and first letter, per level
+    ANSWERS.forEach((a, i) => {
+      const n = ADMITTED.filter(w => w.length === a.length && w[0] === a[0]).length;
+      assert.ok(n >= 30, 'level ' + (i + 1) + ' ' + a + ': ' + n + ' candidates');
+    });
+    // R9: sensitive words are out, everyday family words are in
+    ['pape', 'moine', 'prier', 'croix', 'ange', 'diable', 'rite', 'guerre', 'fusil', 'bombe', 'vote', 'asile', 'greve', 'baiser', 'tuer', 'alcool']
+      .forEach(w => assert.ok(!ADMIT_SET.has(w), w + ' must not be admitted'));
+    ['femme', 'maman', 'papa', 'homme', 'fille', 'famille', 'maison', 'ecole', 'repas'].forEach(w => assert.ok(ADMIT_SET.has(w), w + ' must be admitted'));
     ADMITTED.forEach(w => assert.match(w, /^[a-z]{4,7}$/, w));
     assert.equal(new Set(ADMITTED).size, ADMITTED.length);
     const { page, context } = await open();
@@ -161,17 +179,19 @@ async function test(name, fn) {
     await context.close();
   });
 
-  await test('marks follow the rule (repeated letters), keyboard remembers letters, shapes differ from colours', async () => {
+  await test('marks follow the rule (repeated letters), keyboard remembers letters, shapes and palette (R7, R8)', async () => {
     const { page, context } = await open({ width: 360, height: 640 });
-    // level 10 = "arbre": two r, guesses with repeated letters
-    await page.evaluate(() => window.__game.loadLevel(10));
-    const word = ANSWERS[9];
-    const tries = ['arret', 'aigle', 'ancre'].filter(w => ADMIT_SET.has(w));
-    assert.ok(tries.length >= 1);
+    await page.evaluate(() => window.__game.loadLevel(6));   // "table", a single e
+    const word = ANSWERS[5];
+    const tries = ['tente', 'tarte', 'tasse'].filter(w => ADMIT_SET.has(w));
+    assert.equal(tries.length, 3);
     for (const w of tries) await tapWord(page, w);
     const s = await state(page);
-    assert.equal(s.guesses.length, tries.length);
+    assert.equal(s.guesses.length, 3);
     s.guesses.forEach((g, i) => assert.equal(s.marks[i], refMarks(g.toLowerCase(), word), g));
+    // doubled letter in the guess, single in the word: "tente" has two e, "table" one -> only the e in place is marked
+    assert.equal(s.marks[0], '20002');
+    assert.equal(refMarks('coco', 'chat'), '2000');
     // keys keep the best mark of each letter
     const best = {};
     s.guesses.forEach((g, i) => [...g].forEach((c, k) => { const m = +s.marks[i][k]; if (best[c] === undefined || m > best[c]) best[c] = m; }));
@@ -180,19 +200,29 @@ async function test(name, fn) {
       const cls = await page.locator(`[data-k="${c}"]`).getAttribute('class');
       assert.match(cls, new RegExp('\\bs' + best[c] + '\\b'), c);
     }
-    // three marks, three different shapes (not only colours)
-    const sig = await page.evaluate(() => {
-      const out = {};
-      document.querySelectorAll('.t').forEach(t => {
+    // three marks, three different shapes (not only colours), no tile flip, palette without green/yellow/grey
+    await page.evaluate(() => window.__game.play('talon'));   // adds a letter that is present elsewhere
+    const info = await page.evaluate(() => {
+      const out = {}, hue = c => {
+        const m = c.match(/[\d.]+/g).map(Number), r = m[0] / 255, g = m[1] / 255, b = m[2] / 255;
+        const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+        let h = 0; if (d) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+        return { h: Math.round(((h * 60) + 360) % 360), s: mx ? d / mx : 0 };
+      };
+      document.querySelectorAll('#rows .t').forEach(t => {
         const m = /\bs([012])\b/.exec(t.className);
-        if (m && !out[m[1]]) { const a = getComputedStyle(t, '::after'); out[m[1]] = [a.borderRadius, a.borderTopWidth, a.backgroundColor === 'rgba(0, 0, 0, 0)'].join('|'); }
+        if (m && !out[m[1]]) {
+          const a = getComputedStyle(t, '::after'), cs = getComputedStyle(t);
+          out[m[1]] = { shape: [a.clipPath, a.borderRadius, a.transform].join('|'), anim: cs.animationName, color: hue(cs.backgroundColor) };
+        }
       });
       return out;
     });
-    assert.equal(new Set(Object.values(sig)).size, Object.keys(sig).length, JSON.stringify(sig));
-    assert.ok(Object.keys(sig).length >= 2);
-    // repeated letters: "arret" against "arbre" gives one present mark to the second r, not two
-    assert.equal(refMarks('arret', 'arbre'), '22110');
+    assert.equal(Object.keys(info).length, 3);
+    assert.equal(new Set(Object.values(info).map(x => x.shape)).size, 3, JSON.stringify(info));
+    Object.values(info).forEach(x => assert.ok(!/flip/.test(x.anim), 'no tile flip'));
+    [info[1], info[2]].forEach(x => assert.ok(x.color.h < 20 || x.color.h > 250 || (x.color.h > 175 && x.color.h < 330), 'not green/yellow: hue ' + x.color.h));
+    assert.ok(info[0].color.s > 0.2, 'absent tile is tinted, not grey');
     await context.close();
   });
 
@@ -242,9 +272,14 @@ async function test(name, fn) {
     s = await state(page);
     assert.ok(s.over && !s.won && s.stars === 0 && s.tries === 6);
     assert.equal(s.save.stars[4], 0);
-    assert.equal(await page.locator('#wTitle').textContent(), 'Raté…');
-    assert.equal((await page.locator('#wWord').textContent()), ANSWERS[4].toUpperCase());   // the word is shown
+    assert.equal(await page.locator('#wTitle').textContent(), 'Pas cette fois');
+    // R2: a lost level never reveals the word anywhere on the page
+    assert.equal(await visibleTextHas(page, ANSWERS[4]), false);
+    assert.equal(await page.locator('#wWord').isVisible(), false);
     assert.equal(await page.locator('#bShare').isVisible(), false);
+    assert.equal(await page.locator('#bChal').isVisible(), false);
+    assert.equal((await page.locator('#bAgain').textContent()), 'Réessayer');
+    assert.equal((await page.locator('#bNext').textContent()), 'Niveaux');
     assert.equal((await events(page, 'level_complete')).length, 4);
     // retry: a clean board, still playable and winnable
     await tapBtn(page, 'bAgain');
@@ -341,11 +376,12 @@ async function test(name, fn) {
       const lines = text.split('\n');
       assert.equal(lines[0], 'Mot Tapi · Niveau 7 · ⭐⭐⭐');
       assert.equal(lines.length, 4);
-      lines.slice(1).forEach(l => assert.match(l, /^[■●□]{5}$/));
+      lines.slice(1).forEach(l => assert.match(l, /^[▲◆·]{5}$/));
+      assert.ok(!/[■●□🟩🟨⬛⬜🟦🟥]/u.test(text));
       assert.ok(!text.toLowerCase().includes(ANSWERS[6]));
       assert.ok(!/https?:/.test(text));
       w.forEach(x => assert.ok(!text.toLowerCase().includes(x)));
-      assert.deepEqual(lines[3], '■■■■■');
+      assert.deepEqual(lines[3], '▲▲▲▲▲');
       // the challenge link
       await tapBtn(page, 'bChal');
       await page.waitForFunction(() => window.__shared.length + window.__clip.length >= 2);
@@ -390,11 +426,15 @@ async function test(name, fn) {
     assert.ok(s.won); assert.equal(s.tries, 3);
     assert.equal(await page.locator('#wTitle').textContent(), 'Défi relevé !');
     assert.equal(await page.locator('#bChal').textContent(), 'Renvoyer le défi');
+    // R3: only "Renvoyer le défi" and "Accueil" after a challenge
+    assert.equal(await page.locator('#bAgain').isVisible(), false);
+    assert.equal(await page.locator('#bShare').isVisible(), false);
+    assert.equal(await page.locator('#bNext').textContent(), 'Accueil');
     ev = await events(page, 'challenge_result');
     assert.deepEqual(ev.map(e => ({ level: e.level, score: e.score, target: e.target, won: e.won })), [{ level: 9, score: 3, target: 3, won: true }]);
     assert.equal((await events(page, 'level_complete')).length, 0);
     const raw1 = JSON.parse(await stored(page));
-    assert.deepEqual([raw1.level, raw1.max, raw1.cur], [2, 2, save.cur], 'a challenge never changes the game in progress');
+    assert.deepEqual([raw1.max, raw1.cur], [2, save.cur], 'a challenge never changes the game in progress');
     assert.deepEqual(raw1.stars.slice(0, 2), [3, 1]); assert.ok(raw1.stars.slice(2).every(x => x === 0));
     assert.deepEqual(raw1.best.slice(0, 2), [1, 5]); assert.ok(raw1.best.slice(2).every(x => x === 0));
     await tapBtn(page, 'bNext');                                          // "Accueil"
@@ -423,9 +463,13 @@ async function test(name, fn) {
     const st = JSON.parse((await stored(page)) || '{}');
     assert.ok(!st.stars || st.stars.every(x => x === 0));
     assert.equal(st.max === undefined || st.max === 1, true);
-    await tapBtn(page, 'bAgain');                                         // retry the same challenge
-    s = await state(page);
-    assert.equal(s.tries, 0); assert.deepEqual(s.challenge, { level: 4, target: 2 });
+    // R3: no retry of a lost challenge, one challenge_result per opening, the word stays secret
+    assert.equal(await page.locator('#bAgain').isVisible(), false);
+    assert.equal(await page.locator('#bShare').isVisible(), false);
+    assert.equal(await page.locator('#bChal').isVisible(), false);
+    assert.equal(await visibleTextHas(page, ANSWERS[3]), false);
+    await page.waitForTimeout(100);
+    assert.equal((await events(page, 'challenge_result')).length, 1);
     await context.close();
 
     // --- link opened while the game is running (hashchange), then resumed after a reload
@@ -495,6 +539,93 @@ async function test(name, fn) {
     await page.waitForFunction(() => window.__game.state().screen === 'result', null, { timeout: 400 });
     const dur = await page.evaluate(() => getComputedStyle(document.querySelector('.card')).animationName);
     assert.equal(dur, 'none');
+    await context.close();
+  });
+
+  await test('R1: no restart in the middle of a game; leaving and coming back keeps the tries', async () => {
+    const { page, context } = await open({ width: 360, height: 640 }, { extra: { reducedMotion: 'reduce' } });
+    assert.equal(await page.locator('#bReset').count(), 0);
+    assert.equal(await page.getByText('Recommencer').count(), 0);
+    await tapBtn(page, 'bGo');
+    const w = wrongs(1, 5);
+    for (const x of w) await tapWord(page, x);
+    assert.equal((await state(page)).tries, 5);
+    await tapBtn(page, 'bMap');                         // leave to the grid, then come back to the same level
+    await page.locator('.cell:not([disabled])').first().tap();
+    await waitScreen(page, 'game');
+    assert.equal((await state(page)).tries, 5);
+    await tapWord(page, ANSWERS[0]);
+    await waitScreen(page, 'result');
+    const s = await state(page);
+    assert.equal(s.tries, 6); assert.equal(s.stars, 1);   // not 3 stars
+    await context.close();
+  });
+
+  await test('R6: "Continuer" points at the first unfinished level, replaying does not move it', async () => {
+    const { page, context } = await open({ width: 360, height: 640 }, { extra: { reducedMotion: 'reduce' } });
+    for (const n of [1, 2]) {
+      await page.evaluate(k => window.__game.loadLevel(k), n);
+      await tapWord(page, ANSWERS[n - 1]);
+      await waitScreen(page, 'result');
+    }
+    await tapBtn(page, 'bNext');                        // now on level 3, unfinished
+    await tapBtn(page, 'bMap');
+    assert.match(await page.locator('.cell.cur').textContent(), /^3/);
+    await page.locator('.cell:not([disabled])').first().tap();   // replay level 1
+    await waitScreen(page, 'game');
+    assert.equal((await state(page)).level, 1);
+    await tapWord(page, ANSWERS[0]);
+    await waitScreen(page, 'result');
+    await tapBtn(page, 'bNext');                        // "Suivant" from level 1 -> level 2 (replay), then leave
+    await tapBtn(page, 'bMap'); await tapBtn(page, 'bLBack');
+    assert.match(await page.locator('#bGo').textContent(), /Niveau 3/);
+    await page.reload(); await page.waitForFunction(() => !!window.__game);
+    assert.match(await page.locator('#bGo').textContent(), /Niveau 3/);
+    await context.close();
+  });
+
+  await test('R4: the shared link is origin + path + fragment, never the query string', async () => {
+    const html = fs.readFileSync(FILE);
+    const srv = http.createServer((req, res) => { if (/favicon/.test(req.url)) { res.statusCode = 404; return res.end(); } res.setHeader('content-type', 'text/html; charset=utf-8'); res.end(html); });
+    await new Promise(r => srv.listen(0, '127.0.0.1', r));
+    const port = srv.address().port, base = 'http://127.0.0.1:' + port + '/jeux/mot-secret/index.html';
+    try {
+      let { page, context } = await open({ width: 360, height: 640 }, { url: base + '?token=SECRET123&n=7', share: 'share', extra: { reducedMotion: 'reduce' } });
+      await tapBtn(page, 'bGo');
+      await tapWord(page, ANSWERS[0]);
+      await waitScreen(page, 'result');
+      await tapBtn(page, 'bChal');
+      await page.waitForFunction(() => window.__shared.length >= 1);
+      const t = await page.evaluate(() => window.__shared[0]);
+      assert.ok(t.endsWith(base + '#defi-1-1'), t);
+      assert.ok(!/token|SECRET123|\?/.test(t), t);
+      await context.close();
+      // an explicit base with a query and a fragment is cleaned too
+      ({ page, context } = await open({ width: 360, height: 640 }, { share: 'share', config: { shareBaseUrl: 'https://exemple.test/a/b?x=1&jeton=Z#haut' }, extra: { reducedMotion: 'reduce' } }));
+      await page.evaluate(() => { window.__game.loadLevel(1); window.__game.play('chat'); });
+      await waitScreen(page, 'result');
+      await tapBtn(page, 'bChal');
+      await page.waitForFunction(() => window.__shared.length >= 1);
+      const t2 = await page.evaluate(() => window.__shared[0]);
+      assert.ok(t2.endsWith('https://exemple.test/a/b#defi-1-1'), t2);
+      await context.close();
+    } finally { srv.close(); }
+  });
+
+  await test('R5: nothing in the page lets a player read the word (DOM, attributes, share text)', async () => {
+    const { page, context } = await open({ width: 360, height: 640 }, { share: 'share', config: { shareBaseUrl: 'https://exemple.test/x' }, extra: { reducedMotion: 'reduce' } });
+    for (const n of [1, 9, 20]) {
+      await page.evaluate(k => window.__game.loadLevel(k), n);
+      const a = ANSWERS[n - 1];
+      assert.equal(await visibleTextHas(page, a), false, 'level ' + n + ' at start');
+      for (const x of wrongs(n, 2)) await tapWord(page, x);
+      assert.equal(await visibleTextHas(page, a), false, 'level ' + n + ' after guesses');
+      const g = await page.evaluate(() => JSON.stringify(window.__game.state()) + JSON.stringify(window.__game.levels) + Object.keys(window.__game).join(','));
+      assert.ok(!g.toLowerCase().includes(a), 'state/levels expose the word of level ' + n);
+    }
+    // tiles and keys carry no id or attribute tied to the solution
+    const attrs = await page.evaluate(() => [...document.querySelectorAll('#rows *, #kb *')].map(e => e.id + '|' + [...e.attributes].map(x => x.name).join(',')).join(';'));
+    assert.ok(!/\|.*(word|solution|answer)/i.test(attrs));
     await context.close();
   });
 

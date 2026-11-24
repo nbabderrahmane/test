@@ -655,6 +655,13 @@ function decode(str) {
 }
 var LV = LEVELS.map(decode), DL = DAILY.map(decode);
 var N = LV.length, ND = DL.length, PER_WORLD = 20;
+// Fingerprint of the level set (FNV-1a over the level strings): a save made for other levels is not
+// valid any more (stars, records, games in progress), see loadSave().
+var FP = (function () {
+  var h = 0x811c9dc5, str = LEVELS.join(',') + '|' + DAILY.join(','), i;
+  for (i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(16);
+})();
 
 var WORLDS = [
   { n: 'Le Tiroir',  m: 'bases',                  h: '' },
@@ -670,7 +677,7 @@ var WORLDS = [
 ];
 var RANKS = [
   { n: 'Fouillis', s: 0 }, { n: 'Apprenti', s: 15 }, { n: 'Trieur', s: 40 }, { n: 'Rangeur', s: 80 },
-  { n: 'Organisé', s: 140 }, { n: 'Perfectionniste', s: 230 }, { n: 'Maître trieur', s: 360 }, { n: 'Pile Poil', s: 520 }
+  { n: 'Organisé', s: 140 }, { n: 'Méticuleux', s: 230 }, { n: 'Maître trieur', s: 360 }, { n: 'Pile Poil', s: 520 }
 ];
 var BADGES = [
   { id: 'monde1',     n: 'Premier monde',   d: 'Termine les 20 niveaux d’un monde.' },
@@ -724,7 +731,7 @@ function todayNum() {
 function dayIndex(day) { return ((day % ND) + ND) % ND; }
 
 // ---- persistence (always guarded: the game works without storage) ------------
-var save = { level: 1, max: 1, stars: [], best: [], cur: null, streak: 0, jokers: 0, lastDay: 0, badges: [], rankSeen: 0,
+var save = { fp: FP, level: 1, max: 1, stars: [], best: [], cur: null, streak: 0, jokers: 0, lastDay: 0, badges: [], rankSeen: 0,
   rev: {}, daily: null, chalGame: null };
 function totalStars() {
   var t = 0;
@@ -750,34 +757,34 @@ function loadSave() {
     if (s && typeof s === 'object') {
       var clamp = function (v, hi) { v = v | 0; return v < 1 ? 1 : v > hi ? hi : v; };
       var nat = function (v, hi) { v = v | 0; return v < 0 ? 0 : v > hi ? hi : v; };
-      save.max = clamp(s.max, N);
-      save.level = Math.min(clamp(s.level, N), save.max);
-      if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = nat(s.stars[i], 3);
-      if (Array.isArray(s.best)) for (i = 0; i < N && i < s.best.length; i++) save.best[i] = nat(s.best[i], 9999);
-      if (s.cur && Array.isArray(s.cur.hist)) save.cur = { level: s.cur.level | 0, hist: s.cur.hist };
-      // games in progress outside the normal run (daily level, friend's challenge) and revealed mystery balls
-      if (s.daily && Array.isArray(s.daily.hist)) save.daily = { idx: s.daily.idx | 0, day: s.daily.day | 0, hist: s.daily.hist };
-      if (s.chalGame && Array.isArray(s.chalGame.hist)) {
-        save.chalGame = { kind: s.chalGame.kind === 'day' ? 'day' : 'level', n: s.chalGame.n | 0, day: s.chalGame.day | 0,
-          target: s.chalGame.target | 0, hist: s.chalGame.hist };
-      }
-      if (s.rev && typeof s.rev === 'object') {
-        for (var k in s.rev) if (/^[LD]\d{1,3}$/.test(k) && Array.isArray(s.rev[k])) save.rev[k] = s.rev[k].slice(0, 20).map(function (v) { return nat(v, 9); });
+      var stale = s.fp !== FP;   // saved for another set of levels: progress restarts, the series stays
+      if (!stale) {
+        save.max = clamp(s.max, N);
+        save.level = Math.min(clamp(s.level, N), save.max);
+        if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = nat(s.stars[i], 3);
+        if (Array.isArray(s.best)) for (i = 0; i < N && i < s.best.length; i++) save.best[i] = nat(s.best[i], 9999);
+        if (s.cur && Array.isArray(s.cur.hist)) save.cur = { level: s.cur.level | 0, hist: s.cur.hist };
+        // games in progress outside the normal run (daily level, friend's challenge) and revealed mystery balls
+        if (s.daily && Array.isArray(s.daily.hist)) save.daily = { idx: s.daily.idx | 0, day: s.daily.day | 0, hist: s.daily.hist };
+        if (s.chalGame && Array.isArray(s.chalGame.hist)) {
+          save.chalGame = { kind: s.chalGame.kind === 'day' ? 'day' : 'level', n: s.chalGame.n | 0, day: s.chalGame.day | 0,
+            target: s.chalGame.target | 0, hist: s.chalGame.hist };
+        }
+        if (s.rev && typeof s.rev === 'object') {
+          for (var k in s.rev) if (/^C?[LD]\d{1,3}$/.test(k) && Array.isArray(s.rev[k])) save.rev[k] = s.rev[k].slice(0, 20).map(function (v) { return nat(v, 9); });
+        }
       }
       save.streak = nat(s.streak, 9999);
       save.jokers = nat(s.jokers, 2);
       save.lastDay = nat(s.lastDay, 99999999);
-      if (Array.isArray(s.badges)) save.badges = s.badges.filter(function (id) { return BADGES.some(function (b) { return b.id === id; }); });
-      // A lot 1 save (10 levels): the last level reached was finished, so the next one is open.
-      while (save.max < N && save.stars[save.max - 1] > 0) {
-        if (save.level === save.max && !save.cur) save.level = save.max + 1;
-        save.max++;
-      }
-      save.rankSeen = s.rankSeen === undefined ? rankOf(totalStars()) : nat(s.rankSeen, RANKS.length - 1);
+      // other badges come from stars and games, which restart with a stale save
+      if (Array.isArray(s.badges)) save.badges = s.badges.filter(function (id) { return BADGES.some(function (b) { return b.id === id; }) && (!stale || /^serie/.test(id)); });
+      save.rankSeen = stale ? 0 : s.rankSeen === undefined ? rankOf(totalStars()) : nat(s.rankSeen, RANKS.length - 1);
     }
   } catch (e) { /* no storage: play without it */ }
 }
 function store() {
+  save.fp = FP;
   try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) { /* ignore */ }
 }
 
@@ -797,7 +804,7 @@ var hid = [];         // hid[i] = number of hidden (mystery) balls at the bottom
 var els = [];         // ball elements, same shape as tubes
 var hist = [];        // [from,to] moves, unlimited undo
 var seen = {};        // positions already met in this game (key -> count)
-var revisits = 0, nudged = false;   // returns to a known position; "badly started" message already shown
+var revisits = 0, nudged = false, nudgeOn = false;   // returns to a known position; "badly started" message already shown
 var sel = -1;
 var won = false;
 var stuck = false;
@@ -983,12 +990,16 @@ function refresh() {
   else if ($('msg').className === 'stuck') say('');
   placeHand();
 }
+var NUDGE = 'Partie mal engagée ? Annule quelques coups ou recommence.';
+// The "badly started" message is the resting text of the message line: it comes back after any
+// other message and stays until Undo, Restart or the end of the level.
 function say(text, cls, keep, ms) {
   var m = $('msg');
   clearTimeout(msgTimer);
+  if (!text && nudgeOn) { text = NUDGE; cls = 'warn'; keep = true; }
   m.textContent = text;
   m.className = cls || '';
-  if (text && !keep) msgTimer = setTimeout(function () { if (!stuck) { m.textContent = ''; m.className = ''; } }, ms || 1800);
+  if (text && !keep) msgTimer = setTimeout(function () { if (!stuck) say(''); }, ms || 1800);
 }
 function shake(i) {
   var t = tubeEls[i];
@@ -1030,7 +1041,8 @@ function apply(from, to, wasLifted, quiet) {
   if (uncover(from)) revealTop(from);
   fly(e, from, to, wasLifted, quiet);
 }
-function revKey() { return mode === 'daily' ? 'D' + dailyIdx : 'L' + (level + 1); }
+// A challenge has its own revealed balls: it never reads, writes or erases those of the normal game.
+function revKey() { return (chal ? 'C' : '') + (mode === 'daily' ? 'D' + dailyIdx : 'L' + (level + 1)); }
 // Three separate slots, so a challenge never touches the run in progress: save.cur (levels),
 // save.daily (today's level) and save.chalGame (a friend's challenge). Revealed mystery balls
 // are remembered per level in save.rev.
@@ -1038,9 +1050,9 @@ function posKey() { return tubes.map(function (t) { return t.join(','); }).join(
 // Discreet help for a game going nowhere: more than twice the star reference, or a known position met 3 times.
 function nudge() {
   if (nudged || stuck || won) return;
-  if (hist.length > 2 * cur.par || revisits >= 3) {
-    nudged = true;
-    say('Partie mal engagée ? Annule quelques coups ou recommence.', 'warn', false, 4500);
+  if (hist.length > 2 * (chal ? chal.target : cur.par) || revisits >= 3) {   // a challenge counts against its own objective
+    nudged = nudgeOn = true;
+    say('');
   }
 }
 function persistCur() {
@@ -1091,6 +1103,7 @@ function undo() {
   seen[posKey()]--;   // going back and forth with undo is not "returning to a known position"
   var m = hist.pop();
   apply(m[1], m[0], false);
+  nudgeOn = false;
   say('');
   persistCur();
   refresh();
@@ -1112,7 +1125,7 @@ function begin(L, o) {
   var rv = L.mystery && save.rev[revKey()];
   if (rv && rv.length === hid.length) for (var k = 0; k < hid.length; k++) if (rv[k] < hid[k]) hid[k] = rv[k];
   hist = []; sel = -1; won = false; stuck = false;
-  seen = {}; revisits = 0; nudged = false;
+  seen = {}; revisits = 0; nudged = false; nudgeOn = false;
   seen[posKey()] = 1;
   var r = o.replay;
   if (r) {   // resume an unfinished game: replay the saved moves, drop them if invalid
@@ -1123,7 +1136,9 @@ function begin(L, o) {
       tubes[m[1]].push(tubes[m[0]].pop());
       uncover(m[0]);
       hist.push([m[0], m[1]]);
-      seen[posKey()] = (seen[posKey()] || 0) + 1;
+      var pk = posKey();
+      seen[pk] = (seen[pk] || 0) + 1;
+      if (seen[pk] > 1) revisits++;   // the counter is rebuilt like the positions
     }
     if (isWon()) return begin(L, again);
   }
@@ -1144,6 +1159,7 @@ function begin(L, o) {
   refresh();
   var hint = mode === 'level' && !chal && !hist.length && level % PER_WORLD === 0 ? WORLDS[worldOf(level)].h : '';
   if (hint && !stuck) say(hint, 'hint', true);
+  if (hist.length) nudge();
 }
 function startLevel(n, replay, o) {
   o = o || {};
@@ -1253,6 +1269,8 @@ function win() {
     if (ok) badgeExtra = 'defi';
   }
   delete save.rev[revKey()];   // the next game of this level starts hidden again
+  nudgeOn = false;
+  say('');
   checkProgress(events, news, badgeExtra);
   info.news = news;
   store();
@@ -1461,7 +1479,7 @@ function goDaily() {
 }
 function pickLevel(n) {
   if (mode === 'level' && !chal && n === level + 1 && !won) { show('game'); return; }   // keep the level in progress
-  startLevel(n, null);
+  startLevel(n, save.cur && save.cur.level === n ? save.cur : null, { keepRev: !!(save.cur && save.cur.level === n) });   // the game in progress is resumed
   show('game');
 }
 function openGrid() {

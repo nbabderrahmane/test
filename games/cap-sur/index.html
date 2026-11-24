@@ -28,6 +28,7 @@ svg{display:block}
 }
 header{display:flex;align-items:center;gap:8px;padding:8px 12px 4px;flex:none}
 .icon{width:48px;height:48px;border-radius:14px;background:var(--panel);display:flex;align-items:center;justify-content:center;flex:none}
+.icon.sp{background:none}
 .icon svg{width:24px;height:24px;fill:var(--ink)}
 .icon svg.st{fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
 .ttl{flex:1;min-width:0;text-align:center}
@@ -184,9 +185,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 12px 4px;flex:none}
       <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
     </button>
     <div class="ttl"><span class="brand">Girouette</span><span id="lvl">Niveau 1</span></div>
-    <button class="icon" id="bReset" aria-label="Recommencer">
-      <svg class="st" viewBox="0 0 24 24"><path d="M4 5v6h6M5 11a8 8 0 1 1 2 7"/></svg>
-    </button>
+    <span class="icon sp" aria-hidden="true"></span>
   </header>
   <div id="chal" hidden><svg viewBox="0 0 24 24"><path d="M5 3h2v18H5zM8 4h11l-3 4.500 3 4.500H8z"/></svg><span id="chalT"></span></div>
   <div id="goal"><span id="gAtt"></span><span id="gStars" class="g"></span></div>
@@ -448,7 +447,11 @@ function emit(msg) {
 }
 
 // ---- persistence (always guarded: the game works without storage) ------------------
-var save = { level: 1, max: 1, stars: [], best: [], cur: null, chalGame: null };
+var save = { max: 1, stars: [], best: [], runs: {}, chalGame: null };
+function firstOpen() {   // the first level not yet won: what "Continuer" points at
+  for (var i = 0; i < N; i++) if (!save.stars[i]) return i + 1;
+  return N;
+}
 function totalStars() {
   var t = 0;
   for (var i = 0; i < save.stars.length; i++) t += save.stars[i] || 0;
@@ -474,12 +477,13 @@ function loadSave() {
       var clamp = function (v, hi) { v = v | 0; return v < 1 ? 1 : v > hi ? hi : v; };
       var nat = function (v, hi) { v = v | 0; return v < 0 ? 0 : v > hi ? hi : v; };
       save.max = clamp(s.max, N);
-      save.level = Math.min(clamp(s.level, N), save.max);
       if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = nat(s.stars[i], 3);
       if (Array.isArray(s.best)) for (i = 0; i < N && i < s.best.length; i++) save.best[i] = nat(s.best[i], MAX_TRIES);
-      if (s.cur && typeof s.cur === 'object') {
-        var n = s.cur.level | 0, gs = n >= 1 && n <= N ? validGuesses(s.cur.guesses, TARGETS[n - 1]) : null;
-        if (gs && gs.length) save.cur = { level: n, guesses: gs };
+      if (s.runs && typeof s.runs === 'object' && !Array.isArray(s.runs)) {
+        for (var n = 1; n <= N; n++) {
+          var gs = validGuesses(s.runs[n], TARGETS[n - 1]);
+          if (gs && gs.length) save.runs[n] = gs;
+        }
       }
       if (s.chalGame && typeof s.chalGame === 'object') {
         var cn = s.chalGame.n | 0, ct = s.chalGame.target | 0;
@@ -512,7 +516,7 @@ function persist() {
   if (chal) {
     save.chalGame = over ? null : { n: level, target: chal.target, guesses: guessedIdx() };
   } else {
-    save.cur = guesses.length && !over ? { level: level, guesses: guessedIdx() } : null;
+    if (guesses.length && !over) save.runs[level] = guessedIdx(); else delete save.runs[level];
   }
   store();
 }
@@ -547,7 +551,6 @@ function refresh(fresh) {
   $('lvl').textContent = 'Niveau ' + level;
   $('gAtt').innerHTML = 'Essai <b>' + Math.min(attempts() + 1, MAX_TRIES) + '/' + MAX_TRIES + '</b>';
   $('gStars').textContent = chal ? '' : '★★★ en 3 · ★★ en 5';
-  $('bReset').disabled = !attempts();
   $('inp').disabled = over;
   renderList(fresh);
   updateOk();
@@ -591,7 +594,7 @@ function renderSugg() {
     html = '<div class="sn">' + (again ? 'Déjà essayé.' : 'Aucune ville de ce nom dans la liste.') + '</div>';
   }
   box.innerHTML = html;
-  box.style.maxHeight = (maxSugg() * 45) + 'px';
+  box.style.maxHeight = (maxSugg() * 44) + 'px';
   document.body.classList.toggle('sg-on', !!html);
   scrollList();
 }
@@ -640,7 +643,7 @@ function finish() {
     if (found) {
       if (s > (save.stars[level - 1] || 0)) save.stars[level - 1] = s;
       if (!info.prevBest || n < info.prevBest) save.best[level - 1] = n;
-      if (level < N) { save.max = Math.max(save.max, level + 1); save.level = level + 1; }
+      if (level < N) save.max = Math.max(save.max, level + 1);
       events.push({ event: 'level_complete', level: level, score: n, stars: s });
     }
   }
@@ -655,7 +658,7 @@ function showWin(info) {
   var last = !chal && level === N;
   if (info.chal) $('wTitle').textContent = info.chal.ok ? 'Défi relevé !' : 'Défi manqué';
   else $('wTitle').textContent = !info.found ? 'Pas cette fois' : s === 3 ? 'En plein dans le mille !' : s === 2 ? 'Bien joué !' : 'Trouvé !';
-  $('wSub').textContent = info.found ? c.n + ' · ' + c.c : 'C’était ' + c.n + ' (' + c.c + ')';
+  $('wSub').textContent = info.found ? c.n + ' · ' + c.c : 'La ville t’a échappé.';
   $('wStars').innerHTML = chal ? '' : starSvg(s >= 1) + starSvg(s >= 2) + starSvg(s >= 3);
   $('wStars').hidden = !!chal || !info.found;
   $('wBig').hidden = !info.found;
@@ -669,12 +672,12 @@ function showWin(info) {
   else rec = 'Un nouvel essai ?';
   $('wRec').textContent = rec;
   $('wChal').hidden = true;
-  $('bNext').textContent = chal ? 'Accueil' : !info.found ? 'Rejouer' : last ? 'Niveaux' : 'Suivant';
-  $('bAgain').hidden = !info.found && !chal ? true : false;
-  $('bAgain').textContent = 'Rejouer';
-  $('bShare').hidden = !info.found && !chal;
+  $('bNext').textContent = chal ? 'Accueil' : !info.found ? 'Réessayer' : last ? 'Niveaux' : 'Suivant';
+  $('bAgain').hidden = !!chal;   // a challenge is played once per opening
+  $('bAgain').textContent = info.found ? 'Rejouer' : 'Niveaux';
+  $('bShare').hidden = !!chal || !info.found;
   $('bShare').textContent = 'Partager';
-  $('bChal').hidden = !info.found;
+  $('bChal').hidden = chal ? !info.chal.ok : !info.found;
   $('bChal').textContent = chal ? 'Renvoyer le défi' : 'Défier un ami';
   var w = $('win'), old = w.querySelectorAll('.bit'), i;
   for (i = 0; i < old.length; i++) w.removeChild(old[i]);
@@ -696,17 +699,16 @@ function begin(n, o) {
   o = o || {};
   level = n; target = TARGETS[n - 1]; chal = o.chal || null;
   guesses = []; found = false; over = false; picked = -1;
-  (o.replay || []).forEach(function (i) { guesses.push(judge(i, target)); });
+  (o.replay || (!o.chal && !o.fresh && save.runs[n]) || []).forEach(function (i) { guesses.push(judge(i, target)); });
   $('win').hidden = true;
+  $('wSub').textContent = '';
   $('inp').value = '';
   $('chal').hidden = !chal;
   $('goal').hidden = false;
   if (chal) $('chalT').textContent = 'Objectif : en ' + chal.target + ' essai' + (chal.target > 1 ? 's' : '') + ' ou moins';
   if (!chal) {
     save.chalGame = null;
-    save.level = n;
-    if (n > save.max) save.max = n;
-    save.cur = guesses.length ? { level: n, guesses: guessedIdx() } : null;
+    if (guesses.length) save.runs[n] = guessedIdx(); else delete save.runs[n];
   }
   say(n === 1 && !guesses.length ? 'Chaque essai donne la distance et la direction.' : '', '', 0);
   refresh(false);
@@ -714,9 +716,6 @@ function begin(n, o) {
   if (chal) persist(); else store();
 }
 function startLevel(n, replay, chalObj) { begin(n, { replay: replay, chal: chalObj }); }
-function restart() {
-  if (chal) begin(level, { chal: chal }); else begin(level);
-}
 
 // ---- sharing ---------------------------------------------------------------------------
 function starsText(s) { var st = ''; while (s--) st += '⭐'; return st; }
@@ -724,10 +723,14 @@ function shareText() {
   var seq = guesses.map(function (g) { return g.hit ? '✅' : ARROWS[g.dir] + g.pct + '%'; }).join(' ');
   return NAME + ' · Niveau ' + level + ' · ' + (found ? starsText(starsFor(attempts())) : '✖') + ' ' + seq;
 }
+// Only origin + pathname: a query string (token, host id) never goes into a link.
 function shareBase() {
   var b = window.MJ_CONFIG && window.MJ_CONFIG.shareBaseUrl;
   if (typeof b !== 'string' || !b) b = /^https?:/i.test(String(location.href)) ? String(location.href) : '';
-  return b.split('#')[0];
+  try {
+    var u = new URL(b);
+    return /^https?:$/.test(u.protocol) ? u.origin + u.pathname : '';
+  } catch (e) { return ''; }
 }
 function challengeText() {
   var base = shareBase(), link = base ? base + '#defi-' + level + '-' + attempts() : '';
@@ -794,12 +797,12 @@ function renderHome() {
   var t = totalStars();
   $('hStars').textContent = t + ' / ' + (N * 3);
   $('hBar').style.width = Math.round(100 * t / (N * 3)) + '%';
-  $('bGo').textContent = 'Continuer · Niveau ' + save.level;
+  $('bGo').textContent = 'Continuer · Niveau ' + firstOpen();
 }
 function renderLevels() {
   var html = '';
   for (var i = 0; i < N; i++) {
-    var n = i + 1, s = save.stars[i] || 0, open = n <= save.max, isCur = n === save.level;
+    var n = i + 1, s = save.stars[i] || 0, open = n <= save.max, isCur = n === firstOpen();
     html += '<button class="cell' + (isCur ? ' cur' : '') + (s ? ' ok' : '') + '" data-level="' + n + '"' + (open ? '' : ' disabled') +
       ' aria-label="Niveau ' + n + (open ? ', ' + s + ' étoile' + (s > 1 ? 's' : '') : ', verrouillé') + '">' +
       '<span class="n">' + (open ? n : LOCK) + '</span><span class="s">' + starSvg(s >= 1) + starSvg(s >= 2) + starSvg(s >= 3) + '</span></button>';
@@ -809,14 +812,11 @@ function renderLevels() {
 }
 function inGame(n) { return !chal && level === n && !over; }
 function goContinue() {
-  var n = save.level;
-  if (inGame(n)) { show('game'); return; }
-  startLevel(n, save.cur && save.cur.level === n ? save.cur.guesses : null);
-  show('game');
+  pickLevel(firstOpen());
 }
 function pickLevel(n) {
   if (inGame(n)) { show('game'); return; }
-  startLevel(n, save.cur && save.cur.level === n ? save.cur.guesses : null);
+  startLevel(n);
   show('game');
 }
 
@@ -870,14 +870,13 @@ onTap($('bBack'), goContinue);
 onTap($('bLBack'), function () { show('home'); });
 onTap($('bGo'), goContinue);
 onTap($('bLevels'), function () { show('levels'); });
-onTap($('bReset'), restart);
 onTap($('bNext'), function () {
   if (chal) show('home');
-  else if (!found) restart();
+  else if (!found) { begin(level, { fresh: true }); show('game'); }
   else if (level < N) { startLevel(level + 1); show('game'); }
   else show('levels');
 });
-onTap($('bAgain'), restart);
+onTap($('bAgain'), function () { if (found) { begin(level, { fresh: true }); show('game'); } else show('levels'); });
 onTap($('bShare'), function () { sendText(shareText(), 'result', $('bShare')); });
 onTap($('bChal'), function () { sendText(challengeText(), 'challenge', $('bChal')); });
 document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
@@ -891,7 +890,7 @@ function fit() {
     app.style.top = vv.offsetTop + 'px'; app.style.height = vv.height + 'px'; app.style.bottom = 'auto';
   } else { app.style.top = app.style.height = app.style.bottom = ''; }
   document.body.classList.toggle('tight', app.clientHeight < 440);
-  $('sugg').style.maxHeight = (maxSugg() * 45) + 'px';
+  $('sugg').style.maxHeight = (maxSugg() * 44) + 'px';
   scrollList();
 }
 window.addEventListener('resize', fit);
@@ -907,7 +906,7 @@ if (cg) {
   startLevel(cg.n, cg.guesses, { target: cg.target, level: cg.n });
   show('game');
 } else {
-  startLevel(save.level, save.cur && save.cur.level === save.level ? save.cur.guesses : null);
+  startLevel(firstOpen());
   show('home');
 }
 fit();
@@ -930,7 +929,7 @@ window.__game = {
       suggestions: sugList.map(function (i) { return CITIES[i].n; }),
       total: totalStars(),
       max: save.max,
-      saveLevel: save.level,
+      continueLevel: firstOpen(),
       challenge: chal ? { target: chal.target, level: chal.level } : null
     };
   },

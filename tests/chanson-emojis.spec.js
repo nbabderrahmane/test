@@ -27,18 +27,22 @@ const results = [];
 // Messages to the host land in window.__msgs; navigator.share texts in window.__shared (when opts.share).
 async function open(viewport = { width: 360, height: 640 }, opts = {}) {
   const context = await browser.newContext({ ...MOBILE, viewport, ...(opts.extra || {}) });
-  await context.addInitScript(({ save, key, config, share }) => {
+  await context.addInitScript(({ config, share }) => {
     window.__msgs = []; window.__shared = [];
     window.addEventListener('message', e => { if (e.data && e.data.source === 'mini-jeu') window.__msgs.push(e.data); });
-    // seed once per tab (window.name survives a reload): reading localStorage at document start is racy in Chromium
-    try { if (save !== null && window.name !== 'seeded') { window.name = 'seeded'; localStorage.setItem(key, typeof save === 'string' ? save : JSON.stringify(save)); } } catch (e) { /* ignore */ }
     if (config) window.MJ_CONFIG = config;
     if (share) navigator.share = t => { window.__shared.push(t.text); return Promise.resolve(); };
-  }, { save: opts.save === undefined ? null : opts.save, key: KEY, config: opts.config || null, share: !!opts.share });
+  }, { config: opts.config || null, share: !!opts.share });
   const page = await context.newPage();
   page.on('console', m => { if (m.type() === 'error') problems.push('console.error: ' + m.text()); });
   page.on('pageerror', e => problems.push('pageerror: ' + e.message));
   page.on('request', r => { if (r.url().split('#')[0] !== URL) problems.push('request: ' + r.url()); });
+  if (opts.save !== undefined) {   // seed the storage with a first visit, then open for real (no init-script storage access)
+    await page.goto(URL);
+    await page.waitForFunction(() => !!window.__game);
+    await page.evaluate(([k, v]) => localStorage.setItem(k, v), [KEY, typeof opts.save === 'string' ? opts.save : JSON.stringify(opts.save)]);
+    await page.goto('about:blank');
+  }
   await page.goto(URL + (opts.hash || ''));
   await page.waitForFunction(() => !!window.__game);
   return { context, page };

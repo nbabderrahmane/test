@@ -24,6 +24,16 @@ const WORLD_RULES = [
   [4, 1, 0, false], [4, 1, 1, true], [4, 1, 0, true], [5, 1, 0, false], [5, 1, 1, true],
 ];
 const QA = require('../tools/qa/lib');
+// Another seed for every simulation: TEST_SEED=5555 node tests/tri-couleurs.spec.js
+const SEED = +process.env.TEST_SEED || 90001;
+// Fingerprint of the level set, as the game computes it (FNV-1a over the level strings).
+const FP = (() => {
+  const D = QA.loadAll();
+  let h = 0x811c9dc5;
+  const str = D.levels.map(l => l.raw).join(',') + '|' + D.daily.map(l => l.raw).join(',');
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(16);
+})();
 const { runAll } = require('./helpers/analysis');
 
 let browser;
@@ -40,7 +50,7 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
     window.addEventListener('message', e => { if (e.data && e.data.source === 'mini-jeu') window.__msgs.push(e.data); });
     try { if (save && !localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify(save)); } catch (e) { /* ignore */ }
     if (config) window.MJ_CONFIG = config;
-  }, { save: opts.save || null, key: KEY, config: opts.config || null });
+  }, { save: opts.save ? (opts.rawSave ? opts.save : { fp: FP, ...opts.save }) : null, key: KEY, config: opts.config || null });
   const page = await context.newPage();
   page.on('console', m => { if (m.type() === 'error') problems.push('console.error: ' + m.text()); });
   page.on('pageerror', e => problems.push('pageerror: ' + e.message));
@@ -250,12 +260,17 @@ function checkFit(m, tag) {
   const recount = async () => {
     if (measured) return measured;
     const t = Date.now();
-    const [first, win, opt] = await Promise.all([
+    const myst = ALL.filter(x => x.l.mystery);
+    const [first, win, opt, att, two] = await Promise.all([
       runAll(ALL.map(x => ({ type: 'first', id: x.id, raw: x.l.raw }))),
-      runAll(ALL.map((x, k) => ({ type: 'win', id: x.id, raw: x.l.raw, par: x.par, seed: 90001 + 17 * k, games: 800 }))),
+      runAll(ALL.map((x, k) => ({ type: 'win', id: x.id, raw: x.l.raw, par: x.par, seed: SEED + 17 * k, games: 800 }))),
       runAll(ALL.map(x => ({ type: 'opt', id: x.id, raw: x.l.raw, maxNodes: 400000 }))),
+      runAll(ALL.map((x, k) => ({ type: 'att', id: x.id, raw: x.l.raw, seed: SEED + 4001 + 31 * k, games: x.daily ? 100 : 300 }))),
+      runAll(myst.map(x => ({ type: 'two', id: x.id, raw: x.l.raw }))),
     ]);
-    measured = ALL.map((x, k) => ({ ...x, first: first[k], win: win[k].win, opt: opt[k], d: x.par + 40 * (1 - win[k].win) }));
+    const twoById = {};
+    two.forEach(r => { twoById[r.id] = r; });
+    measured = ALL.map((x, k) => ({ ...x, first: first[k], win: win[k].win, opt: opt[k], att: att[k].win, two: twoById[x.id] || null, d: x.par + 40 * (1 - win[k].win) }));
     console.log(`        recount of ${ALL.length} levels: ${((Date.now() - t) / 1000).toFixed(0)} s`);
     return measured;
   };
@@ -299,10 +314,10 @@ function checkFit(m, tag) {
     console.log('        median difficulty per world: ' + med.map(m => m.toFixed(0)).join(' '));
   });
 
-  await test('decision 3: daily levels are homogeneous (random player wins 25 % to 60 % of the games)', async () => {
+  await test('decision 3 and 12: daily levels are homogeneous (random player wins 28 % to 57 %, a margin inside the 25-60 % of the spec)', async () => {
     const D = (await recount()).filter(x => x.daily);
     assert.equal(D.length, 120);
-    D.forEach(x => assert.ok(x.win >= 0.25 && x.win <= 0.60, `${x.id}: random player wins ${(100 * x.win).toFixed(1)} %`));
+    D.forEach(x => assert.ok(x.win >= 0.28 && x.win <= 0.57, `${x.id}: random player wins ${(100 * x.win).toFixed(1)} %`));
     console.log(`        daily win rates: ${Math.round(100 * Math.min(...D.map(x => x.win)))}-${Math.round(100 * Math.max(...D.map(x => x.win)))} %`);
   });
 
@@ -315,7 +330,7 @@ function checkFit(m, tag) {
       assert.ok(x.par <= x.opt.len, `${x.id}: reference ${x.par} is longer than the optimum ${x.opt.len}`);
       assert.equal(x.par, x.opt.len, `${x.id}: reference ${x.par} is shorter than the optimum ${x.opt.len}?!`);
     });
-    assert.ok(proven >= 0.9 * M.length, `only ${proven}/${M.length} optima could be recomputed`);
+    assert.equal(proven, M.length, `only ${proven}/${M.length} optima could be recomputed`);
     console.log(`        optimum recomputed and equal to the reference on ${proven}/${M.length} levels`);
   });
 
@@ -833,11 +848,216 @@ function checkFit(m, tag) {
     await context.close();
   });
 
-  await test('ranks: "Maniaque" is now "Perfectionniste"', async () => {
-    assert.ok(!/Maniaque/.test(fs.readFileSync(FILE, 'utf8')));
-    const { context, page } = await open({ width: 360, height: 640 }, { save: { level: 78, max: 78, stars: stars(77, 3), best: stars(77, 30), cur: null, rankSeen: 5 } });
-    assert.equal((await page.locator('#hRankN').textContent()).trim(), 'Perfectionniste');
+  await test('decision 17: rank names fit at 320 px (the longest included); "Méticuleux" replaces "Perfectionniste"', async () => {
+    const html = fs.readFileSync(FILE, 'utf8');
+    assert.ok(!/Maniaque|Perfectionniste/.test(html));
+    const thresholds = [0, 15, 40, 80, 140, 230, 360, 520];
+    const names = ['Fouillis', 'Apprenti', 'Trieur', 'Rangeur', 'Organisé', 'Méticuleux', 'Maître trieur', 'Pile Poil'];
+    const widths = [];
+    for (let r = 0; r < 8; r++) {
+      const T = thresholds[r], full = Math.floor(T / 3), rest = T - 3 * full;
+      const st = stars(full, 3).concat(rest ? [rest] : []);
+      const { context, page } = await open({ width: 320, height: 568 }, { save: { level: Math.min(200, st.length + 1), max: Math.min(200, st.length + 1), stars: st, best: stars(st.length, 30), cur: null, rankSeen: r } });
+      const m = await page.evaluate(() => { const e = document.getElementById('hRankN'); return { t: e.textContent.trim(), sw: e.scrollWidth, cw: e.clientWidth }; });
+      assert.equal(m.t, names[r]);
+      assert.ok(m.sw <= m.cw, `rank "${m.t}" is cut at 320 px (${m.sw} > ${m.cw})`);
+      widths.push(`${m.t}:${m.sw}/${m.cw}`);
+      await context.close();
+    }
+    console.log('        rank name widths at 320 px: ' + widths.join(' '));
+  });
+
+  await test('decision 15: a save made for other levels restarts progress, keeps the series, jokers and series badges', async () => {
+    const old = { level: 30, max: 30, stars: stars(29, 3), best: stars(29, 20), cur: { level: 30, hist: [[0, 1]] }, rankSeen: 5,
+      streak: 9, jokers: 1, lastDay: Math.floor(Date.now() / 864e5), badges: ['serie7', 'monde1', 'defi', 'etoiles100'],
+      rev: { L41: [0, 0] }, daily: { idx: 1, day: 5, hist: [[0, 1]] }, chalGame: { kind: 'level', n: 3, day: 0, target: 9, hist: [] }, fp: 'not-this-game' };
+    for (const fp of ['not-this-game', undefined]) {
+      const save = { ...old }; if (fp === undefined) delete save.fp;
+      const { context, page } = await open({ width: 360, height: 640 }, { save, rawSave: true });
+      const s = await state(page);
+      assert.equal(s.screen, 'home', 'a stale challenge in progress is not resumed');
+      assert.equal(s.total, 0, 'stars restart');
+      assert.match(await page.locator('#bGo').textContent(), /Niveau 1/);
+      assert.equal(s.streak, 9); assert.equal(s.jokers, 1);
+      assert.deepEqual(s.badges, ['serie7'], 'only the series badges stay');
+      const st = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY);
+      assert.equal(st.cur, null); assert.equal(st.daily, null); assert.equal(st.chalGame, null); assert.deepEqual(st.rev, {});
+      assert.equal(st.rankSeen, 0);
+      assert.equal(st.fp, FP);
+      assert.equal((await msgs(page)).length, 0);
+      await context.close();
+    }
+    // the same content under the right fingerprint is kept
+    const { context, page } = await open({ width: 360, height: 640 }, { save: { ...old, fp: FP, cur: null, daily: null, chalGame: null } , rawSave: true });
+    assert.equal((await state(page)).total, 87);
     await context.close();
+  });
+
+  await test('decision 16: choosing the level in progress in the grid resumes it, whatever the game on screen', async () => {
+    const hist = SOL.levels[11].slice(0, 6);
+    const save = { level: 12, max: 12, stars: stars(11, 3), best: stars(11, 20), cur: { level: 12, hist } };
+    const { context, page } = await open({ width: 360, height: 640 }, { save, hash: '#defi-3-50' });
+    assert.equal((await state(page)).level, 3, 'fixture: a challenge is on screen');
+    await page.locator('#bMap').tap();
+    await page.locator('#bGBack').tap();
+    await page.locator('[data-world="0"]').tap();
+    await page.locator('[data-level="12"]').tap();
+    let s = await state(page);
+    assert.equal(s.level, 12);
+    assert.equal(s.moves, 6, 'the 6 moves in progress are resumed');
+    assert.equal(s.challenge, null);
+    // and from a daily level on screen
+    await page.evaluate(() => window.__game.loadDaily(0));
+    await page.locator('#bMap').tap();                       // daily: back to the home screen
+    await page.locator('#bWorlds').tap();
+    await page.locator('[data-world="0"]').tap();
+    await page.locator('[data-level="12"]').tap();
+    s = await state(page);
+    assert.equal(s.level, 12); assert.equal(s.moves, 6);
+    const st = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY);
+    assert.deepEqual(st.cur, { level: 12, hist });
+    await context.close();
+  });
+
+  await test('decision 14: a challenge has its own revealed balls; the normal game keeps (and never loses) its own', async () => {
+    const { context, page } = await open();
+    const n = 41, sol = SOL.levels[n - 1];
+    const sum = x => x.hidden.reduce((a, b) => a + b, 0);
+    const s0 = await page.evaluate(k => window.__game.loadLevel(k), n);
+    await page.evaluate(m => m.forEach(([a, b]) => window.__game.applyMove(a, b)), sol.slice(0, 8));
+    await page.locator('#bUndo').tap(); await page.locator('#bUndo').tap();
+    const normal = await state(page);                        // 6 moves, some balls revealed (and 2 undone)
+    assert.ok(sum(normal) < sum(s0), 'fixture: a reveal happened');
+    const rev = () => page.evaluate(k => JSON.parse(localStorage.getItem(k)).rev, KEY);
+    const before = (await rev()).L41;
+    // open the challenge on the same level without playing, then "Continuer"
+    await page.evaluate(h => { location.hash = h; }, `#defi-${n}-99`);
+    await page.waitForFunction(() => window.__game.state().challenge !== null);
+    const ch = await state(page);
+    assert.deepEqual(ch.hidden, s0.hidden, 'the challenge starts with everything hidden');
+    assert.deepEqual((await rev()).L41, before, 'opening a challenge leaves the normal game alone');
+    await page.locator('#bMap').tap(); await page.locator('#bGBack').tap(); await page.locator('#bWBack').tap();
+    await page.locator('#bGo').tap();
+    const back = await state(page);
+    assert.equal(back.challenge, null);
+    assert.deepEqual(back.hidden, normal.hidden, 'Continuer: the normal game has its balls as it left them');
+    assert.equal(back.moves, 6);
+    // play the challenge: its reveals do not leak into the normal game; winning it does not erase them
+    await page.evaluate(h => { location.hash = h; }, `#defi-${n}-99`);
+    await page.waitForFunction(() => window.__game.state().challenge !== null);
+    await page.evaluate(m => m.forEach(([a, b]) => window.__game.applyMove(a, b)), sol.slice(0, 5));
+    const r1 = await rev();
+    assert.deepEqual(r1.L41, before, 'the normal revealed balls are untouched while the challenge is played');
+    assert.ok(r1.CL41, 'the challenge keeps its own');
+    await page.evaluate(m => m.forEach(([a, b]) => window.__game.applyMove(a, b)), sol.slice(5));
+    assert.equal((await state(page)).won, true);
+    const r2 = await rev();
+    assert.deepEqual(r2.L41, before, 'winning the challenge does not erase the normal revealed balls');
+    assert.equal(r2.CL41, undefined, 'it erases its own');
+    await context.close();
+  });
+
+  await test('decision 13: the "badly started" message stays until Undo, Restart or the end; threshold on the challenge objective; counter rebuilt on reload', async () => {
+    const { context, page } = await open();
+    const levels = await page.evaluate(() => window.__game.levels);
+    const walkOn = (n, steps, seed0) => {                  // self-avoiding walk of `steps` moves
+      const L = levels[n - 1], t = L.tubes.map(x => x.slice()), seen = new Set(), walk = [];
+      const key = u => u.map(x => x.join(',')).join('|');
+      let seed = seed0;
+      const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+      seen.add(key(t));
+      while (walk.length < steps) {
+        const opts = [];
+        for (let a = 0; a < t.length; a++) for (let b = 0; b < t.length; b++) {
+          if (!canMove(t, L.caps, a, b)) continue;
+          const u = t.map(x => x.slice()); u[b].push(u[a].pop());
+          if (!seen.has(key(u)) && !done(u, L.caps) && !noMove(u, L.caps)) opts.push([a, b, u]);
+        }
+        assert.ok(opts.length, 'fixture: the walk got stuck');
+        const [a, b, u] = opts[Math.floor(rnd() * opts.length)];
+        walk.push([a, b]); seen.add(key(u)); t[b].push(t[a].pop());
+      }
+      return walk;
+    };
+    const msg = () => page.locator('#msg').textContent();
+    // (a) persistent message
+    const n = 22, par = SOL.levels[n - 1].length, walk = walkOn(n, 2 * par + 3, 4242);
+    await page.evaluate(k => window.__game.loadLevel(k), n);
+    await page.evaluate(m => m.forEach(([a, b]) => window.__game.applyMove(a, b)), walk.slice(0, 2 * par + 1));
+    assert.match(await msg(), /mal engagée/);
+    await tube(page, walk[2 * par + 1][0]).tap();            // selecting a ball does not wipe it
+    assert.match(await msg(), /mal engagée/, 'still there after selecting a tube');
+    await tube(page, walk[2 * par + 1][1]).tap();            // ... nor does the next move
+    assert.match(await msg(), /mal engagée/, 'still there after the next move');
+    await page.evaluate(m => window.__game.applyMove(m[0], m[1]), walk[2 * par + 2]);
+    assert.match(await msg(), /mal engagée/);
+    await page.locator('#bUndo').tap();
+    assert.doesNotMatch(await msg(), /mal engagée/, 'Undo dismisses it');
+    await page.evaluate(m => m.forEach(([a, b]) => window.__game.applyMove(a, b)), [walk[2 * par + 2]]);
+    assert.doesNotMatch(await msg(), /mal engagée/, 'once per game until Restart');
+    await page.locator('#bReset').tap();
+    assert.doesNotMatch(await msg(), /mal engagée/, 'Restart dismisses it');
+    await page.evaluate(m => m.forEach(([a, b]) => window.__game.applyMove(a, b)), walk.slice(0, 2 * par + 1));
+    assert.match(await msg(), /mal engagée/, 'and it can come back after a Restart');
+    // (b) the threshold of a challenge is its objective
+    const target = 5;
+    await page.evaluate(h => { location.hash = h; }, `#defi-${n}-${target}`);
+    await page.waitForFunction(() => window.__game.state().challenge !== null);
+    await page.evaluate(m => m.forEach(([a, b]) => window.__game.applyMove(a, b)), walk.slice(0, 2 * target));
+    assert.doesNotMatch(await msg(), /mal engagée/);
+    await page.evaluate(m => window.__game.applyMove(m[0], m[1]), walk[2 * target]);
+    assert.match(await msg(), /mal engagée/, 'twice the objective of the challenge, not twice the reference');
+    await context.close();
+
+    // (c) returns are counted again after a reload
+    const b = await open();
+    let cyc = null;
+    const lv = await b.page.evaluate(() => window.__game.levels);
+    for (let i = 3; i < 60 && !cyc; i++) {
+      const l = lv[i], e = l.tubes.findIndex((x, k) => !x.length && l.caps[k] === l.cap);
+      const a = l.tubes.findIndex(x => x.length >= 2 && x[x.length - 1] === x[x.length - 2]);
+      if (e >= 0 && a >= 0 && SOL.levels[i].length >= 8) cyc = { n: i + 1, a, e };
+    }
+    assert.ok(cyc, 'fixture: a cycle');
+    await b.page.evaluate(k => window.__game.loadLevel(k), cyc.n);
+    const go = (x, y) => b.page.evaluate(([f, t]) => window.__game.applyMove(f, t), [x, y]);
+    await go(cyc.a, cyc.e); await go(cyc.e, cyc.a); await go(cyc.a, cyc.e);   // 2 returns so far
+    await b.page.reload();
+    await b.page.waitForFunction(() => !!window.__game);
+    await b.page.locator('#bGo').tap();
+    assert.equal((await state(b.page)).moves, 3);
+    await b.page.evaluate(([f, t]) => window.__game.applyMove(f, t), [cyc.e, cyc.a]);   // the 3rd return
+    assert.match(await b.page.locator('#msg').textContent(), /mal engagée/, 'returns seen before the reload still count');
+    await b.context.close();
+  });
+
+  await test('decision 10: no wall (an attentive player wins >= 10 % of every level, medians never fall by more than a third, world 10 stays the hardest and >= 15 %)', async () => {
+    const M = (await recount()).filter(x => !x.daily);
+    const all = await recount();
+    all.forEach(x => assert.ok(x.att >= 0.10, `${x.id}: the attentive player wins ${(100 * x.att).toFixed(1)} %`));
+    const am = [], dm = [];
+    for (let w = 0; w < 10; w++) {
+      const W = M.slice(w * 20, w * 20 + 20);
+      am.push(median(W.map(x => x.att))); dm.push(median(W.map(x => x.d)));
+    }
+    for (let w = 1; w < 10; w++) assert.ok(am[w] >= am[w - 1] * 2 / 3, `attentive median falls from ${(100 * am[w - 1]).toFixed(0)} % to ${(100 * am[w]).toFixed(0)} % (world ${w} -> ${w + 1})`);
+    assert.ok(am[9] >= 0.15, `world 10: attentive median ${(100 * am[9]).toFixed(0)} %`);
+    assert.equal(dm.indexOf(Math.max(...dm)), 9, 'world 10 has the highest difficulty');
+    assert.ok(am[9] <= Math.min(...am.slice(0, 9)) + 0.001, 'and the lowest attentive median');
+    console.log('        attentive median win per world: ' + am.map(a => Math.round(100 * a) + '%').join(' ') + ' (lowest level: ' + Math.round(100 * Math.min(...all.map(x => x.att))) + '%)');
+  });
+
+  await test('decision 11: mystery levels: at most 25 % of the two-move openings lose the level', async () => {
+    const M = (await recount()).filter(x => x.l.mystery);
+    assert.equal(M.length, 80);
+    let worst = 0;
+    M.forEach(x => {
+      assert.equal(x.two.unknown, 0, `${x.id}: a position could not be decided`);
+      const f = x.two.fatal / x.two.pairs;
+      worst = Math.max(worst, f);
+      assert.ok(f <= 0.25, `${x.id}: ${x.two.fatal}/${x.two.pairs} two-move openings lose the level`);
+    });
+    console.log(`        worst two-move trap on a mystery level: ${Math.round(100 * worst)} %`);
   });
 
   await test('the win screen never opens over another screen', async () => {
@@ -962,13 +1182,13 @@ function checkFit(m, tag) {
     await blocked.close();
   });
 
-  await test('migration: a lot 1 save is read without loss (stars, best, unlocked levels, level in progress)', async () => {
-    const lot1 = { level: 10, max: 10, stars: [3, 3, 2, 3, 1, 2, 3, 3, 2, 3], best: [3, 6, 14, 17, 25, 22, 24, 27, 30, 34], cur: null };
-    let { context, page } = await open({ width: 360, height: 640 }, { save: lot1 });
+  await test('save: read without loss, level in progress resumed, garbage ignored; stale saves restart (decision 15)', async () => {
+    const mine = { level: 11, max: 11, stars: [3, 3, 2, 3, 1, 2, 3, 3, 2, 3], best: [3, 6, 14, 17, 25, 22, 24, 27, 30, 34], cur: null };
+    let { context, page } = await open({ width: 360, height: 640 }, { save: mine });
     let s = await state(page);
     assert.equal(s.total, 25, 'total stars kept');
     assert.equal((await msgs(page)).length, 0, 'nothing celebrated for stars already won');
-    assert.match(await page.locator('#bGo').textContent(), /Niveau 11/, 'level 10 was finished: level 11 is next');
+    assert.match(await page.locator('#bGo').textContent(), /Niveau 11/);
     await page.locator('#bWorlds').tap();
     assert.equal((await page.locator('#mTotal').textContent()).trim(), '25/600');
     await page.locator('[data-world="0"]').tap();
@@ -977,9 +1197,10 @@ function checkFit(m, tag) {
     assert.ok(await page.locator('[data-level="11"]').isEnabled(), 'level 11 unlocked');
     assert.ok(await page.locator('[data-level="12"]').isDisabled());
     const stored = JSON.parse(await page.evaluate(k => localStorage.getItem(k), KEY));
-    assert.deepEqual(stored.stars.slice(0, 10), lot1.stars);
-    assert.deepEqual(stored.best.slice(0, 10), lot1.best);
+    assert.deepEqual(stored.stars.slice(0, 10), mine.stars);
+    assert.deepEqual(stored.best.slice(0, 10), mine.best);
     assert.equal(stored.stars.length, 200);
+    assert.equal(stored.fp, FP, 'the save carries the fingerprint of the level set');
     assert.equal(s.streak, 0); assert.equal(s.jokers, 0);
     await context.close();
 

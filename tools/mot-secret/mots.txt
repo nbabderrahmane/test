@@ -146,3 +146,14 @@ lire écrire compter calculer dessiner colorier découper coller plier ranger ne
 ordinateur clavier souris écran téléphone message courrier lettre timbre enveloppe colis
 tableau règle gomme cartable cahier trousse stylo crayon feutre ciseaux colle compas équerre
 printemps été automne hiver saison semaine mois année heure minute seconde matin midi soir nuit
+# --- batch 3 (R9): family words and extra candidates per letter
+femme maman papa fille garçon tante oncle cousin cousine neveu nièce grand-mère homme bébé famille maison repas soupe riz
+cake cari cime clan clic club cola cône coût cèpe cuve coin clip
+paon pari pays plie pneu pore pote pouf puma paie pavé pied pipe pile pion plan plat
+tuile tulle tenue tarot totem tango taupe tonte tarte tapis tente tigre table talon tasse tâche tabac timbre trace train trait tribu trône truc tuyau texte thème titre toile tonne torse tuteur
+saumon salive sachet sortie sorbet signer souper sucrer stable sentir serrer savane saison salade saluer sauter savoir secret siècle signal soleil sommet source sourire souris statue studio sillon sonner sortir souffler soulever sourcil souvenir
+bambou bassin besoin bonbon bonnet bouche briser bidule barrer bateau berger bijou bouton boucle bougie brique brosse bureau buffet bocal balcon ballon banane banque barque bagage balcon blouse
+mémoire minerai montage mesurer masseur matinée machine magasin marcher mariage marteau matelas mélange message mission moineau monnaie moustique musique mystère médecin meunier marmite maillot mijoter moisson modèle mousse mastic mouchoir musique
+cycle carte cabri cacao cadre canal canif canne carré cause chair champ chant chêne chien chose cidre ciel cible citer clown calme chaos chute colle corde corps coton coude cours crème créer crier cuire
+piano perle pièce piège pince piste place plage plaie plume plomb pluie poche poème poids point poire poule prise proie puits pomme pouce paume pelle peine phare pêche panne paire palme
+fruit fleur fable façon faire farce ferme fiche filet foire folie forêt forge forme fosse foule frein frère frite froid fumée fusée fête fève figue flair flûte

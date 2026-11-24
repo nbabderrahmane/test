@@ -60,20 +60,24 @@ const events = async (page, name) => (await msgs(page)).filter(m => m.event === 
 const saved = page => page.evaluate(k => JSON.parse(localStorage.getItem(k) || 'null'), KEY);
 const pit = (page, i) => page.locator(`[data-pit="${i}"]`);
 // Resolves with the state once it is my turn again (or the game is over), polling inside the page.
-const myTurn = page => page.evaluate(() => new Promise((resolve, reject) => {
+// `after` = the number of moves played before the tap: a tap is handled asynchronously by the page, so
+// the state is only trusted once the move has really been played.
+const myTurn = (page, after = -1) => page.evaluate(a => new Promise((resolve, reject) => {
   let n = 0;
   const f = () => {
     const s = window.__game.state();
-    if (!s.busy && (s.turn === 0 || s.over)) resolve(s);
+    if (s.plies > a && !s.busy && (s.turn === 0 || s.over)) resolve(s);
     else if (++n > 6000) reject(new Error('no turn after 12 s'));
     else setTimeout(f, 2);
   };
   f();
-}));
+}), after);
+// Reloads after letting the page's storage writes reach the browser (a reload right after a write can read the old value).
+async function reload(page) { await page.waitForTimeout(250); await page.reload(); await page.waitForFunction(() => !!window.__game); }
 const refOf = s => R.initial(s.board, s.store, 0);
 
 // One real tap on a pit, then waits until the adversary has answered (or the game is over).
-async function tapPit(page, i) { await pit(page, i).tap(); await myTurn(page); }
+async function tapPit(page, i) { const b = await state(page); await pit(page, i).tap(); return myTurn(page, b.plies); }
 
 // Plays the current game to its end with real taps; `player` chooses from a reference state.
 async function playByTaps(page, player) {
@@ -84,8 +88,9 @@ async function playByTaps(page, player) {
     if (s.over) return s;
     const p = player(refOf(s), null, s.plies);
     assert.ok(s.legal.includes(p), `player chose an illegal pit ${p} (legal ${s.legal})`);
+    const before = s.plies;
     await page.touchscreen.tap(c[p][0], c[p][1]);
-    s = await myTurn(page);
+    s = await myTurn(page, before);
   }
   throw new Error('game does not end');
 }
@@ -575,7 +580,7 @@ const ENDS = [
     await page.evaluate(() => { window.__game.still(true); window.__game.seed(21); window.__game.loadLevel(10); });
     await tapPit(page, 1); await tapPit(page, 4); await tapPit(page, 0);
     const before = await state(page);
-    await page.reload(); await page.waitForFunction(() => !!window.__game);
+    await reload(page);
     let s = await state(page);
     assert.equal(s.screen, 'home');
     assert.equal(await page.locator('#bGo').innerText(), 'Continuer · Niveau 10');
@@ -595,11 +600,10 @@ const ENDS = [
     await a.page.evaluate(() => { window.__game.seed(5); window.__game.loadLevel(12); });
     await a.page.locator('[data-pit="3"]').tap();
     await a.page.waitForFunction(() => window.__game.state().hist.length >= 1);
-    await a.page.reload(); await a.page.waitForFunction(() => !!window.__game);
+    await reload(a.page);
     await a.page.locator('#bGo').tap();
     await a.page.waitForFunction(() => !window.__game.state().busy && window.__game.state().turn === 0, null, { timeout: 6000 });
     const got = await state(a.page);
-    if (JSON.stringify([got.board, got.store, got.hist]) !== JSON.stringify([want.board, want.store, want.hist])) console.log('DBG MISMATCH got', JSON.stringify(got), 'want', JSON.stringify(want), await a.page.evaluate(() => localStorage.getItem('mj:semailles:v1')));
     assert.deepEqual([got.board, got.store, got.hist], [want.board, want.store, want.hist]);
     await a.context.close();
   });
@@ -621,7 +625,7 @@ const ENDS = [
     await page.locator('#bMap').tap();
     await page.locator('.cell[data-lv="9"]').tap({ force: true }).catch(() => {});
     assert.equal((await state(page)).screen, 'levels', 'a locked level does not open');
-    await page.reload(); await page.waitForFunction(() => !!window.__game);
+    await reload(page);
     s = await state(page);
     assert.equal(s.total, 6); assert.equal(s.max, 5);
     await context.close();
@@ -644,6 +648,7 @@ const ENDS = [
       assert.equal(s.screen, 'home', raw);
       assert.ok(s.level >= 1 && s.level <= 20 && s.max >= 1 && s.max <= 20, raw);
       await page.locator('#bGo').tap();
+      await page.evaluate(() => window.__game.still(true));
       s = await state(page);
       assert.equal(s.over, false, raw); assert.equal(s.turn, 0, raw);
       assert.equal(s.board.reduce((a, b) => a + b, 0) + s.store[0] + s.store[1], 48, raw);
@@ -737,7 +742,7 @@ const ENDS = [
     assert.equal(s.free, true);
     assert.equal(await A.page.locator('#chal').isVisible(), true);
     assert.match(await A.page.locator('#chalT').innerText(), new RegExp('Défi : prends au moins ' + myScore + ' graines'));
-    assert.equal(await A.page.locator('#goal').innerText(), `Un seul objectif : ${myScore} graines`);
+    assert.equal(await A.page.locator('#goal').isVisible(), false, 'the star criteria are gone: the challenge is the only goal');
     assert.equal(await A.page.evaluate(() => location.hash), '', 'the fragment is consumed');
     assert.equal(keep(await saved(A.page)), keep(snapshot), 'opening a challenge writes nothing');
     assert.deepEqual((await events(A.page, 'challenge_open')).map(e => [e.level, e.target]), [[12, myScore]]);
@@ -780,7 +785,7 @@ const ENDS = [
     await page.evaluate(() => { window.__game.still(true); window.__game.seed(2); });
     await tapPit(page, 1);
     const before = await state(page);
-    await page.reload(); await page.waitForFunction(() => !!window.__game);
+    await reload(page);
     const s = await state(page);
     assert.equal(s.mode, 'challenge'); assert.equal(s.level, 6); assert.equal(s.challenge.target, 30); assert.equal(s.screen, 'game');
     assert.deepEqual([s.board, s.hist], [before.board, before.hist]);

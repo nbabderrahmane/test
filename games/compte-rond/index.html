@@ -306,7 +306,13 @@ function emit(msg) {
 }
 
 // ---- persistence (always guarded: the game works without storage) ------------
-var save = { level: 1, max: 1, stars: [], cur: null };
+var save = { max: 1, stars: [], cur: null };
+// "Continuer" always points to the first unfinished level (replaying an old level never moves it)
+function firstOpen() {
+  for (var i = 0; i < N; i++) if (!save.stars[i]) return i + 1;
+  return N;
+}
+function curFor(n) { return save.cur && save.cur.level === n ? save.cur : null; }
 function totalStars() {
   var t = 0;
   for (var i = 0; i < save.stars.length; i++) t += save.stars[i] || 0;
@@ -321,18 +327,18 @@ function loadSave() {
     if (s && typeof s === 'object') {
       var nat = function (v, lo, hi) { v = v | 0; return v < lo ? lo : v > hi ? hi : v; };
       save.max = nat(s.max, 1, N);
-      save.level = Math.min(nat(s.level, 1, N), save.max);
       if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = nat(s.stars[i], 0, 3);
       if (s.cur && typeof s.cur === 'object' && Array.isArray(s.cur.hist)) {
         var h = [];
         s.cur.hist.slice(0, 5).forEach(function (m) {
           if (Array.isArray(m) && m.length === 3) h.push([nat(m[0], 0, 5), nat(m[1], 0, 3), nat(m[2], 0, 5)]);
         });
-        save.cur = { level: nat(s.cur.level, 1, N), hist: h };
+        var sl = Array.isArray(s.cur.sel) ? s.cur.sel : [];
+        save.cur = { level: nat(s.cur.level, 1, N), hist: h, sel: [nat(sl[0] === undefined ? -1 : sl[0], -1, 5), nat(sl[1] === undefined ? -1 : sl[1], -1, 3)] };
+        if (sl[0] === -1 || sl[0] === undefined) save.cur.sel = [-1, -1];
       }
       // a finished level always opens the next one
       for (i = 0; i < N - 1; i++) if (save.stars[i] > 0 && save.max < i + 2) save.max = i + 2;
-      save.level = Math.min(save.level, save.max);
     }
   } catch (e) { /* no storage: play without it */ }
 }
@@ -392,7 +398,8 @@ function doOp(a, o, b) {
   return c;
 }
 
-function begin(n, replay, ch) {
+function begin(n, cur, ch) {
+  var replay = cur && cur.hist;
   clearTimeout(winTimer); clearTimeout(msgTimer);
   level = n - 1; L = LEVELS[level]; chal = ch || null;
   vals = L.n.slice(); made = [0, 0, 0, 0, 0, 0]; hist = []; selA = -1; selOp = -1; won = false; stuck = false; warn = '';
@@ -402,20 +409,20 @@ function begin(n, replay, ch) {
       if (!doOp(m[0], m[1], m[2]).ok) break;
     }
     if (exact() || (replay.length && hist.length !== replay.length)) { vals = L.n.slice(); made = [0, 0, 0, 0, 0, 0]; hist = []; }
+    else if (cur.sel && cur.sel[0] >= 0 && vals[cur.sel[0]] !== null) { selA = cur.sel[0]; selOp = cur.sel[1]; }
   }
   $('win').hidden = true;
   buildTiles();
   refresh();
-  if (!replay || !hist.length) hintFirst();
+  if (!(replay && (hist.length || selA >= 0))) hintFirst();
 }
-function startLevel(n, replay) {
-  save.level = n;
-  begin(n, replay, null);
+function startLevel(n, cur) {
+  begin(n, cur, null);
   persist();
 }
 function persist() {
   if (chal) return;
-  save.cur = hist.length && !won ? { level: level + 1, hist: hist.map(function (m) { return m.slice(); }) } : null;
+  save.cur = !won && (hist.length || selA >= 0) ? { level: level + 1, hist: hist.map(function (m) { return m.slice(); }), sel: [selA, selOp] } : null;
   store();
 }
 
@@ -437,7 +444,6 @@ function refresh(popSlot) {
     el.disabled = v === null || won;
     el.setAttribute('aria-label', v === null ? 'case vide' : v + (selA === i ? ', choisi' : '') + (made[i] ? ', résultat' : ''));
     el.setAttribute('data-value', v === null ? '' : v);
-    el.style.order = v === null ? 10 + i : i;
   }
   var ops = document.querySelectorAll('.op');
   for (i = 0; i < ops.length; i++) ops[i].className = 'op' + (selOp === i ? ' sel' : '');
@@ -508,7 +514,7 @@ function tapTile(i) {
     var r = doOp(a, o, i);
     clearSel();
     if (!r.ok) {
-      refresh();
+      persist(); refresh();
       if (r.why) {
         say(r.why);
         var el = tileEls[i];
@@ -519,14 +525,14 @@ function tapTile(i) {
     afterMove(a);
     return;
   }
-  refresh();
+  persist(); refresh();
 }
 function tapOp(o) {
   if (won) return;
   if (selA < 0) { say('Choisis d’abord un nombre.'); return; }
   if (warn) { clearTimeout(msgTimer); warn = ''; }
   selOp = selOp === o ? -1 : o;
-  refresh();
+  persist(); refresh();
 }
 function afterMove(slot) {
   persist();
@@ -565,7 +571,6 @@ function win(isExact) {
   } else {
     if (s > save.stars[level]) save.stars[level] = s;
     if (n < N) save.max = Math.max(save.max, n + 1);
-    save.level = n < N ? n + 1 : N;
     save.cur = null;
     store();
     emit({ event: 'level_complete', level: n, score: ops, stars: s });
@@ -600,7 +605,8 @@ function showWin() {
   $('bShare').textContent = 'Partager';
   $('bShare').hidden = !!c;
   $('bChal').textContent = c ? 'Renvoyer le défi' : 'Défier un ami';
-  $('bChal').hidden = !info.exact;
+  $('bChal').hidden = c ? !c.ok : !info.exact;
+  $('bAgain').hidden = !!c;
   $('win').hidden = false;
 }
 
@@ -612,7 +618,7 @@ function shareText() {
 // The link base: MJ_CONFIG.shareBaseUrl, else the current address if it is http(s); otherwise no link.
 function shareBase() {
   var b = window.MJ_CONFIG && window.MJ_CONFIG.shareBaseUrl;
-  if (typeof b !== 'string' || !b) b = /^https?:/i.test(String(location.href)) ? String(location.href) : '';
+  if (typeof b !== 'string' || !b) b = /^https?:$/i.test(location.protocol) ? location.origin + location.pathname : '';   // never the query string
   return b.split('#')[0];
 }
 function challengeText() {
@@ -657,7 +663,7 @@ function openChallenge() {
   try { if (h) history.replaceState(null, '', String(location.href).split('#')[0]); } catch (e) { /* ignore */ }
   if (!(m = /^#defi-(\d{1,2})-(\d{1,2})$/.exec(h))) return false;
   var n = +m[1], target = +m[2];
-  if (n < 1 || n > N || target < 1 || target > 5) return false;
+  if (n < 1 || n > N || target < LEVELS[n - 1].p || target > 5) return false;   // reachable values only
   begin(n, null, { target: target });
   emit({ event: 'challenge_open', level: n, target: target });
   show('game');
@@ -670,7 +676,7 @@ function show(name) {
   clearTimeout(winTimer);
   if (chal && name !== 'game') {   // leaving a challenge: the real game in progress comes back as it was saved
     chal = null;
-    begin(save.level, save.cur && save.cur.level === save.level ? save.cur.hist : null, null);
+    begin(save.cur ? save.cur.level : firstOpen(), save.cur, null);
   }
   screen = name;
   SCREENS.forEach(function (s) { $(s).hidden = s !== name; });
@@ -683,13 +689,13 @@ function renderHome() {
   var t = totalStars();
   $('hStarsN').textContent = t + ' / ' + (N * 3);
   $('hBar').style.width = Math.round(100 * t / (N * 3)) + '%';
-  $('bGo').textContent = 'Continuer · Niveau ' + save.level;
+  $('bGo').textContent = 'Continuer · Niveau ' + firstOpen();
 }
 function renderGrid() {
   var html = '';
   for (var i = 0; i < N; i++) {
     var n = i + 1, s = save.stars[i] || 0, open = n <= save.max;
-    html += '<button class="cell' + (n === save.level ? ' cur' : '') + (s ? ' ok' : '') + '" data-level="' + n + '"' + (open ? '' : ' disabled') +
+    html += '<button class="cell' + (n === firstOpen() ? ' cur' : '') + (s ? ' ok' : '') + '" data-level="' + n + '"' + (open ? '' : ' disabled') +
       ' aria-label="Niveau ' + n + (open ? ', ' + s + ' étoile' + (s > 1 ? 's' : '') : ', verrouillé') + '">' +
       '<span class="n">' + (open ? n : LOCK) + '</span><span class="s">' + starSvg(s >= 1) + starSvg(s >= 2) + starSvg(s >= 3) + '</span></button>';
   }
@@ -697,14 +703,14 @@ function renderGrid() {
   $('gTotal').textContent = totalStars() + '/' + (N * 3);
 }
 function goContinue() {
-  var n = save.level;
+  var n = firstOpen();
   if (!chal && level + 1 === n && !won) { show('game'); return; }
-  startLevel(n, save.cur && save.cur.level === n ? save.cur.hist : null);
+  startLevel(n, curFor(n));
   show('game');
 }
 function pickLevel(n) {
-  if (!chal && n === level + 1 && !won) { save.level = n; show('game'); return; }
-  startLevel(n, save.cur && save.cur.level === n ? save.cur.hist : null);
+  if (!chal && n === level + 1 && !won) { show('game'); return; }
+  startLevel(n, curFor(n));
   show('game');
 }
 function openGrid() { show('levels'); }
@@ -768,7 +774,7 @@ window.addEventListener('hashchange', function () { if (/^#defi-/.test(location.
 
 // ---- boot --------------------------------------------------------------------
 loadSave();
-startLevel(save.level, save.cur && save.cur.level === save.level ? save.cur.hist : null);
+startLevel(firstOpen(), curFor(firstOpen()));
 show('home');
 if (/^#defi-/.test(location.hash)) openChallenge();
 
@@ -792,7 +798,7 @@ window.__game = {
       challenge: chal ? { target: chal.target, level: level + 1 } : null,
       total: totalStars(),
       max: save.max,
-      saved: save.level
+      saved: firstOpen()
     };
   },
   levels: LEVELS.map(function (l) { return { numbers: l.n.slice(), target: l.t, par: l.p }; }),

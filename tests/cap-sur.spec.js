@@ -89,7 +89,7 @@ const msgs = page => page.evaluate(() => new Promise(r => setTimeout(() => r(win
 const events = async (page, name) => (await msgs(page)).filter(m => m.event === name);
 const savedData = page => page.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY);
 const winShown = page => page.waitForSelector('#win:not([hidden])', { timeout: 4000 });
-const FULL = { level: 20, max: 20, stars: new Array(20).fill(2), best: new Array(20).fill(3) };
+const FULL = { max: 20, stars: new Array(20).fill(2), best: new Array(20).fill(3) };
 
 // Real taps: type in the field, tap the suggestion, tap Valider.
 async function playName(page, name, how = 'fill') {
@@ -286,7 +286,7 @@ function checkFit(m, tag) {
       assert.equal(st.attempts, tries); assert.equal(st.stars, stars);
       assert.equal(await page.locator('#wStars svg.on').count(), stars);
       const sv = await savedData(page);
-      assert.equal(sv.stars[0], stars); assert.equal(sv.best[0], tries); assert.equal(sv.max, 2); assert.equal(sv.level, 2); assert.equal(sv.cur, null);
+      assert.equal(sv.stars[0], stars); assert.equal(sv.best[0], tries); assert.equal(sv.max, 2); assert.deepEqual(sv.runs, {});
       const ev = await events(page, 'level_complete');
       assert.deepEqual(ev.map(e => [e.level, e.score, e.stars]), [[1, tries, stars]]);
       await context.close();
@@ -304,13 +304,15 @@ function checkFit(m, tag) {
     const st = await state(page);
     assert.ok(st.over && !st.found && st.stars === 0 && st.attempts === 6);
     assert.match(await page.locator('#win').innerText(), /Pas cette fois/);
-    assert.match(await page.locator('#win').innerText(), /C’était Nairobi \(Kenya\)/);
+    assert.match(await page.locator('#win').innerText(), /La ville t’a échappé/);
+    assert.ok(!/Nairobi|Kenya/.test(await page.evaluate(() => document.body.innerText)), 'a failure must not reveal the city (R2)');
+    assert.deepEqual(await page.locator('#win .btn:visible').allInnerTexts(), ['Réessayer', 'Niveaux']);
     assert.equal(await page.locator('#wStars svg.on').count(), 0);
     assert.equal(await page.locator('#bOk').isDisabled(), true);
     const sv = await savedData(page);
-    assert.equal(sv.max, 1); assert.equal(sv.stars[0], 0); assert.equal(sv.cur, null);
+    assert.equal(sv.max, 1); assert.equal(sv.stars[0], 0); assert.deepEqual(sv.runs, {});
     assert.equal((await events(page, 'level_complete')).length, 0);
-    await page.locator('#bNext').tap();   // "Rejouer"
+    await page.locator('#bNext').tap();   // "Réessayer"
     const st2 = await state(page);
     assert.equal(st2.attempts, 0); assert.equal(st2.over, false); assert.equal(st2.level, 1);
     await playName(page, 'Nairobi'); await winShown(page);
@@ -401,11 +403,11 @@ function checkFit(m, tag) {
   await test('corrupt, hostile or missing saves: the game starts sound', async () => {
     const cases = [
       '{not json', 'null', '[]', '"abc"', '123',
-      JSON.stringify({ level: 'x', max: -4, stars: 'zz', best: { a: 1 }, cur: 7, chalGame: 'no' }),
-      JSON.stringify({ level: 99, max: 99, stars: [9, -1, 'a', null], best: [99], cur: { level: 99, guesses: [1] } }),
-      JSON.stringify({ level: 3, max: 3, stars: [3, 3], cur: { level: 3, guesses: ['a', 1.5, -2, 9999, null] } }),
-      JSON.stringify({ level: 1, max: 1, cur: { level: 1, guesses: [0, 0, 0] } }),
-      JSON.stringify({ level: 1, max: 1, cur: { level: 1, guesses: [0, 1, 2, 3, 4, 5, 6, 7] } }),
+      JSON.stringify({ level: 'x', max: -4, stars: 'zz', best: { a: 1 }, runs: 7, chalGame: 'no' }),
+      JSON.stringify({ level: 99, max: 99, stars: [9, -1, 'a', null], best: [99], runs: { 99: [1], x: [2] } }),
+      JSON.stringify({ level: 3, max: 3, stars: [3, 3], runs: { 3: ['a', 1.5, -2, 9999, null] } }),
+      JSON.stringify({ level: 1, max: 1, runs: { 1: [0, 0, 0] } }),
+      JSON.stringify({ level: 1, max: 1, runs: { 1: [0, 1, 2, 3, 4, 5, 6, 7] } }),
       JSON.stringify({ level: 1, max: 1, chalGame: { n: 1, target: 99, guesses: [] } }),
     ];
     for (const raw of cases) {
@@ -420,7 +422,7 @@ function checkFit(m, tag) {
     }
     // the answer of level 1 inside a saved run is dropped (never a half-won game)
     const nairobi = CITIES.findIndex(c => c.name === 'Nairobi');
-    const { context, page } = await open({ width: 360, height: 640 }, { raw: JSON.stringify({ level: 1, max: 1, cur: { level: 1, guesses: [nairobi] } }) });
+    const { context, page } = await open({ width: 360, height: 640 }, { raw: JSON.stringify({ level: 1, max: 1, runs: { 1: [nairobi] } }) });
     await page.locator('#bGo').tap();
     assert.equal((await state(page)).attempts, 0);
     await context.close();
@@ -474,8 +476,9 @@ function checkFit(m, tag) {
       await context.close();
       return { text, ev };
     };
-    const a = await play({ shareBaseUrl: 'https://exemple.test/jeux/cap-sur/?x=1#old' });
-    assert.match(a.text, /https:\/\/exemple\.test\/jeux\/cap-sur\/\?x=1#defi-1-2$/);
+    const a = await play({ shareBaseUrl: 'https://exemple.test/jeux/cap-sur/?token=SECRET&x=1#old' });
+    assert.match(a.text, /https:\/\/exemple\.test\/jeux\/cap-sur\/#defi-1-2$/);
+    assert.ok(!/token|SECRET|\?/.test(a.text.split(' ').pop()), 'no query string in the link (R4)');
     assert.match(a.text.split('#')[1], /^[a-z0-9-]+$/);
     assert.deepEqual(a.ev, ['challenge']);
     assert.ok(!a.text.includes('Nairobi'));
@@ -485,7 +488,7 @@ function checkFit(m, tag) {
   });
 
   await test('challenge open: locked level opens, one objective, equal is enough, progress and run untouched', async () => {
-    const seed = { level: 3, max: 4, stars: [3, 2, 1, 0], best: [1, 4, 6, 0], cur: { level: 3, guesses: [CITIES.findIndex(c => c.name === 'Lagos')] } };
+    const seed = { max: 4, stars: [3, 2, 0, 0], best: [1, 4, 0, 0], runs: { 3: [CITIES.findIndex(c => c.name === 'Lagos')] } };
     // locked level 9 (not unlocked yet), target 2 tries; found in exactly 2 -> won
     let { context, page } = await open({ width: 360, height: 640 }, { save: seed, hash: '#defi-9-2' });
     let st = await state(page);
@@ -501,9 +504,10 @@ function checkFit(m, tag) {
     await playName(page, 'Lagos');
     await playName(page, 'Casablanca'); await winShown(page);
     assert.match(await page.locator('#win').innerText(), /Défi relevé/);
+    assert.deepEqual((await page.locator('#win .btn:visible').allInnerTexts()).sort(), ['Accueil', 'Renvoyer le défi'], 'R3: no replay of a challenge');
     let sv = await savedData(page);
-    assert.deepEqual([sv.level, sv.max, sv.stars.slice(0, 4), sv.best.slice(0, 4)], [3, 4, [3, 2, 1, 0], [1, 4, 6, 0]], 'progress untouched');
-    assert.equal(sv.stars[8], 0); assert.deepEqual(sv.cur, seed.cur, 'run in progress untouched');
+    assert.deepEqual([sv.max, sv.stars.slice(0, 4), sv.best.slice(0, 4)], [4, [3, 2, 0, 0], [1, 4, 0, 0]], 'progress untouched');
+    assert.equal(sv.stars[8], 0); assert.deepEqual(sv.runs, seed.runs, 'run in progress untouched');
     assert.deepEqual((await events(page, 'challenge_result')).map(e => [e.level, e.score, e.target, e.won]), [[9, 2, 2, true]]);
     assert.equal((await events(page, 'level_complete')).length, 0);
     await page.locator('#bNext').tap();   // Accueil
@@ -519,9 +523,10 @@ function checkFit(m, tag) {
     for (const n of ['Lagos', 'Le Cap']) await playName(page, n);
     await playName(page, 'Nairobi'); await winShown(page);
     assert.match(await page.locator('#win').innerText(), /Défi manqué/);
+    assert.deepEqual(await page.locator('#win .btn:visible').allInnerTexts(), ['Accueil'], 'R3: a lost challenge only goes home');
     assert.deepEqual((await events(page, 'challenge_result')).map(e => [e.level, e.score, e.target, e.won]), [[1, 3, 2, false]]);
     sv = await savedData(page);
-    assert.deepEqual([sv.level, sv.max, sv.stars.slice(0, 4)], [3, 4, [3, 2, 1, 0]]);
+    assert.deepEqual([sv.max, sv.stars.slice(0, 4)], [4, [3, 2, 0, 0]]);
     await context.close();
 
     // lost: the city is never found
@@ -539,7 +544,7 @@ function checkFit(m, tag) {
     st = await state(page);
     assert.equal(st.screen, 'game'); assert.deepEqual(st.challenge, { target: 4, level: 2 }); assert.equal(st.attempts, 1);
     sv = await savedData(page);
-    assert.deepEqual(sv.cur, seed.cur);
+    assert.deepEqual(sv.runs, seed.runs);
     await context.close();
   });
 
@@ -584,12 +589,134 @@ function checkFit(m, tag) {
     await context.close();
   });
 
+  // ---------------------------------------------------------------- decisions after the first review (R1-R7)
+  await test('R1: no restart button; leaving a game and coming back keeps the tries (even across levels)', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { save: { max: 6, stars: [3, 3, 3, 3, 0, 0] } });
+    assert.equal(await page.locator('#bReset, [aria-label="Recommencer"]').count(), 0);
+    await page.locator('#bGo').tap();
+    assert.equal((await state(page)).level, 5);
+    await playName(page, 'Lagos'); await playName(page, 'Le Cap');
+    await page.locator('#bMap').tap();
+    await page.locator('[data-level="6"]').tap();
+    assert.equal((await state(page)).level, 6);
+    await playName(page, 'Dakar');
+    await page.locator('#bMap').tap();
+    await page.locator('#bBack').tap();   // Reprendre
+    let st = await state(page);
+    assert.equal(st.level, 5); assert.equal(st.attempts, 2);
+    await page.locator('#bMap').tap();
+    await page.locator('[data-level="6"]').tap();
+    assert.equal((await state(page)).attempts, 1, 'level 6 kept its own try');
+    await page.locator('#bMap').tap(); await page.locator('#bLBack').tap();
+    await page.locator('#bGo').tap();
+    assert.deepEqual([(await state(page)).level, (await state(page)).attempts], [5, 2]);
+    await context.close();
+  });
+
+  await test('R2: a lost level never shows the city (screen, DOM, storage); Réessayer starts at zero, Niveaux goes to the grid', async () => {
+    const { context, page } = await open();
+    await page.locator('#bGo').tap();
+    for (const n of ['Lagos', 'Le Cap', 'Alexandrie', 'Dakar', 'Tunis', 'Accra']) assert.ok(await page.evaluate(x => window.__game.guess(x), n));
+    await winShown(page);
+    const dom = await page.evaluate(() => document.documentElement.cloneNode(true).outerHTML.replace(/<script[\s\S]*?<\/script>/g, ''));
+    assert.ok(!/Nairobi|Kenya/.test(dom), 'the city is in the DOM after a failure');
+    assert.ok(!/Nairobi|Kenya/.test(JSON.stringify(await state(page))));
+    assert.ok(!/Nairobi/.test(await page.evaluate(k => localStorage.getItem(k), KEY)));
+    await page.locator('#bAgain').tap();   // Niveaux
+    assert.equal((await state(page)).screen, 'levels');
+    await page.locator('#bBack').tap();
+    assert.equal((await state(page)).attempts, 0, 'a lost game is not resumed');
+    await context.close();
+  });
+
+  await test('R3: a challenge is played once per opening; one challenge_result; bounds 1-6', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { hash: '#defi-1-3' });
+    await playName(page, 'Nairobi'); await winShown(page);
+    assert.equal(await page.locator('#bAgain').isVisible(), false);
+    assert.ok(!/Rejouer|Réessayer/.test(await page.locator('#win').innerText()));
+    await page.waitForTimeout(300);
+    assert.equal((await events(page, 'challenge_result')).length, 1);
+    assert.equal((await events(page, 'challenge_open')).length, 1);
+    await context.close();
+    for (const h of ['#defi-1-0', '#defi-1-7', '#defi-1-99']) {
+      const o = await open({ width: 360, height: 640 }, { hash: h });
+      assert.equal((await state(o.page)).challenge, null, h);
+      await o.context.close();
+    }
+  });
+
+  await test('R4: the link keeps only origin + pathname + fragment, even from an address carrying ?token=', async () => {
+    const context = await browser.newContext({ ...MOBILE, viewport: { width: 360, height: 640 } });
+    const html = fs.readFileSync(FILE, 'utf8');
+    await context.route('http://jeux.exemple.test/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: html }));
+    await context.addInitScript(() => {
+      window.__shared = [];
+      Object.defineProperty(navigator, 'share', { value: t => { window.__shared.push(t.text); return Promise.resolve(); }, configurable: true });
+    });
+    const page = await context.newPage();
+    page.on('pageerror', e => problems.push('pageerror: ' + e.message));
+    await page.goto('http://jeux.exemple.test/cap-sur/index.html?token=SECRET123&slot=9#ignored');
+    await page.waitForFunction(() => !!window.__game);
+    await page.locator('#bGo').tap();
+    await playName(page, 'Lagos'); await playName(page, 'Nairobi'); await winShown(page);
+    await page.locator('#bChal').tap();
+    await page.waitForFunction(() => window.__shared.length === 1);
+    const text = (await page.evaluate(() => window.__shared))[0];
+    assert.match(text, /http:\/\/jeux\.exemple\.test\/cap-sur\/index\.html#defi-1-2$/, text);
+    assert.ok(!/SECRET|token|slot|\?/.test(text), text);
+    await context.close();
+  });
+
+  await test('R5: the answer cannot be read in the DOM, attributes, state, storage or share text (20 levels)', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { save: FULL, share: true });
+    for (let n = 1; n <= 20; n++) {
+      const t = ANSWERS[n - 1];
+      await page.evaluate(k => window.__game.loadLevel(k), n);
+      const wrong = CITIES.filter(c => c.name !== t && c.name !== ANSWERS[n - 1]).slice(n, n + 2);
+      for (const w of wrong) await page.evaluate(x => window.__game.guess(x), w.name);
+      const dom = await page.evaluate(() => document.documentElement.cloneNode(true).outerHTML.replace(/<script[\s\S]*?<\/script>/g, ''));
+      assert.ok(!dom.includes(t), `level ${n}: ${t} is in the DOM`);
+      assert.ok(!JSON.stringify(await state(page)).includes(t), `level ${n}: state leaks`);
+      assert.ok(!(await page.evaluate(k => localStorage.getItem(k), KEY)).includes(t), `level ${n}: storage leaks`);
+      const attrs = await page.evaluate(() => [...document.querySelectorAll('#list [data-city]')].map(e => e.getAttribute('data-city')));
+      assert.equal(attrs.length, 2, 'only tried cities carry an id');
+    }
+    await context.close();
+  });
+
+  await test('R6: Continuer always points at the first unfinished level; replaying an old level does not move it', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { save: { max: 5, stars: [3, 2, 3, 0, 0] } });
+    assert.match(await page.locator('#bGo').innerText(), /Niveau 4/);
+    await page.locator('#bLevels').tap();
+    await page.locator('[data-level="1"]').tap();
+    await playName(page, 'Nairobi'); await winShown(page);
+    await page.locator('#bNext').tap();   // Suivant: level 2 (replayed)
+    await page.locator('#bMap').tap(); await page.locator('#bLBack').tap();
+    assert.match(await page.locator('#bGo').innerText(), /Niveau 4/);
+    await page.locator('#bGo').tap();
+    assert.equal((await state(page)).level, 4);
+    assert.equal((await state(page)).continueLevel, 4);
+    await context.close();
+  });
+
+  await test('R7: share text readable without colour (arrows + percentages, check mark)', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { share: true });
+    await page.locator('#bGo').tap();
+    await playName(page, 'Lagos'); await playName(page, 'Le Cap'); await playName(page, 'Nairobi'); await winShown(page);
+    await page.locator('#bShare').tap();
+    await page.waitForFunction(() => window.__shared.length === 1);
+    const text = (await page.evaluate(() => window.__shared))[0];
+    assert.ok(!/[\u{1F7E0}-\u{1F7EB}\u{2B1B}\u{2B1C}]/u.test(text), 'coloured squares or circles in the share text');
+    assert.match(text, /→\d+% ↗\d+% ✅/);
+    await context.close();
+  });
+
   // ---------------------------------------------------------------- layout
   await test('layout: every screen at 320x568, 360x640, 430x932 (no page scroll, targets >= 44 px, keyboard case)', async () => {
     const longest = ['Sao Tomé-et-Principe', 'Guinée équatoriale', 'Afrique du Sud', 'Bobo-Dioulasso', 'Dar es Salaam'];
     for (const vp of [{ width: 320, height: 568 }, { width: 360, height: 640 }, { width: 430, height: 932 }]) {
       const tag = `${vp.width}x${vp.height}`;
-      const { context, page } = await open(vp, { save: { level: 12, max: 14, stars: [3, 3, 2, 2, 1, 3, 3, 2, 2, 1, 3, 2, 0, 0], best: [] } });
+      const { context, page } = await open(vp, { save: { max: 14, stars: [3, 3, 2, 2, 1, 3, 3, 2, 2, 1, 3, 2, 0, 0], best: [] } });
       checkFit(await measure(page), tag + ' home'); await shot(page, `${tag}-home`);
       await page.locator('#bLevels').tap();
       checkFit(await measure(page), tag + ' levels'); await shot(page, `${tag}-levels`);
@@ -621,6 +748,13 @@ function checkFit(m, tag) {
         assert.ok(g.sg.length >= 3, 'suggestions present');
         g.sg.slice(0, 2).forEach(r => assert.ok(r.top >= g.header.b - 0.5 && r.bottom <= g.inp.t + 0.5, 'a suggestion is hidden or under the input'));
         assert.ok(g.sugg.b <= g.inp.t + 0.5, 'suggestions end above the input');
+        const sb = await page.evaluate(() => { const b = document.querySelector('#sugg').getBoundingClientRect(); return { t: b.top, b: b.bottom, st: document.querySelector('#sugg').scrollTop, items: [...document.querySelectorAll('.sg')].map(e => { const r = e.getBoundingClientRect(); return [r.top, r.bottom]; }) }; });
+        assert.equal(sb.st, 0);
+        sb.items.forEach(([t, b], i) => {
+          const inside = t >= sb.t - 0.5 && b <= sb.b + 0.5, outside = t >= sb.b - 0.5 || b <= sb.t + 0.5;
+          assert.ok(inside || outside, `${tag} keyboard ${kb}px: suggestion ${i} is cut (${t}-${b} in ${sb.t}-${sb.b})`);
+        });
+        assert.ok(sb.items[0][0] >= sb.t - 0.5 && sb.items[0][1] <= sb.b + 0.5, 'first suggestion is cut');
         assert.ok(g.list.h >= 40, 'the list of tries keeps some room: ' + g.list.h);
         await shot(page, `${tag}-keyboard-${kb}`);
       }
