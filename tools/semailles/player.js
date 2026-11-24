@@ -7,10 +7,10 @@
 const R = require('./engine');
 
 const G = require('./game-engine').load();
-// Same search as the game, but deeper and with a much larger node budget than the adversary.
+// Same search as the game, but 4 plies deeper and with 12 times the node budget of the adversary.
 function strongFor(n, level) {
   const ai = level.ai;
-  const depth = Math.min(ai.d + 4, 11), nodes = Math.min(Math.max(ai.n * 25, 40000), 300000);
+  const depth = Math.min(ai.d + 4, 11), nodes = Math.max(ai.n * 12, 3000);
   return (s, rng, plies) => {
     const b = G.mkBoard(s.pits, s.store);
     return G.bestMoves(b, 0, plies, depth, nodes).moves[0];

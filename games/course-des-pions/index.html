@@ -254,7 +254,7 @@ footer{flex:none;display:flex;gap:10px;padding:4px 12px 10px}
   <section class="scr" id="levels" hidden>
     <div class="top">
       <button class="icon" id="bLBack" aria-label="Accueil"><svg class="st" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
-      <div class="tt"><h1>Niveaux</h1><div class="sub">2 pions, puis 3 · 1 à 3 adversaires</div></div>
+      <div class="tt"><h1>Niveaux</h1><div class="sub">2 pions, puis 3 dès le niveau 11</div></div>
       <div class="total" aria-label="Étoiles gagnées"><svg viewBox="0 0 24 24"><use href="#star"/></svg><span id="gTotal">0/60</span></div>
     </div>
     <div id="grid"></div>
@@ -740,9 +740,10 @@ function chip(p) { return '<svg viewBox="0 0 24 24" class="k' + p + '"><use href
 function showResult() {
   var r = result, S = G.S, hot = r.kind === 'hot', acts = [];
   var rank = r.rank.indexOf(0) + 1;
-  $('wTitle').textContent = hot ? NAMES[S.winner] + ' gagne !' : r.win ? (r.stars === 3 ? 'Superbe course !' : 'Gagné !') : S.winner >= 0 ? 'Pas cette fois' : '';
+  $('wTitle').textContent = hot ? NAMES[S.winner] + ' gagne !' : r.kind === 'chal' ? (r.chalOk ? 'Défi relevé !' : r.win ? 'Gagné, mais trop lent' : 'Pas cette fois') :
+    r.win ? (r.stars === 3 ? 'Superbe course !' : 'Gagné !') : 'Pas cette fois';
   $('wSub').textContent = hot ? 'Tous les pions sont rentrés' : r.kind === 'chal' ? 'Défi · Niveau ' + r.level : 'Niveau ' + r.level + (r.win ? ' terminé' : ' · tu finis ' + ord(rank));
-  $('wStars').hidden = hot || !r.win;
+  $('wStars').hidden = hot || r.kind === 'chal' || !r.win;
   $('wStars').innerHTML = starSvg(r.stars >= 1) + starSvg(r.stars >= 2) + starSvg(r.stars >= 3);
   $('wStars').setAttribute('aria-label', r.stars + ' étoile' + (r.stars > 1 ? 's' : '') + ' sur 3');
   $('wTurns').textContent = r.turns;
@@ -753,7 +754,7 @@ function showResult() {
   var c = $('wChal');
   c.hidden = r.kind !== 'chal';
   if (r.kind === 'chal') {
-    c.textContent = r.chalOk ? 'Défi relevé !' : r.win ? 'Trop lent : ' + (r.turns - r.target) + ' tour' + (r.turns - r.target > 1 ? 's' : '') + ' de trop' : 'Défi raté';
+    c.textContent = r.chalOk ? 'Tu égales ou bats l’objectif' : r.win ? plural(r.turns - r.target, 'tour') + ' de trop' : 'Défi raté';
     c.className = 'cres' + (r.chalOk ? '' : ' lost');
   }
   if (hot) acts = [['again', 'Rejouer', 'acc'], ['home', 'Accueil', 'line']];
@@ -960,8 +961,8 @@ function refresh() {
   $('lvl').textContent = lvlTxt;
   var goal = $('goal');
   goal.className = G.kind === 'chal' ? 'chal' : '';
-  if (hot) goal.innerHTML = '<span>Le premier qui rentre tout gagne</span>';
-  else if (G.kind === 'chal') goal.innerHTML = '<span>Objectif : gagner en ' + plural(G.target, 'tour') + ' ou moins</span>';
+  if (hot) goal.innerHTML = '<span>Rentre tes pions le premier</span>';
+  else if (G.kind === 'chal') goal.innerHTML = '<span>Objectif : ' + plural(G.target, 'tour') + ' ou moins</span>';
   else goal.innerHTML = starSvg(1) + starSvg(1) + starSvg(1) + '<span>' + ENGINE.STAR3 * S.k + ' cases d’avance</span>';
   $('tn').textContent = hot ? S.turns[over ? S.winner : p] : S.turns[0];
   // die
@@ -972,6 +973,7 @@ function refresh() {
   d.disabled = !ready;
   d.setAttribute('aria-label', ready ? 'Lancer le dé' : v ? 'Dé : ' + v : 'Dé');
   d.setAttribute('data-v', S.roll || 0);
+  d.setAttribute('data-shown', v);
   // who
   var who = $('who'), name = NAMES[over ? S.winner : p];
   who.innerHTML = chip(over ? S.winner : p) + '<span>' + (over ? name + ' a gagné' : human ? (hot ? name + ', à toi' : 'À toi') : name + ' joue') + '</span>';
@@ -1020,7 +1022,7 @@ function renderLevels() {
     var s = save.stars[n - 1] || 0, open = n <= save.max, L = ENGINE.LEVELS[n - 1];
     html += '<button class="cell' + (n === save.level ? ' cur' : '') + (s ? ' ok' : '') + '" data-level="' + n + '"' + (open ? '' : ' disabled') +
       ' aria-label="Niveau ' + n + ', ' + L.k + ' pions, ' + plural(L.opp.length, 'adversaire') + (open ? ', ' + plural(s, 'étoile') : ', verrouillé') + '">' +
-      '<span class="n">' + (open ? n : LOCK) + '</span><span class="m">' + L.k + ' pions · ' + (L.opp.length + 1) + ' j.</span><span class="s">' + starSvg(s >= 1) + starSvg(s >= 2) + starSvg(s >= 3) + '</span></button>';
+      '<span class="n">' + (open ? n : LOCK) + '</span><span class="m">contre ' + L.opp.length + '</span><span class="s">' + starSvg(s >= 1) + starSvg(s >= 2) + starSvg(s >= 3) + '</span></button>';
   }
   $('grid').innerHTML = html;
   $('gTotal').textContent = totalStars() + '/' + (N * 3);

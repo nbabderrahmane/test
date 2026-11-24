@@ -45,6 +45,8 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
 const state = page => page.evaluate(() => window.__game.state());
 const msgs = page => page.evaluate(() => new Promise(r => setTimeout(() => r(window.__msgs), 40)));
 const events = async (page, name) => (await msgs(page)).filter(m => m.event === name);
+// Chromium flushes localStorage to the browser process a few ms after a write: let it settle before a reload.
+const reload = async page => { await page.waitForTimeout(300); await page.reload(); await page.waitForFunction(() => !!window.__game); };
 const stored = page => page.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY);
 const answerOf = s => TITLE.get(s.emojis).t;
 const rightIdx = s => s.choices.indexOf(answerOf(s));
@@ -302,8 +304,7 @@ function checkFit(m, tag) {
     await tapOpt(page, wrongIdx(s));
     const before = await state(page);
     assert.equal(before.pos, 1);
-    await page.reload();
-    await page.waitForFunction(() => !!window.__game);
+    await reload(page);
     assert.equal((await state(page)).screen, 'home');
     assert.equal(await page.locator('#bGo').textContent(), 'Continuer · Niveau 1');
     await page.locator('#bGo').tap();
@@ -314,8 +315,7 @@ function checkFit(m, tag) {
     await tapOpt(page, rightIdx(await state(page)));
     await tapNext(page);
     assert.ok((await state(page)).over);
-    await page.reload();
-    await page.waitForFunction(() => !!window.__game);
+    await reload(page);
     await page.locator('#bGo').tap();
     s = await state(page);
     assert.equal(s.level, 2); assert.equal(s.pos, 0);
@@ -443,8 +443,7 @@ function checkFit(m, tag) {
     await g.page.waitForFunction(() => window.__game.state().mode === 'chal');
     const cs = await state(g.page);
     await tapOpt(g.page, rightIdx(cs));
-    await g.page.reload();
-    await g.page.waitForFunction(() => !!window.__game);
+    await reload(g.page);
     const rs = await state(g.page);
     assert.equal(rs.mode, 'chal'); assert.deepEqual(rs.answers, [rightIdx(cs), -1, -1]); assert.equal(rs.screen, 'game');
     await g.context.close();

@@ -44,6 +44,13 @@ const problems = [];
 const results = [];
 const dirsSeen = new Set();
 
+async function newPage(context) {
+  const page = await context.newPage();
+  page.on('console', m => { if (m.type() === 'error') problems.push('console.error: ' + m.text()); });
+  page.on('pageerror', e => problems.push('pageerror: ' + e.message));
+  page.on('request', r => { if (r.url().split('#')[0] !== URL) problems.push('request: ' + r.url()); });
+  return page;
+}
 async function open(viewport = { width: 360, height: 640 }, opts = {}) {
   const context = await browser.newContext({ ...MOBILE, viewport, ...(opts.extra || {}) });
   await context.addInitScript(({ save, raw, key, config, share, clip, nostore }) => {
@@ -65,19 +72,22 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
     else Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
     if (clip) Object.defineProperty(navigator, 'clipboard', { value: { writeText: t => { window.__shared.push(t); return Promise.resolve(); } }, configurable: true });
   }, { save: opts.save || null, raw: opts.raw === undefined ? null : opts.raw, key: KEY, config: opts.config || null, share: !!opts.share, clip: !!opts.clip, nostore: !!opts.nostore });
-  const page = await context.newPage();
-  page.on('console', m => { if (m.type() === 'error') problems.push('console.error: ' + m.text()); });
-  page.on('pageerror', e => problems.push('pageerror: ' + e.message));
-  page.on('request', r => { if (r.url().split('#')[0] !== URL) problems.push('request: ' + r.url()); });
+  const page = await newPage(context);
   await page.goto(URL + (opts.hash || ''));
   await page.waitForFunction(() => !!window.__game);
   return { context, page };
 }
-async function reload(page) {   // wait for the NEW document (the marker only exists on the old one)
-  // (page.reload() sometimes drops the last localStorage write of a file:// page in headless Chromium; a plain navigation does not)
-  await page.evaluate(() => { window.__old = true; });
-  await page.goto(URL);
-  await page.waitForFunction(() => !window.__old && !!window.__game);
+// Reload = close the tab and open the game again in the same context (storage kept).
+// (page.reload() sometimes drops the last localStorage write of a file:// page in headless Chromium.)
+async function reload(page) {
+  const context = page.context();
+  const w = process.env.DBG ? await page.evaluate(k => localStorage.getItem(k), KEY) : '';
+  await page.close();
+  const np = await newPage(context);
+  await np.goto(URL);
+  await np.waitForFunction(() => !!window.__game);
+  if (process.env.DBG) { const r = await np.evaluate(k => { try { return localStorage.getItem(k); } catch (e) { return 'ERR ' + e.message; } }, KEY); console.log('DBG', w === r ? 'same' : 'DIFF\n w=' + w + '\n r=' + r); }
+  return np;
 }
 const state = page => page.evaluate(() => window.__game.state());
 const msgs = page => page.evaluate(() => new Promise(r => setTimeout(() => r(window.__msgs), 40)));
@@ -366,11 +376,11 @@ function checkFit(m, tag) {
 
   // ---------------------------------------------------------------- resume, corrupt saves
   await test('resume: the game in progress comes back identical after a reload', async () => {
-    const { context, page } = await open();
+    let { context, page } = await open();
     await page.locator('#bGo').tap();
     await playName(page, 'Lagos'); await playName(page, 'Le Cap');
     const before = await state(page);
-    await reload(page);
+    page = await reload(page);
     assert.equal((await state(page)).screen, 'home');
     assert.match(await page.locator('#bGo').innerText(), /Niveau 1/);
     await page.locator('#bGo').tap();
@@ -380,13 +390,13 @@ function checkFit(m, tag) {
     assert.equal(after.attempts, 2);
     await playName(page, 'Nairobi'); await winShown(page);
     assert.equal((await state(page)).stars, 3);
-    await reload(page);
+    page = await reload(page);
     assert.match(await page.locator('#bGo').innerText(), /Niveau 2/);
     await page.locator('#bGo').tap();
     assert.equal((await state(page)).attempts, 0, 'a finished level does not come back');
     // progress in the middle of a later level
     await playName(page, 'Lagos');
-    await reload(page);
+    page = await reload(page);
     await page.locator('#bGo').tap();
     const st = await state(page);
     assert.equal(st.level, 2); assert.equal(st.attempts, 1);
@@ -530,7 +540,7 @@ function checkFit(m, tag) {
     // a challenge in progress survives a reload, and the run is still apart
     ({ context, page } = await open({ width: 360, height: 640 }, { save: seed, hash: '#defi-2-4' }));
     await playName(page, 'Lagos');
-    await reload(page);
+    page = await reload(page);
     st = await state(page);
     assert.equal(st.screen, 'game'); assert.deepEqual(st.challenge, { target: 4, level: 2 }); assert.equal(st.attempts, 1);
     sv = await savedData(page);
