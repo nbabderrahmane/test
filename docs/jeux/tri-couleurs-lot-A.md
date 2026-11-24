@@ -97,3 +97,13 @@ Classement, identité, récompenses, son, notifications.
 7. **Défi** : un seul objectif à l'écran (celui du défi remplace le repère d'étoiles). Résultat perdu : « À N coups près ». Sans `MJ_CONFIG.shareBaseUrl` et hors http(s), le partage n'inclut pas de lien.
 8. **Textes** : le rang « Maniaque » devient « Perfectionniste ».
 9. Les niveaux 1 à 10 peuvent changer : il n'y a pas encore de joueurs.
+
+## Décisions après deuxième recette et deuxième revue (24 novembre) — voir `docs/qa/RECETTE-NIVEAUX-2.md`
+10. **Pas de mur.** La difficulté se mesure aussi avec un joueur « attentif » simulé (celui de la recette, `tools/qa/`). Tout niveau est gagné par ce joueur au moins 10 % du temps ; d'un monde au suivant, sa médiane de victoire ne chute pas de plus d'un tiers ; le monde 10 reste le plus dur mais sa médiane ne descend pas sous 15 %. Si un seuil est infaisable, appliquer le plus strict atteignable et le dire avec les chiffres.
+11. **Mystère, deuxième coup.** Pour un niveau mystère, au plus 25 % des suites de deux coups légaux mènent à une position perdue.
+12. **Marges.** Le générateur vise des marges au moins égales aux tolérances des tests (pente de difficulté : +2 points ; niveaux du jour : 28 à 57 %), pour que les tests ne dépendent pas de la graine. Le test des repères exige 320 optima sur 320.
+13. **Message « partie mal engagée ».** Il reste affiché jusqu'à Annuler, Recommencer ou la fin du niveau (il ne s'efface pas au tap suivant). En défi, le seuil se calcule sur l'objectif du défi. Le compteur de retours est reconstruit au rechargement.
+14. **Défi et billes mystère.** Un défi a ses propres billes révélées ; il ne lit, n'écrit ni n'efface celles de la partie normale.
+15. **Sauvegarde et jeu de niveaux.** La sauvegarde porte une empreinte du jeu de niveaux ; si elle change, étoiles, records, parties en cours et billes révélées repartent de zéro (série, jokers et badges de série sont gardés).
+16. **Grille.** Choisir dans la grille le niveau en cours reprend la partie en cours.
+17. **Rang.** « Perfectionniste » devient « Méticuleux » ; aucun nom de rang ne doit être tronqué à 320 px (testé sur le plus long).

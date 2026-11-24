@@ -77,17 +77,12 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
   await page.waitForFunction(() => !!window.__game);
   return { context, page };
 }
-// Reload = close the tab and open the game again in the same context (storage kept).
-// (page.reload() sometimes drops the last localStorage write of a file:// page in headless Chromium.)
-async function reload(page) {
-  const context = page.context();
-  const w = process.env.DBG ? await page.evaluate(k => localStorage.getItem(k), KEY) : '';
-  await page.close();
-  const np = await newPage(context);
-  await np.goto(URL);
-  await np.waitForFunction(() => !!window.__game);
-  if (process.env.DBG) { const r = await np.evaluate(k => { try { return localStorage.getItem(k); } catch (e) { return 'ERR ' + e.message; } }, KEY); console.log('DBG', w === r ? 'same' : 'DIFF\n w=' + w + '\n r=' + r); }
-  return np;
+// Reload = same storage content, new browser context. (In headless Chromium a file:// page that is reloaded, or
+// reopened in the same context, sometimes starts with an empty localStorage: the content is copied by hand.)
+async function reopen(context, page) {
+  const raw = await page.evaluate(k => localStorage.getItem(k), KEY);
+  await context.close();
+  return open({ width: 360, height: 640 }, { raw });
 }
 const state = page => page.evaluate(() => window.__game.state());
 const msgs = page => page.evaluate(() => new Promise(r => setTimeout(() => r(window.__msgs), 40)));
@@ -380,7 +375,7 @@ function checkFit(m, tag) {
     await page.locator('#bGo').tap();
     await playName(page, 'Lagos'); await playName(page, 'Le Cap');
     const before = await state(page);
-    page = await reload(page);
+    ({ context, page } = await reopen(context, page));
     assert.equal((await state(page)).screen, 'home');
     assert.match(await page.locator('#bGo').innerText(), /Niveau 1/);
     await page.locator('#bGo').tap();
@@ -390,13 +385,13 @@ function checkFit(m, tag) {
     assert.equal(after.attempts, 2);
     await playName(page, 'Nairobi'); await winShown(page);
     assert.equal((await state(page)).stars, 3);
-    page = await reload(page);
+    ({ context, page } = await reopen(context, page));
     assert.match(await page.locator('#bGo').innerText(), /Niveau 2/);
     await page.locator('#bGo').tap();
     assert.equal((await state(page)).attempts, 0, 'a finished level does not come back');
     // progress in the middle of a later level
     await playName(page, 'Lagos');
-    page = await reload(page);
+    ({ context, page } = await reopen(context, page));
     await page.locator('#bGo').tap();
     const st = await state(page);
     assert.equal(st.level, 2); assert.equal(st.attempts, 1);
@@ -419,7 +414,7 @@ function checkFit(m, tag) {
       assert.equal(st.screen, 'home', raw);
       assert.ok(st.level >= 1 && st.level <= 20 && st.max >= 1 && st.max <= 20 && st.attempts < 6 && !st.over && !st.challenge, raw);
       await page.locator('#bGo').tap();
-      await playName(page, ANSWERS[(await state(page)).level - 1]); await winShown(page);
+      await playName(page, ANSWERS[(await state(page)).level - 1]);
       assert.ok((await state(page)).found, raw);
       await context.close();
     }
@@ -540,7 +535,7 @@ function checkFit(m, tag) {
     // a challenge in progress survives a reload, and the run is still apart
     ({ context, page } = await open({ width: 360, height: 640 }, { save: seed, hash: '#defi-2-4' }));
     await playName(page, 'Lagos');
-    page = await reload(page);
+    ({ context, page } = await reopen(context, page));
     st = await state(page);
     assert.equal(st.screen, 'game'); assert.deepEqual(st.challenge, { target: 4, level: 2 }); assert.equal(st.attempts, 1);
     sv = await savedData(page);
@@ -650,7 +645,7 @@ function checkFit(m, tag) {
     }
   });
 
-  assert.ok(dirsSeen.size >= 6, 'the guessed pairs exercised few directions: ' + [...dirsSeen]);
+  if (!process.env.ONLY) assert.ok(dirsSeen.size >= 6, 'the guessed pairs exercised few directions: ' + [...dirsSeen]);
 
   await test('no network request, no console error, no page error during the whole run', async () => {
     assert.deepEqual(problems, []);

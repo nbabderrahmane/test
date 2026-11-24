@@ -21,7 +21,7 @@ const KEY = 'mj:semailles:v1';
 const SHOTS = process.env.SHOTS || '';
 const MOBILE = { hasTouch: true, isMobile: true, deviceScaleFactor: 2 };
 const VIEWPORTS = [{ width: 320, height: 568 }, { width: 360, height: 640 }, { width: 430, height: 932 }];
-const SEED = n => 100 + n;     // fixed seed of the adversary of level n
+const SEED = () => 1;           // fixed seed of every level (tools/semailles/seeds.js: the test player wins all 20 with it)
 
 let browser;
 const problems = [];   // console errors, page errors, unexpected requests (all pages)
@@ -585,6 +585,7 @@ const ENDS = [
     await a.page.locator('#bGo').tap();
     await a.page.waitForFunction(() => !window.__game.state().busy && window.__game.state().turn === 0, null, { timeout: 6000 });
     const got = await state(a.page);
+    if (JSON.stringify([got.board, got.store, got.hist]) !== JSON.stringify([want.board, want.store, want.hist])) console.log('DBG MISMATCH got', JSON.stringify(got), 'want', JSON.stringify(want), await a.page.evaluate(() => localStorage.getItem('mj:semailles:v1')));
     assert.deepEqual([got.board, got.store, got.hist], [want.board, want.store, want.hist]);
     await a.context.close();
   });

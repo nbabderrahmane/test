@@ -168,7 +168,6 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     });
     const counts = info.levels.map(l => l.opp.length);
     assert.deepEqual([counts[0], counts[5], counts[13]], [1, 2, 3]);
-    assert.ok(counts.slice(0, 5).every(c => c === 1) && counts.slice(5, 14).every(c => c === 2) && counts.slice(14).every(c => c === 3) || true);
     // strength never decreases from one run of opponents to the next (breathers when a new opponent or pion arrives are allowed)
     const strength = info.levels.map(l => l.opp.reduce((a, b) => a + b, 0) / l.opp.length);
     assert.ok(strength[19] > strength[0] + 3, 'last level not tougher than the first');
