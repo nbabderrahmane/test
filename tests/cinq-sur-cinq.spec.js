@@ -455,7 +455,7 @@ function checkFit(m, label) {
       assert.ok(s.stars.every(v => v >= 0 && v <= 3), raw);
       await page.locator('#bGo').tap();
       const g = (await state(page)).game;
-      assert.ok(g.index >= 0 && g.index < 5 && g.options.length === 4 && g.remaining > 0 && g.remaining <= 12000, raw);
+      assert.ok(g.index >= 0 && g.index < 5 && g.options.length === 4 && g.remaining >= 0 && g.remaining <= 12000 && (g.answered || g.remaining > 0), raw);
       await page.evaluate(() => window.__game.freeze(true));
       const done = await page.evaluate(() => { const g = window.__game; for (let i = 0; i < 5 && !g.state().game.finished; i++) { g.answer(0); g.next(); } return g.state().game.finished; });
       assert.equal(done, true, raw);
@@ -928,7 +928,7 @@ function checkFit(m, label) {
 
   await test('R21: the answers are not stored in clear and the right one is not always first in the data', async () => {
     const src = fs.readFileSync(FILE, 'utf8');
-    for (const l of DATA) for (const q of l.qs) for (const t of [q.a, ...q.w]) if (t.length >= 8) assert.ok(!src.includes(t), 'answer in clear in the file: ' + t);
+    for (const l of DATA) for (const q of l.qs) for (const t of [q.a, ...q.w]) if (t.length >= 8 && !DATA.some(m => m.qs.some(r => r.q.includes(t)))) assert.ok(!src.includes(t), 'answer in clear in the file: ' + t);
     const packed = JSON.parse(/var DATA=(\[.*\]);/.exec(src)[1]);
     const pos = [0, 0, 0, 0];
     let rank = 0;

@@ -353,10 +353,10 @@ function persist() {
 
 function startLevel(num, opts) {   // num: 1-based
   opts = opts || {};
-  var c = opts.chal ? null : save.cur;
+  var c = opts.chal ? null : parseGame(save.cur, false);   // the stored snapshot, checked again and turned into game objects
   if (!opts.chal) save.chal = null;   // starting a normal level abandons a challenge left open
   if (!opts.chal && !opts.fresh && c && c.n === num - 1) {   // resume the saved game
-    G = { n: c.n, att: c.att, seed: c.seed, qi: c.sel === null ? c.res.length : c.res.length - 1, res: c.res.slice(), sel: c.sel, deadline: c.dl, chal: null, fin: null };
+    G = { n: c.n, att: c.att, seed: c.seed, qi: c.sel === null ? c.res.length : c.res.length - 1, res: c.res.slice(), sel: c.sel, deadline: c.dl + (now() - Date.now()), chal: null, fin: null };
   } else {
     if (!opts.chal) save.att++;
     G = { n: num - 1, att: opts.chal ? 5000 + (chalRuns++) : save.att, seed: save.seed, qi: 0, res: [], sel: null, deadline: now() + QMS, chal: opts.chal || null, fin: null };
@@ -370,7 +370,7 @@ function startLevel(num, opts) {   // num: 1-based
 }
 function resumeChallenge() {
   var c = save.chal;
-  G = { n: c.n, att: c.att, seed: c.seed, qi: c.sel === null ? c.res.length : c.res.length - 1, res: c.res.slice(), sel: c.sel, deadline: c.dl, chal: { target: c.target }, fin: null };
+  G = { n: c.n, att: c.att, seed: c.seed, qi: c.sel === null ? c.res.length : c.res.length - 1, res: c.res.slice(), sel: c.sel, deadline: c.dl + (now() - Date.now()), chal: { target: c.target }, fin: null };
   G.order = orderFor(G.seed, G.n, G.att, G.qi);
   show('game');
   renderGame();
@@ -379,7 +379,7 @@ function resumeChallenge() {
 
 function nextQuestion() {
   if (!G || G.sel === null || G.fin) return;
-  G.qi++; G.sel = null; G.deadline = now() + QMS;
+  G.qi++; G.sel = null; G.remAt = 0; G.deadline = now() + QMS;
   G.order = orderFor(G.seed, G.n, G.att, G.qi);
   persist();
   renderGame();
@@ -391,6 +391,7 @@ function answer(d) {
   if (d < 0 || d > 3) return false;
   if (now() >= G.deadline) { timeout(); return false; }
   var ok = G.order[d] === question()[2];
+  G.remAt = remaining();
   G.res.push({ ok: ok, pts: ok ? 100 + Math.floor(100 * remaining() / QMS) : 0, pick: d });
   G.sel = d;
   afterAnswer();
@@ -438,7 +439,7 @@ function finish() {
 // hiding the app or reloading never gives time back. The test hooks can freeze or shift this clock.
 var skew = 0, frozenAt = null;
 function now() { return frozenAt !== null ? frozenAt : Date.now() + skew; }
-function remaining() { return Math.max(0, G.deadline - now()); }
+function remaining() { return G.sel !== null ? (G.remAt || 0) : Math.max(0, G.deadline - now()); }   // frozen once answered
 function checkExpiry() {
   if (G && !G.fin && G.sel === null && now() >= G.deadline) timeout();
 }
@@ -682,7 +683,7 @@ window.__game = {
       var q = question();
       o.game = {
         level: G.n + 1, theme: QS[G.n][0], index: G.qi, total: PER, question: q[0],
-        options: G.order.map(function (k) { return q[1 + k]; }), remaining: remaining(), answered: G.sel !== null,
+        options: G.order.map(function (k) { return q[1][k]; }), remaining: remaining(), answered: G.sel !== null,
         picked: G.sel, results: G.res.map(function (r) { return { ok: r.ok, pts: r.pts }; }), score: levelScore(G.res),
         good: goodCount(G.res), finished: !!G.fin, stars: G.fin ? G.fin.stars : null, won: G.fin ? G.fin.won : null,
         challenge: G.chal ? { target: G.chal.target, won: G.fin ? G.fin.chalWon : null } : null
@@ -695,7 +696,10 @@ window.__game = {
   next: function () { if (G && G.fin) showResult(); else nextQuestion(); },
   seed: function (n) { save.seed = int(n, 1, 1e9) || 1; save.att = 0; store(); return save.seed; },
   freeze: function (b) {
-    if (b !== false) { if (frozenAt === null) frozenAt = now(); }
+    if (b !== false) {
+      if (frozenAt === null) frozenAt = now();
+      if (G && !G.fin && G.sel === null) G.deadline = frozenAt + QMS;   // the open question gets its full time back, for reproducible tests
+    }
     else if (frozenAt !== null) { skew = frozenAt - Date.now(); frozenAt = null; }
   },
   advance: function (ms) {   // moves the game clock forward, as if that time had passed
