@@ -2,13 +2,13 @@
 
 **À valider par un humain avant publication.**
 
-20 grilles de 12 mots à ranger en 4 familles de 3 (3 erreurs permises, la 4e termine la partie). Source : `tools/les-familles/data.js` ; preuve d'unicité : `node tools/les-familles/verify.js` (relancé par `node tests/les-familles.spec.js`).
+20 grilles de 12 mots à ranger en 4 familles de 3 (3 erreurs permises, la 4e termine la partie ; les erreurs des parties perdues et des défis s'additionnent jusqu'à la première victoire du niveau). Source : `tools/les-familles/data.js` ; preuve d'unicité : `node tools/les-familles/verify.js` (relancé par `node tests/les-familles.spec.js`).
 
 ## Ce qui est contrôlé par script, et ce qui ne l'est pas
 
 - Contrôlé : avec la table « famille → tous les mots du lot qui lui appartiennent » (`CATS` dans `data.js`, un mot qui va dans deux familles est listé dans les deux), chaque grille n'a qu'une seule répartition complète en 4 triples de mots partageant au moins une famille de la table. Deux grilles partagent au plus un mot ; aucune famille n'est reprise telle quelle ; tout mot de la table sert dans une grille ; mots de 9 lettres au plus, sans espace ni trait d'union.
-- Non contrôlé : l'exhaustivité de la table. Elle est écrite à la main et relue famille par famille (après la première revue : tabouret/banc, piment/gingembre et soleil/orage, qui donnaient une autre répartition légitime, ont été retirés des grilles 9, 10 et 12). Seul un humain peut dire si un mot a une lecture oubliée ou si une famille est discutable. Mots à relire en priorité : plantain (fruit / féculent, niveau 17), bureau (meuble / pièce, 9), sifflet (on souffle dedans / au football, 13), mètre (unité / outil de bricolage, 14), basket (chaussure / sport, 15), maillot, gardien (métiers / football, 19), batterie (percussions / véhicule, 18), piment (assaisonner / légume, 10), muscade, balance, kaki et marron évités.
-- Aucune marque, aucun nom de personne, rien de politique ni de religieux. Aucune compréhension régionale vérifiée : certains mots (sorgho évité, acajou, fromager, muscade, poireau) sont à confirmer pour l'Afrique francophone.
+- Non contrôlé : l'exhaustivité de la table. Elle est écrite à la main et relue famille par famille. Les relectures ont déjà trouvé des oublis (tabouret/banc, piment/gingembre, soleil/orage, puis maillot, qui est aussi du matériel de sport : le niveau 18 avait deux solutions, le mot est retiré). Dernière relecture : arbitre, gardien (métiers), tailleur (habit), fromager (métier), aubergine et acajou (couleurs), batterie (ustensile), sifflet (instrument), tir (sport) ajoutés aux familles concernées. Seul un humain peut dire s'il reste une lecture oubliée ou une famille discutable. Mots à relire en priorité : plantain (fruit / féculent, niveau 17), bureau (meuble / pièce, 9), sifflet (on souffle dedans / au football, 13), mètre (unité / outil de bricolage, 14), basket (chaussure / sport, 15), gardien (métiers / football, 19), batterie (percussions / véhicule, 18), piment (assaisonner / légume, 10).
+- Aucune marque, aucun nom de personne, rien de politique ni de religieux. Aucune compréhension régionale vérifiée : acajou, fromager, muscade, poireau, handball sont à confirmer pour l'Afrique francophone.
 - Difficulté : niveaux 1-5 sans piège ; 6-15 un mot qui pourrait aller dans une autre famille ; 16-19 deux pièges ; 20 trois pièges. Aux niveaux 18, 19 et 20, les pièges s'enchaînent (un mot forcé en impose un autre).
 
 ## Niveau 1
@@ -113,7 +113,7 @@
 - Cœur ♥ — **Au football** : penalty, tir, corner
 - Étoile ✦ — **Arbres** : cocotier, acajou, fromager
 - Triangle ▲ — **Insectes** : termite, criquet, mouche
-- Pièges : sifflet (On souffle dedans / Au football)
+- Pièges : sifflet (Instruments de musique / On souffle dedans / Au football)
 
 ## Niveau 14
 
@@ -152,8 +152,8 @@
 - Croix ✚ — **Percussions** : cymbale, maracas, batterie
 - Cœur ♥ — **Pièces d'un véhicule** : moteur, frein, klaxon
 - Étoile ✦ — **Matériel de sport** : raquette, haltère, ballon
-- Triangle ▲ — **Au football** : but, arbitre, maillot
-- Pièges : batterie (Instruments de musique / Percussions / Pièces d'un véhicule) ; ballon (Au football / Matériel de sport)
+- Triangle ▲ — **Au football** : but, arbitre, corner
+- Pièges : batterie (Instruments de musique / Percussions / Ustensiles de cuisine / Pièces d'un véhicule) ; ballon (Au football / Matériel de sport)
 
 ## Niveau 19
 

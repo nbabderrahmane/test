@@ -60,8 +60,10 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
       Storage.prototype.getItem = function () { throw new Error('no storage'); };
       Storage.prototype.setItem = function () { throw new Error('no storage'); };
     } else {
+      // the starting save is written on the first navigation of the tab only (never after a reload: R14)
       try {
-        if (!localStorage.getItem(key)) {
+        if (!sessionStorage.getItem('__seeded')) {
+          sessionStorage.setItem('__seeded', '1');
           if (raw !== null) localStorage.setItem(key, raw);
           else if (save) localStorage.setItem(key, JSON.stringify(save));
         }
@@ -89,7 +91,7 @@ const msgs = page => page.evaluate(() => new Promise(r => setTimeout(() => r(win
 const events = async (page, name) => (await msgs(page)).filter(m => m.event === name);
 const savedData = page => page.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY);
 const winShown = page => page.waitForSelector('#win:not([hidden])', { timeout: 4000 });
-const FULL = { max: 20, stars: new Array(20).fill(2), best: new Array(20).fill(3) };
+const FULL = { max: 20, stars: new Array(20).fill(0), best: new Array(20).fill(0) };   // everything unlocked, nothing won
 
 // Real taps: type in the field, tap the suggestion, tap Valider.
 async function playName(page, name, how = 'fill') {
@@ -173,8 +175,13 @@ function checkFit(m, tag) {
     assert.equal(new Set(CITIES.map(c => strip(c.name).replace(/[^a-z]/g, ''))).size, CITIES.length, 'duplicate names');
     CITIES.forEach(c => {
       assert.ok(c.lat >= -35.5 && c.lat <= 37.5 && c.lon >= -26 && c.lon <= 58, c.name + ' is outside Africa');
-      assert.ok(Math.abs(c.lat * 10 - Math.round(c.lat * 10)) < 1e-6 && Math.abs(c.lon * 10 - Math.round(c.lon * 10)) < 1e-6, c.name + ': one decimal');
+      const dec = ['Kinshasa', 'Brazzaville'].includes(c.name) ? 100 : 10;   // R16: two decimals for the two twin capitals only
+      assert.ok(Math.abs(c.lat * dec - Math.round(c.lat * dec)) < 1e-6 && Math.abs(c.lon * dec - Math.round(c.lon * dec)) < 1e-6, c.name + ': decimals');
     });
+    let minD = 1e9, minP = '';
+    CITIES.forEach((a, i) => CITIES.forEach((b, j) => { if (j > i) { const d = hav(a, b); if (d < minD) { minD = d; minP = a.name + '/' + b.name; } } }));
+    assert.ok(minD >= 5, `two cities are only ${minD.toFixed(1)} km apart: ${minP} (R16)`);
+    assert.ok(!city('Malabo').cap, 'R16: Malabo (capital in transition) must not be marked capital');
     const banned = /laayoune|laâyoune|dakhla|hargeisa|sahara|sahrawi|el aaiun|\bsmara\b|boujdour|berbera/i;
     CITIES.forEach(c => assert.ok(!banned.test(c.name + ' ' + c.country), 'disputed territory: ' + c.name));
     assert.equal(ANSWERS.length, 20);
@@ -315,8 +322,12 @@ function checkFit(m, tag) {
     await page.locator('#bNext').tap();   // "Réessayer"
     const st2 = await state(page);
     assert.equal(st2.attempts, 0); assert.equal(st2.over, false); assert.equal(st2.level, 1);
+    assert.match(await page.locator('#gAtt').innerText(), /cumulés 6/);
     await playName(page, 'Nairobi'); await winShown(page);
-    assert.equal((await state(page)).stars, 3);
+    assert.equal((await state(page)).stars, 1, 'R11: 6 lost tries + 1 = 7 cumulated tries, one star');
+    assert.match(await page.locator('#win').innerText(), /Essais cumulés : 7/);
+    const sv2 = await savedData(page);
+    assert.deepEqual([sv2.stars[0], sv2.best[0], sv2.prior[0]], [1, 7, 0]);
     await context.close();
   });
 
@@ -520,11 +531,12 @@ function checkFit(m, tag) {
 
     // lost: found in 3 while the target was 2
     ({ context, page } = await open({ width: 360, height: 640 }, { save: seed, hash: '#defi-1-2' }));
-    for (const n of ['Lagos', 'Le Cap']) await playName(page, n);
-    await playName(page, 'Nairobi'); await winShown(page);
+    for (const n of ['Lagos', 'Le Cap']) await playName(page, n);   // R15: the game stops at the objective
+    await winShown(page);
+    assert.equal((await state(page)).over, true);
     assert.match(await page.locator('#win').innerText(), /Défi manqué/);
     assert.deepEqual(await page.locator('#win .btn:visible').allInnerTexts(), ['Accueil'], 'R3: a lost challenge only goes home');
-    assert.deepEqual((await events(page, 'challenge_result')).map(e => [e.level, e.score, e.target, e.won]), [[1, 3, 2, false]]);
+    assert.deepEqual((await events(page, 'challenge_result')).map(e => [e.level, e.score, e.target, e.won]), [[1, 2, 2, false]]);
     sv = await savedData(page);
     assert.deepEqual([sv.max, sv.stars.slice(0, 4)], [4, [3, 2, 0, 0]]);
     await context.close();
@@ -708,6 +720,73 @@ function checkFit(m, tag) {
     const text = (await page.evaluate(() => window.__shared))[0];
     assert.ok(!/[\u{1F7E0}-\u{1F7EB}\u{2B1B}\u{2B1C}]/u.test(text), 'coloured squares or circles in the share text');
     assert.match(text, /→\d+% ↗\d+% ✅/);
+    await context.close();
+  });
+
+  await test('R11: stars freeze at the first win; replaying a won level changes nothing; challenges on an unwon level count', async () => {
+    let { context, page } = await open({ width: 360, height: 640 }, { save: { max: 2, stars: [1, 0], best: [6, 0] } });
+    await page.locator('#bLevels').tap();
+    await page.locator('[data-level="1"]').tap();
+    assert.match(await page.locator('#gStars').innerText(), /Étoiles déjà gagnées/);
+    await playName(page, 'Nairobi'); await winShown(page);
+    assert.equal(await page.locator('#wStars svg.on').count(), 1, 'the frozen star is shown, not 3');
+    assert.match(await page.locator('#win').innerText(), /Pour le plaisir/);
+    const sv = await savedData(page);
+    assert.deepEqual([sv.stars[0], sv.best[0]], [1, 6]);
+    assert.equal((await events(page, 'level_complete')).length, 0);
+    await context.close();
+
+    // a challenge on a locked, unwon level: won or lost, it adds to the running total
+    ({ context, page } = await open({ width: 360, height: 640 }, { hash: '#defi-5-6' }));
+    await playName(page, 'Kinshasa'); await winShown(page);
+    let s2 = await savedData(page);
+    assert.deepEqual([s2.prior[4], s2.stars[4], s2.max], [1, 0, 1]);
+    await context.close();
+    ({ context, page } = await open({ width: 360, height: 640 }, { hash: '#defi-5-1' }));
+    await playName(page, 'Lagos'); await winShown(page);
+    s2 = await savedData(page);
+    assert.equal(s2.prior[4], 1);
+    assert.equal((await state(page)).over, true);
+    await context.close();
+
+    // the running total is what the stars are made of: 1 (challenge) + 3 tries on the level = 4 -> 2 stars
+    ({ context, page } = await open({ width: 360, height: 640 }, { save: { max: 5, stars: [3, 3, 3, 3, 0], prior: [0, 0, 0, 0, 1] } }));
+    await page.locator('#bGo').tap();
+    assert.equal((await state(page)).level, 5);
+    await playName(page, 'Lagos'); await playName(page, 'Dakar'); await playName(page, 'Kinshasa'); await winShown(page);
+    assert.equal((await state(page)).stars, 2);
+    assert.match(await page.locator('#win').innerText(), /Essais cumulés : 4/);
+    assert.deepEqual((await events(page, 'level_complete')).map(e => [e.level, e.score, e.stars]), [[5, 4, 2]]);
+    await context.close();
+  });
+
+  await test('R15: a challenge stops at its objective, one counter, resumed after a reload, one result', async () => {
+    let { context, page } = await open({ width: 360, height: 640 }, { hash: '#defi-1-3' });
+    assert.equal(await page.locator('#list .row').count(), 3, 'only as many slots as the objective');
+    assert.match(await page.locator('#gAtt').innerText(), /Essai 1\/3/);
+    assert.ok(!/\/6/.test(await page.evaluate(() => document.body.innerText)), 'a single counter');
+    await playName(page, 'Lagos');
+    ({ context, page } = await reopen(context, page));
+    let st = await state(page);
+    assert.deepEqual([st.screen, st.attempts, st.challenge && st.challenge.target], ['game', 1, 3]);
+    await playName(page, 'Le Cap'); await playName(page, 'Dakar'); await winShown(page);
+    assert.equal((await state(page)).over, true);
+    assert.match(await page.locator('#win').innerText(), /Défi manqué/);
+    await page.waitForTimeout(250);
+    assert.deepEqual((await events(page, 'challenge_result')).map(e => [e.level, e.score, e.target, e.won]), [[1, 3, 3, false]]);
+    await context.close();
+  });
+
+  await test('R16: twin capitals are distinct (moins de 10 km, not a hit) and no pair is closer than 5 km', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { save: { max: 5, stars: [3, 3, 3, 3, 0] } });
+    await page.locator('#bGo').tap();
+    assert.equal((await state(page)).level, 5);
+    await playName(page, 'Brazzaville');
+    const st = await state(page);
+    assert.equal(st.guesses[0].hit, false); assert.equal(st.over, false);
+    assert.ok(st.guesses[0].km >= 5 && st.guesses[0].km < 10, 'km ' + st.guesses[0].km);
+    assert.match(await page.locator('#list .row').first().innerText(), /moins de 10 km/);
+    assert.ok(st.guesses[0].pct < 100);
     await context.close();
   });
 

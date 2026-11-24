@@ -1,13 +1,15 @@
 # cap-sur (Girouette) : contenu
 
-> **À valider par un humain avant publication.** Les coordonnées ont été écrites de mémoire (une décimale, soit ~10 km de précision) et n'ont été vérifiées contre aucune source externe.
+> **À valider par un humain avant publication.** Les coordonnées ont été écrites de mémoire (une décimale, soit ~10 km de précision ; deux décimales pour Kinshasa et Brazzaville, très proches) et n'ont été vérifiées contre aucune source externe.
 
 Source de vérité : `tools/cap-sur/cities.txt` et `tools/cap-sur/levels.txt` ; `node tools/cap-sur/build.js` régénère le jeu et cette fiche.
 
 ## Règles de contenu
 
-- 123 villes d'Afrique, avec pays, latitude et longitude (degrés décimaux, une décimale).
+- 123 villes d'Afrique, avec pays, latitude et longitude (degrés décimaux, une décimale ; deux pour Kinshasa et Brazzaville).
 - Aucune ville de territoire au statut disputé. Aucune ville de territoire d'outre-mer d'un autre continent.
+- Statut de capitale : seules les capitales au statut stable sont marquées (Malabo, dont le siège du gouvernement est en cours de transfert, ne l'est pas ; Gitega n'est pas proposée).
+- Aucune paire de villes à moins de 5 km (Kinshasa et Brazzaville : deux décimales). Si la distance arrondie est inférieure à 10 km sans être la bonne ville, le jeu affiche « moins de 10 km ».
 - Pas de carte, pas de frontière dessinée. Noms de pays en français d'usage courant.
 - Distance : formule de haversine (rayon 6371 km), arrondie au km. Direction : 8 flèches (nord, nord-est, est, sud-est, sud, sud-ouest, ouest, nord-ouest) depuis la ville proposée vers la ville à trouver.
 - Proximité : 100 % si c'est la bonne ville, sinon `100 × (1 − distance / 9000 km)` arrondi, borné à 0-99 %.
@@ -20,7 +22,7 @@ Source de vérité : `tools/cap-sur/cities.txt` et `tools/cap-sur/levels.txt` ; 
 | 2 | Dakar | Sénégal | capitale | 14.7 | -17.5 |
 | 3 | Le Caire | Égypte | capitale | 30.0 | 31.2 |
 | 4 | Alger | Algérie | capitale | 36.8 | 3.1 |
-| 5 | Kinshasa | RD Congo | capitale | -4.3 | 15.3 |
+| 5 | Kinshasa | RD Congo | capitale | -4.32 | 15.31 |
 | 6 | Windhoek | Namibie | capitale | -22.6 | 17.1 |
 | 7 | Niamey | Niger | capitale | 13.5 | 2.1 |
 | 8 | Lilongwe | Malawi | capitale | -14.0 | 33.8 |
@@ -51,12 +53,12 @@ Source de vérité : `tools/cap-sur/cities.txt` et `tools/cap-sur/levels.txt` ; 
 | Bangui | Centrafrique | 4.4 | 18.6 | oui |
 | N'Djamena | Tchad | 12.1 | 15.0 | oui |
 | Moroni | Comores | -11.7 | 43.3 | oui |
-| Brazzaville | Congo | -4.3 | 15.3 | oui |
-| Kinshasa | RD Congo | -4.3 | 15.3 | oui |
+| Brazzaville | Congo | -4.27 | 15.28 | oui |
+| Kinshasa | RD Congo | -4.32 | 15.31 | oui |
 | Yamoussoukro | Côte d'Ivoire | 6.8 | -5.3 | oui |
 | Djibouti | Djibouti | 11.6 | 43.1 | oui |
 | Le Caire | Égypte | 30.0 | 31.2 | oui |
-| Malabo | Guinée équatoriale | 3.8 | 8.8 | oui |
+| Malabo | Guinée équatoriale | 3.8 | 8.8 |  |
 | Asmara | Érythrée | 15.3 | 38.9 | oui |
 | Addis-Abeba | Éthiopie | 9.0 | 38.7 | oui |
 | Libreville | Gabon | 0.4 | 9.5 | oui |

@@ -51,6 +51,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 12px 4px;flex:none}
 .row .nm span{display:block;font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row.hit .nm span{color:var(--acc-ink)}
 .row .ds{flex:none;font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right;min-width:62px}
+.row .ds.near{font-size:12px;line-height:1.1;white-space:normal}
 .row .ar{flex:none;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center}
 .row .ar svg{width:22px;height:22px;fill:var(--acc)}
 .row.hit .ar{background:rgba(4,33,29,.18)}
@@ -268,12 +269,12 @@ var CITIES = [
   "Bangui|Centrafrique|4.4|18.6|c",
   "N'Djamena|Tchad|12.1|15.0|c",
   "Moroni|Comores|-11.7|43.3|c",
-  "Brazzaville|Congo|-4.3|15.3|c",
-  "Kinshasa|RD Congo|-4.3|15.3|c",
+  "Brazzaville|Congo|-4.27|15.28|c",
+  "Kinshasa|RD Congo|-4.32|15.31|c",
   "Yamoussoukro|Côte d'Ivoire|6.8|-5.3|c",
   "Djibouti|Djibouti|11.6|43.1|c",
   "Le Caire|Égypte|30.0|31.2|c",
-  "Malabo|Guinée équatoriale|3.8|8.8|c",
+  "Malabo|Guinée équatoriale|3.8|8.8",
   "Asmara|Érythrée|15.3|38.9|c",
   "Addis-Abeba|Éthiopie|9.0|38.7|c",
   "Libreville|Gabon|0.4|9.5|c",
@@ -447,7 +448,7 @@ function emit(msg) {
 }
 
 // ---- persistence (always guarded: the game works without storage) ------------------
-var save = { max: 1, stars: [], best: [], runs: {}, chalGame: null };
+var save = { max: 1, stars: [], best: [], prior: [], runs: {}, chalGame: null };
 function firstOpen() {   // the first level not yet won: what "Continuer" points at
   for (var i = 0; i < N; i++) if (!save.stars[i]) return i + 1;
   return N;
@@ -469,8 +470,8 @@ function validGuesses(arr, target) {   // distinct valid cities, none of them th
 }
 function loadSave() {
   var i;
-  save.stars = []; save.best = [];
-  for (i = 0; i < N; i++) { save.stars.push(0); save.best.push(0); }
+  save.stars = []; save.best = []; save.prior = [];
+  for (i = 0; i < N; i++) { save.stars.push(0); save.best.push(0); save.prior.push(0); }
   try {
     var s = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (s && typeof s === 'object') {
@@ -478,6 +479,7 @@ function loadSave() {
       var nat = function (v, hi) { v = v | 0; return v < 0 ? 0 : v > hi ? hi : v; };
       save.max = clamp(s.max, N);
       if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = nat(s.stars[i], 3);
+      if (Array.isArray(s.prior)) for (i = 0; i < N && i < s.prior.length; i++) save.prior[i] = nat(s.prior[i], 999);
       if (Array.isArray(s.best)) for (i = 0; i < N && i < s.best.length; i++) save.best[i] = nat(s.best[i], MAX_TRIES);
       if (s.runs && typeof s.runs === 'object' && !Array.isArray(s.runs)) {
         for (var n = 1; n <= N; n++) {
@@ -488,7 +490,7 @@ function loadSave() {
       if (s.chalGame && typeof s.chalGame === 'object') {
         var cn = s.chalGame.n | 0, ct = s.chalGame.target | 0;
         var cg = cn >= 1 && cn <= N ? validGuesses(s.chalGame.guesses, TARGETS[cn - 1]) : null;
-        if (cg && ct >= 1 && ct <= MAX_TRIES) save.chalGame = { n: cn, target: ct, guesses: cg };
+        if (cg && ct >= 1 && ct <= MAX_TRIES && cg.length < ct) save.chalGame = { n: cn, target: ct, guesses: cg };
       }
     }
   } catch (e) { /* no storage: play without it */ }
@@ -508,6 +510,9 @@ var screen = 'home';
 var winTimer = 0, msgTimer = 0;
 var lastInfo = null;
 
+function slotCount() { return chal ? chal.target : MAX_TRIES; }
+function wonBefore() { return save.stars[level - 1] > 0; }
+function prior() { return chal || wonBefore() ? 0 : save.prior[level - 1] || 0; }
 function attempts() { return guesses.length; }
 function starsFor(n) { return n <= 3 ? 3 : n <= 5 ? 2 : 1; }
 function guessedIdx() { return guesses.map(function (g) { return g.i; }); }
@@ -530,12 +535,12 @@ function rowHtml(g, fresh) {
   var c = CITIES[g.i], cls = g.pct >= 80 ? ' hot' : g.pct >= 50 ? ' mid' : '';
   var ar = g.hit ? '<svg viewBox="0 0 24 24"><path d="M4 12.500l5 5L20 6.500" fill="none" stroke="#04211D" stroke-width="3.200" stroke-linecap="round" stroke-linejoin="round"/></svg>' : arrowSvg(g.dir);
   return '<div class="row' + (g.hit ? ' hit' : '') + (fresh ? ' new' : '') + '" data-city="' + g.i + '"><div class="nm"><b>' + c.n + '</b><span>' + c.c +
-    '</span></div><div class="ds">' + fmt(g.km) + ' km</div><div class="ar" role="img" aria-label="' + (g.hit ? 'trouvé' : DIRS[g.dir]) + '">' + ar +
+    '</span></div><div class="ds' + (g.km < 10 && !g.hit ? ' near' : '') + '">' + (g.hit ? '0 km' : g.km < 10 ? 'moins de 10 km' : fmt(g.km) + ' km') + '</div><div class="ar" role="img" aria-label="' + (g.hit ? 'trouvé' : DIRS[g.dir]) + '">' + ar +
     '</div><div class="pc"><b>' + g.pct + ' %</b><u><i class="' + cls.trim() + '" style="width:' + g.pct + '%"></i></u></div></div>';
 }
 function renderList(fresh) {
   var html = '', i;
-  for (i = 0; i < MAX_TRIES; i++) {
+  for (i = 0; i < slotCount(); i++) {
     html += i < guesses.length ? rowHtml(guesses[i], fresh && i === guesses.length - 1) :
       '<div class="row empty" aria-hidden="true">' + (i + 1) + '</div>';
   }
@@ -549,8 +554,9 @@ function scrollList() {   // keep the latest guess in view when the list is sque
 }
 function refresh(fresh) {
   $('lvl').textContent = 'Niveau ' + level;
-  $('gAtt').innerHTML = 'Essai <b>' + Math.min(attempts() + 1, MAX_TRIES) + '/' + MAX_TRIES + '</b>';
-  $('gStars').textContent = chal ? '' : '★★★ en 3 · ★★ en 5';
+  $('gAtt').innerHTML = 'Essai <b>' + Math.min(attempts() + 1, slotCount()) + '/' + slotCount() + '</b>' +
+    (prior() ? ' · cumulés <b>' + (prior() + attempts()) + '</b>' : '');
+  $('gStars').textContent = chal ? '' : wonBefore() ? 'Étoiles déjà gagnées' : '★★★ en 3 · ★★ en 5';
   $('inp').disabled = over;
   renderList(fresh);
   updateOk();
@@ -623,7 +629,7 @@ function submitGuess(i, quiet) {
   var inp = $('inp');
   inp.value = '';
   if (j.hit) { found = true; over = true; }
-  else if (guesses.length >= MAX_TRIES) over = true;
+  else if (guesses.length >= slotCount()) over = true;
   say('');
   persist();
   refresh(!quiet);
@@ -633,19 +639,23 @@ function submitGuess(i, quiet) {
 }
 function finish() {
   $('inp').blur();
-  var n = attempts(), s = found ? starsFor(n) : 0, events = [], info;
+  var n = attempts(), i = level - 1, was = wonBefore(), events = [], info;
+  var add = function () { if (!was) save.prior[i] = Math.min(999, (save.prior[i] || 0) + n); };
   if (chal) {
-    var ok = found && n <= chal.target;
-    info = { n: n, stars: s, found: found, chal: { ok: ok, target: chal.target }, prevBest: 0 };
-    events.push({ event: 'challenge_result', level: level, score: n, target: chal.target, won: ok });
+    info = { n: n, stars: 0, found: found, chal: { ok: found, target: chal.target }, total: 0 };
+    add();   // R11: a challenge on a level not yet won counts in the running total
+    events.push({ event: 'challenge_result', level: level, score: n, target: chal.target, won: found });
+  } else if (found && !was) {
+    var total = (save.prior[i] || 0) + n, s = starsFor(total);
+    info = { n: n, stars: s, found: true, chal: null, total: total, first: true };
+    save.stars[i] = s; save.best[i] = total; save.prior[i] = 0;
+    if (level < N) save.max = Math.max(save.max, level + 1);
+    events.push({ event: 'level_complete', level: level, score: total, stars: s });
+  } else if (found) {   // replay of a won level: for fun, the stars stay as they were
+    info = { n: n, stars: save.stars[i], found: true, chal: null, total: n, replay: true };
   } else {
-    info = { n: n, stars: s, found: found, chal: null, prevBest: save.best[level - 1] || 0 };
-    if (found) {
-      if (s > (save.stars[level - 1] || 0)) save.stars[level - 1] = s;
-      if (!info.prevBest || n < info.prevBest) save.best[level - 1] = n;
-      if (level < N) save.max = Math.max(save.max, level + 1);
-      events.push({ event: 'level_complete', level: level, score: n, stars: s });
-    }
+    add();
+    info = { n: n, stars: 0, found: false, chal: null, total: (save.prior[i] || 0) + (was ? n : 0) };
   }
   lastInfo = info;
   store();
@@ -667,9 +677,10 @@ function showWin(info) {
   $('wU').textContent = info.found && n === 1 ? 'essai' : 'essais';
   var rec = '';
   if (info.chal) rec = 'Objectif : ' + info.chal.target + ' essai' + (info.chal.target > 1 ? 's' : '') + ' ou moins';
-  else if (info.found) rec = info.prevBest ? (n < info.prevBest ? 'Nouveau record !' : 'Record : ' + info.prevBest + ' essai' + (info.prevBest > 1 ? 's' : '')) :
-    (s < 3 ? '3 étoiles en 3 essais ou moins' : '');
-  else rec = 'Un nouvel essai ?';
+  else if (info.replay) rec = 'Pour le plaisir : les étoiles ne changent pas';
+  else if (info.total > n) rec = 'Essais cumulés : ' + info.total;
+  else if (info.found && s < 3) rec = '3 étoiles en 3 essais ou moins';
+  if (!rec && !info.found) rec = 'Essais cumulés : ' + info.total;
   $('wRec').textContent = rec;
   $('wChal').hidden = true;
   $('bNext').textContent = chal ? 'Accueil' : !info.found ? 'Réessayer' : last ? 'Niveaux' : 'Suivant';
@@ -923,13 +934,14 @@ window.__game = {
         return { name: CITIES[g.i].n, country: CITIES[g.i].c, km: g.km, dir: g.dir, arrow: g.dir < 0 ? '' : ARROWS[g.dir], pct: g.pct, hit: g.hit };
       }),
       found: found, over: over,
-      stars: over && found && !chal ? starsFor(attempts()) : 0,
+      stars: over && found && !chal ? save.stars[level - 1] : 0,
       input: $('inp').value,
       picked: picked >= 0 ? CITIES[picked].n : null,
       suggestions: sugList.map(function (i) { return CITIES[i].n; }),
       total: totalStars(),
       max: save.max,
       continueLevel: firstOpen(),
+      cumulative: prior() + attempts(),
       challenge: chal ? { target: chal.target, level: chal.level } : null
     };
   },

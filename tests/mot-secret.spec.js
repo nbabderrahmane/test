@@ -29,14 +29,12 @@ const results = [];
 
 async function open(viewport = { width: 360, height: 640 }, opts = {}) {
   const context = await browser.newContext({ ...MOBILE, viewport, ...(opts.extra || {}) });
-  await context.addInitScript(({ save, key, config, share, brokenStorage }) => {
+  await context.addInitScript(({ config, share, brokenStorage }) => {
     window.__msgs = []; window.__shared = []; window.__clip = [];
     window.addEventListener('message', e => { if (e.data && e.data.source === 'mini-jeu') window.__msgs.push(e.data); });
     if (brokenStorage) {
       Storage.prototype.getItem = function () { throw new Error('blocked'); };
       Storage.prototype.setItem = function () { throw new Error('blocked'); };
-    } else {
-      try { if (save !== null && !localStorage.getItem(key)) localStorage.setItem(key, typeof save === 'string' ? save : JSON.stringify(save)); } catch (e) { /* ignore */ }
     }
     if (config) window.MJ_CONFIG = config;
     if (share === 'share') navigator.share = t => { window.__shared.push(t.text); return Promise.resolve(); };
@@ -44,15 +42,28 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
       Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
       Object.defineProperty(navigator, 'clipboard', { value: { writeText: t => { window.__clip.push(t); return Promise.resolve(); } }, configurable: true });
     }
-  }, { save: opts.save === undefined ? null : opts.save, key: KEY, config: opts.config || null, share: opts.share || '', brokenStorage: !!opts.brokenStorage });
+  }, { config: opts.config || null, share: opts.share || '', brokenStorage: !!opts.brokenStorage });
   const page = await context.newPage();
   page.on('console', m => { if (m.type() === 'error') problems.push('console.error: ' + m.text()); });
   page.on('pageerror', e => problems.push('pageerror: ' + e.message));
   const base = opts.url || URL;
   page.on('request', r => { const u = r.url().split('#')[0]; if (u !== base && !(opts.url && /\/favicon\.ico$/.test(u))) problems.push('request: ' + r.url()); });
+  // R14: the starting save is written once, from node, after a first load; never by a script that runs again on reload
+  if (opts.save !== undefined && opts.save !== null && !opts.brokenStorage) {
+    await page.goto(base);
+    await page.evaluate(([k, v]) => localStorage.setItem(k, v), [KEY, typeof opts.save === 'string' ? opts.save : JSON.stringify(opts.save)]);
+    await page.goto('about:blank');
+  }
   await page.goto(base + (opts.hash || ''));
   await page.waitForFunction(() => !!window.__game);
   return { context, page };
+}
+// Chromium on file:// can lose a localStorage write made just before a reload (measured: 1 loss in 50 with no pause,
+// 0 in 50 with 400 ms). Let the write settle before reloading; this is a browser timing issue, not game logic.
+async function reload(page) {
+  await page.waitForTimeout(400);
+  await page.reload();
+  await page.waitForFunction(() => !!window.__game);
 }
 const state = page => page.evaluate(() => window.__game.state());
 const msgs = page => page.evaluate(() => new Promise(r => setTimeout(() => r(window.__msgs), 40)));
@@ -121,7 +132,8 @@ async function test(name, fn) {
       assert.ok(n >= 30, 'level ' + (i + 1) + ' ' + a + ': ' + n + ' candidates');
     });
     // R9: sensitive words are out, everyday family words are in
-    ['pape', 'moine', 'prier', 'croix', 'ange', 'diable', 'rite', 'guerre', 'fusil', 'bombe', 'vote', 'asile', 'greve', 'baiser', 'tuer', 'alcool']
+    ['pape', 'moine', 'prier', 'croix', 'ange', 'diable', 'rite', 'guerre', 'fusil', 'bombe', 'vote', 'asile', 'greve', 'baiser', 'tuer', 'alcool',
+      'rhum', 'cidre', 'fumer', 'pipe', 'armee', 'juger', 'jury', 'police', 'frapper', 'blesser', 'race', 'tribu', 'hymne', 'urne', 'exil', 'pari', 'parier', 'cochon', 'jambon', 'lard']
       .forEach(w => assert.ok(!ADMIT_SET.has(w), w + ' must not be admitted'));
     ['femme', 'maman', 'papa', 'homme', 'fille', 'famille', 'maison', 'ecole', 'repas'].forEach(w => assert.ok(ADMIT_SET.has(w), w + ' must be admitted'));
     ADMITTED.forEach(w => assert.match(w, /^[a-z]{4,7}$/, w));
@@ -290,7 +302,7 @@ async function test(name, fn) {
     assert.equal((await state(page)).won, true);
     assert.ok(before.limit === 6);
     // stars are shown before playing (goal line)
-    await page.evaluate(() => window.__game.loadLevel(3));
+    await page.evaluate(() => window.__game.loadLevel(8));
     assert.match(await page.locator('#goal').textContent(), /3 essais/);
     await context.close();
   });
@@ -306,8 +318,7 @@ async function test(name, fn) {
     await tapKeys(page, ANSWERS[1].slice(1, 3));              // two letters typed, not sent
     const before = await state(page);
     assert.equal(before.level, 2); assert.equal(before.tries, 2); assert.equal(before.typed.length, 3);
-    await page.reload();
-    await page.waitForFunction(() => !!window.__game);
+    await reload(page);
     assert.equal((await state(page)).screen, 'home');
     assert.match(await page.locator('#bGo').textContent(), /Niveau 2/);
     await tapBtn(page, 'bGo');
@@ -406,7 +417,7 @@ async function test(name, fn) {
   });
 
   await test('challenge: opens a locked level with one goal, equal is enough, lost, events, progress and game untouched', async () => {
-    const save = { level: 2, max: 2, stars: [3, 1], best: [1, 5], cur: { level: 2, guesses: [wrongs(2, 1)[0].toUpperCase()], typed: ANSWERS[1][0].toUpperCase() } };
+    const save = { level: 2, max: 2, stars: [3, 1], best: [1, 5], games: { 2: { guesses: [wrongs(2, 1)[0].toUpperCase()], typed: ANSWERS[1][0].toUpperCase() } } };
     const savedStr = JSON.stringify(save);
     // --- won (equal to the target)
     let { page, context } = await open({ width: 360, height: 640 }, { save: savedStr, hash: '#defi-9-3', extra: { reducedMotion: 'reduce' } });
@@ -434,7 +445,7 @@ async function test(name, fn) {
     assert.deepEqual(ev.map(e => ({ level: e.level, score: e.score, target: e.target, won: e.won })), [{ level: 9, score: 3, target: 3, won: true }]);
     assert.equal((await events(page, 'level_complete')).length, 0);
     const raw1 = JSON.parse(await stored(page));
-    assert.deepEqual([raw1.max, raw1.cur], [2, save.cur], 'a challenge never changes the game in progress');
+    assert.deepEqual([raw1.max, raw1.games], [2, save.games], 'a challenge never changes the game in progress');
     assert.deepEqual(raw1.stars.slice(0, 2), [3, 1]); assert.ok(raw1.stars.slice(2).every(x => x === 0));
     assert.deepEqual(raw1.best.slice(0, 2), [1, 5]); assert.ok(raw1.best.slice(2).every(x => x === 0));
     await tapBtn(page, 'bNext');                                          // "Accueil"
@@ -480,12 +491,11 @@ async function test(name, fn) {
     s = await state(page);
     assert.equal(s.level, 12); assert.deepEqual(s.challenge, { level: 12, target: 4 });
     await tapWord(page, wrongs(12, 1)[0]);
-    await page.reload();
-    await page.waitForFunction(() => !!window.__game);
+    await reload(page);
     s = await state(page);
     assert.equal(s.screen, 'game'); assert.deepEqual(s.challenge, { level: 12, target: 4 }); assert.equal(s.tries, 1);
     const raw = JSON.parse(await stored(page));
-    assert.deepEqual(raw.cur, save.cur); assert.deepEqual(raw.stars.slice(0, 2), save.stars); assert.equal(raw.max, 2);
+    assert.deepEqual(raw.games, save.games); assert.deepEqual(raw.stars.slice(0, 2), save.stars); assert.equal(raw.max, 2);
     await tapBtn(page, 'bMap');                                           // leaving abandons the challenge
     s = await state(page);
     assert.equal(s.screen, 'levels'); assert.equal(s.challenge, null);
@@ -579,7 +589,7 @@ async function test(name, fn) {
     await tapBtn(page, 'bNext');                        // "Suivant" from level 1 -> level 2 (replay), then leave
     await tapBtn(page, 'bMap'); await tapBtn(page, 'bLBack');
     assert.match(await page.locator('#bGo').textContent(), /Niveau 3/);
-    await page.reload(); await page.waitForFunction(() => !!window.__game);
+    await reload(page);
     assert.match(await page.locator('#bGo').textContent(), /Niveau 3/);
     await context.close();
   });
@@ -608,6 +618,7 @@ async function test(name, fn) {
       await page.waitForFunction(() => window.__shared.length >= 1);
       const t2 = await page.evaluate(() => window.__shared[0]);
       assert.ok(t2.endsWith('https://exemple.test/a/b#defi-1-1'), t2);
+      assert.ok(!/jeton|x=1|\?/.test(t2), t2);
       await context.close();
     } finally { srv.close(); }
   });
@@ -626,6 +637,120 @@ async function test(name, fn) {
     // tiles and keys carry no id or attribute tied to the solution
     const attrs = await page.evaluate(() => [...document.querySelectorAll('#rows *, #kb *')].map(e => e.id + '|' + [...e.attributes].map(x => x.name).join(',')).join(';'));
     assert.ok(!/\|.*(word|solution|answer)/i.test(attrs));
+    await context.close();
+  });
+
+  await test('R12: one game in progress per level (detour through another level keeps the tries)', async () => {
+    const { page, context } = await open({ width: 360, height: 640 }, { extra: { reducedMotion: 'reduce' } });
+    for (const n of [1, 2]) {
+      await page.evaluate(k => window.__game.loadLevel(k), n);
+      await tapWord(page, ANSWERS[n - 1]);
+      await waitScreen(page, 'result');
+    }
+    await page.evaluate(() => window.__game.loadLevel(3));
+    for (const x of wrongs(3, 5)) await tapWord(page, x);
+    await tapKeys(page, ANSWERS[2].slice(1, 2));                 // a letter typed too
+    const before = await state(page);
+    assert.equal(before.tries, 5);
+    await tapBtn(page, 'bMap');
+    await page.locator('.cell[data-level="1"]').tap();           // another level
+    await waitScreen(page, 'game');
+    assert.equal((await state(page)).level, 1);
+    await tapBtn(page, 'bMap');
+    await page.locator('.cell[data-level="3"]').tap();           // back to level 3
+    await waitScreen(page, 'game');
+    const after = await state(page);
+    assert.equal(after.level, 3);
+    ['guesses', 'marks', 'typed', 'tries'].forEach(k => assert.deepEqual(after[k], before[k], k));
+    await reload(page);   // and after a reload
+    await tapBtn(page, 'bGo');
+    assert.equal((await state(page)).tries, 5);
+    await tapKeys(page, '<');
+    await tapWord(page, ANSWERS[2]);
+    await waitScreen(page, 'result');
+    assert.equal((await state(page)).stars, 1);                 // 6 tries, not 3 stars
+    await context.close();
+  });
+
+  await test('R11: tries add up across games until the first win; stars freeze; challenges count', async () => {
+    const { page, context } = await open({ width: 360, height: 640 }, { extra: { reducedMotion: 'reduce' } });
+    // lose level 4, retry, find the word at once: the 6 lost tries still count (1 star)
+    await page.evaluate(() => window.__game.loadLevel(4));
+    for (const x of wrongs(4, 6)) await page.evaluate(y => window.__game.play(y), x);
+    await waitScreen(page, 'result');
+    assert.equal(await page.locator('#wRec').textContent(), 'Essais cumulés : 6');
+    await tapBtn(page, 'bAgain');
+    assert.equal((await state(page)).tries, 0);
+    assert.match(await page.locator('#goal').textContent(), /Essais cumulés : 6/);
+    await tapWord(page, ANSWERS[3]);
+    await waitScreen(page, 'result');
+    let s = await state(page);
+    assert.equal(s.stars, 1); assert.equal(s.tries, 1);
+    assert.equal(await page.locator('#wRec').textContent(), 'Essais cumulés : 7');
+    assert.equal(s.save.stars[3], 1);
+    // stars freeze at the first win: replaying (even at the first try) does not change them
+    await tapBtn(page, 'bAgain');
+    assert.match(await page.locator('#goal').textContent(), /déjà gagné/);
+    await tapWord(page, ANSWERS[3]);
+    await waitScreen(page, 'result');
+    s = await state(page);
+    assert.equal(s.stars, 1); assert.equal(s.save.stars[3], 1);
+    assert.match(await page.locator('#wRec').textContent(), /étoiles inchangées/);
+    // a level won in 2 tries keeps its 3 stars even if a later replay needs 6
+    await page.evaluate(() => window.__game.loadLevel(1));
+    await page.evaluate(x => window.__game.play(x), wrongs(1, 1)[0]);
+    await page.evaluate(x => window.__game.play(x), ANSWERS[0]);
+    await waitScreen(page, 'result');
+    assert.equal((await state(page)).save.stars[0], 3);
+    await tapBtn(page, 'bAgain');
+    for (const x of wrongs(1, 5)) await page.evaluate(y => window.__game.play(y), x);
+    await page.evaluate(x => window.__game.play(x), ANSWERS[0]);
+    await waitScreen(page, 'result');
+    assert.equal((await state(page)).save.stars[0], 3);
+    // a challenge on a level not won yet counts, won or lost: #defi-20-6 won in 4 tries
+    await page.evaluate(() => { location.hash = '#defi-20-6'; });
+    await page.waitForFunction(() => window.__game.state().challenge !== null);
+    for (const x of wrongs(20, 3)) await page.evaluate(y => window.__game.play(y), x);
+    await page.evaluate(x => window.__game.play(x), ANSWERS[19]);
+    await waitScreen(page, 'result');
+    s = await state(page);
+    assert.ok(s.won); assert.equal(s.save.cum[19], 4);
+    assert.equal(s.save.stars[19], 0);
+    // the word seen in the challenge cannot give 3 stars afterwards: 4 + 1 = 5 tries = 2 stars
+    await page.evaluate(() => window.__game.loadLevel(20));
+    await page.evaluate(x => window.__game.play(x), ANSWERS[19]);
+    await waitScreen(page, 'result');
+    s = await state(page);
+    assert.equal(s.stars, 2);
+    // a lost challenge counts too
+    await page.evaluate(() => { location.hash = '#defi-19-2'; });
+    await page.waitForFunction(() => window.__game.state().challenge !== null && window.__game.state().level === 19);
+    for (const x of wrongs(19, 2)) await page.evaluate(y => window.__game.play(y), x);
+    await waitScreen(page, 'result');
+    assert.equal((await state(page)).save.cum[18], 2);
+    await context.close();
+  });
+
+  await test('R15: a challenge stops at its target; rows beyond it are hidden; one challenge result per opening, resumed after reload', async () => {
+    const { page, context } = await open({ width: 360, height: 640 }, { hash: '#defi-6-2', extra: { reducedMotion: 'reduce' } });
+    assert.equal(await page.locator('#rows .row:nth-child(3)').evaluate(e => getComputedStyle(e).visibility), 'hidden');
+    assert.equal(await page.locator('#rows .row:nth-child(2)').evaluate(e => getComputedStyle(e).visibility), 'visible');
+    assert.equal(await page.locator('#goal').isVisible(), false);
+    const w = wrongs(6, 2);
+    await tapWord(page, w[0]);
+    await reload(page);
+    let s = await state(page);
+    assert.equal(s.screen, 'game'); assert.equal(s.tries, 1); assert.deepEqual(s.challenge, { level: 6, target: 2 });
+    await tapWord(page, w[1]);
+    await waitScreen(page, 'result');
+    s = await state(page);
+    assert.ok(s.over && !s.won && s.tries === 2);
+    await tapKeys(page, 'a');                                   // no more input once it is over
+    assert.equal((await state(page)).tries, 2);
+    await reload(page);
+    s = await state(page);
+    assert.equal(s.challenge, null); assert.equal(s.screen, 'home');
+    assert.equal((await events(page, 'challenge_result')).length, 0);   // fresh page: nothing re-sent
     await context.close();
   });
 

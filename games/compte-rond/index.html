@@ -281,18 +281,18 @@ var LEVELS=[
   {n:[3,4,5,7,8,9],t:54,p:3},
   {n:[1,2,3,9,10,12],t:71,p:3},
   {n:[1,3,4,8,9,12],t:78,p:3},
-  {n:[1,2,3,6,10,25],t:113,p:4},
-  {n:[1,2,5,7,10,100],t:132,p:3},
-  {n:[1,6,7,9,10,50],t:179,p:4},
-  {n:[3,5,7,8,10,75],t:299,p:4},
-  {n:[1,2,3,8,50,100],t:288,p:3},
-  {n:[1,5,6,8,25,100],t:428,p:4},
-  {n:[1,2,6,9,10,100],t:346,p:5},
-  {n:[1,2,7,10,50,100],t:404,p:4},
-  {n:[4,6,8,10,50,100],t:707,p:5},
-  {n:[1,2,6,15,50,75],t:472,p:4},
-  {n:[3,7,8,10,25,75],t:929,p:5},
-  {n:[1,4,6,25,25,75],t:832,p:5}
+  {n:[1,2,3,4,8,20],t:107,p:4},
+  {n:[1,2,3,5,10,20],t:74,p:3},
+  {n:[1,5,6,8,9,45],t:137,p:4},
+  {n:[2,4,6,8,10,45],t:191,p:4},
+  {n:[1,2,3,8,30,40],t:178,p:3},
+  {n:[3,7,9,10,12,15],t:212,p:4},
+  {n:[1,5,6,9,10,60],t:218,p:5},
+  {n:[1,3,4,9,12,18],t:314,p:4},
+  {n:[4,6,8,10,20,60],t:341,p:5},
+  {n:[4,6,9,15,36,60],t:247,p:4},
+  {n:[1,3,4,5,40,60],t:434,p:5},
+  {n:[1,4,5,18,20,60],t:508,p:5}
 ];
 /*LEVELS:END*/
 var N = LEVELS.length;
@@ -306,13 +306,13 @@ function emit(msg) {
 }
 
 // ---- persistence (always guarded: the game works without storage) ------------
-var save = { max: 1, stars: [], cur: null };
+var save = { max: 1, stars: [], cur: {} };   // cur: one game in progress per level {n: {hist, sel}} ; chalGame: a friend's challenge in progress
 // "Continuer" always points to the first unfinished level (replaying an old level never moves it)
 function firstOpen() {
   for (var i = 0; i < N; i++) if (!save.stars[i]) return i + 1;
   return N;
 }
-function curFor(n) { return save.cur && save.cur.level === n ? save.cur : null; }
+function curFor(n) { return save.cur[n] || null; }
 function totalStars() {
   var t = 0;
   for (var i = 0; i < save.stars.length; i++) t += save.stars[i] || 0;
@@ -328,14 +328,22 @@ function loadSave() {
       var nat = function (v, lo, hi) { v = v | 0; return v < lo ? lo : v > hi ? hi : v; };
       save.max = nat(s.max, 1, N);
       if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = nat(s.stars[i], 0, 3);
-      if (s.cur && typeof s.cur === 'object' && Array.isArray(s.cur.hist)) {
-        var h = [];
-        s.cur.hist.slice(0, 5).forEach(function (m) {
+      var clean = function (g) {
+        if (!g || typeof g !== 'object' || !Array.isArray(g.hist)) return null;
+        var h = [], sl = Array.isArray(g.sel) ? g.sel : [];
+        g.hist.slice(0, 5).forEach(function (m) {
           if (Array.isArray(m) && m.length === 3) h.push([nat(m[0], 0, 5), nat(m[1], 0, 3), nat(m[2], 0, 5)]);
         });
-        var sl = Array.isArray(s.cur.sel) ? s.cur.sel : [];
-        save.cur = { level: nat(s.cur.level, 1, N), hist: h, sel: [nat(sl[0] === undefined ? -1 : sl[0], -1, 5), nat(sl[1] === undefined ? -1 : sl[1], -1, 3)] };
-        if (sl[0] === -1 || sl[0] === undefined) save.cur.sel = [-1, -1];
+        return { hist: h, sel: sl[0] === undefined || sl[0] < 0 ? [-1, -1] : [nat(sl[0], -1, 5), nat(sl[1] === undefined ? -1 : sl[1], -1, 3)] };
+      };
+      if (s.cur && typeof s.cur === 'object') {
+        if (Array.isArray(s.cur.hist)) {   // older format: a single game
+          var one = clean(s.cur); if (one) save.cur[nat(s.cur.level, 1, N)] = one;
+        } else for (var k in s.cur) if (/^\d{1,2}$/.test(k) && +k >= 1 && +k <= N) { var g1 = clean(s.cur[k]); if (g1) save.cur[+k] = g1; }
+      }
+      if (s.chalGame && typeof s.chalGame === 'object') {
+        var cg = clean(s.chalGame), cl = nat(s.chalGame.level, 0, N), ct = nat(s.chalGame.target, 0, 5);
+        if (cg && cl >= 1 && ct >= LEVELS[cl - 1].p) save.chalGame = { level: cl, target: ct, hist: cg.hist, sel: cg.sel };
       }
       // a finished level always opens the next one
       for (i = 0; i < N - 1; i++) if (save.stars[i] > 0 && save.max < i + 2) save.max = i + 2;
@@ -408,7 +416,7 @@ function begin(n, cur, ch) {
       var m = replay[i];
       if (!doOp(m[0], m[1], m[2]).ok) break;
     }
-    if (exact() || (replay.length && hist.length !== replay.length)) { vals = L.n.slice(); made = [0, 0, 0, 0, 0, 0]; hist = []; }
+    if (exact() || (replay.length && hist.length !== replay.length) || (chal && hist.length >= chal.target)) { vals = L.n.slice(); made = [0, 0, 0, 0, 0, 0]; hist = []; }
     else if (cur.sel && cur.sel[0] >= 0 && vals[cur.sel[0]] !== null) { selA = cur.sel[0]; selOp = cur.sel[1]; }
   }
   $('win').hidden = true;
@@ -421,8 +429,11 @@ function startLevel(n, cur) {
   persist();
 }
 function persist() {
-  if (chal) return;
-  save.cur = !won && (hist.length || selA >= 0) ? { level: level + 1, hist: hist.map(function (m) { return m.slice(); }), sel: [selA, selOp] } : null;
+  var g = { hist: hist.map(function (m) { return m.slice(); }), sel: [selA, selOp] };
+  if (chal) {
+    if (won) delete save.chalGame; else save.chalGame = { level: level + 1, target: chal.target, hist: g.hist, sel: g.sel };
+  } else if (!won && (hist.length || selA >= 0)) save.cur[level + 1] = g;
+  else delete save.cur[level + 1];
   store();
 }
 
@@ -538,6 +549,7 @@ function afterMove(slot) {
   persist();
   refresh(slot);
   if (exact()) win(true);
+  else if (chal && hist.length >= chal.target) lose();   // the objective can no longer be reached
 }
 function undo() {
   if (won || !hist.length) return;
@@ -548,7 +560,7 @@ function undo() {
 }
 function restart() {
   clearTimeout(winTimer);
-  if (chal) { begin(level + 1, null, chal); return; }
+  if (chal) { begin(level + 1, null, chal); persist(); return; }
   startLevel(level + 1, null);
 }
 function validate() {
@@ -568,14 +580,23 @@ function win(isExact) {
     var ok = isExact && ops <= chal.target;
     info.chal = { ok: ok, target: chal.target };
     emit({ event: 'challenge_result', level: n, score: ops, target: chal.target, won: ok });
+    persist();
   } else {
     if (s > save.stars[level]) save.stars[level] = s;
     if (n < N) save.max = Math.max(save.max, n + 1);
-    save.cur = null;
+    delete save.cur[n];
     store();
     emit({ event: 'level_complete', level: n, score: ops, stars: s });
   }
   refresh();
+  winTimer = setTimeout(showWin, reduced ? 60 : 450);
+}
+function lose() {
+  won = true; clearSel(); warn = '';
+  var ops = hist.length;
+  info = { ops: ops, stars: 0, exact: false, chal: { ok: false, target: chal.target } };
+  emit({ event: 'challenge_result', level: level + 1, score: ops, target: chal.target, won: false });
+  persist(); refresh();
   winTimer = setTimeout(showWin, reduced ? 60 : 450);
 }
 function starSvg(on) { return '<svg viewBox="0 0 24 24"' + (on ? ' class="on"' : '') + '><use href="#star"/></svg>'; }
@@ -618,8 +639,11 @@ function shareText() {
 // The link base: MJ_CONFIG.shareBaseUrl, else the current address if it is http(s); otherwise no link.
 function shareBase() {
   var b = window.MJ_CONFIG && window.MJ_CONFIG.shareBaseUrl;
-  if (typeof b !== 'string' || !b) b = /^https?:$/i.test(location.protocol) ? location.origin + location.pathname : '';   // never the query string
-  return b.split('#')[0];
+  if (typeof b !== 'string' || !b) b = /^https?:$/i.test(location.protocol) ? location.href : '';
+  try {   // only origin + pathname: never a query string (it may carry a token of the host app)
+    var u = new URL(b, location.href);
+    return /^https?:$/i.test(u.protocol) ? u.origin + u.pathname : '';
+  } catch (e) { return ''; }
 }
 function challengeText() {
   var base = shareBase(), link = base ? base + '#defi-' + (level + 1) + '-' + info.ops : '';
@@ -665,6 +689,7 @@ function openChallenge() {
   var n = +m[1], target = +m[2];
   if (n < 1 || n > N || target < LEVELS[n - 1].p || target > 5) return false;   // reachable values only
   begin(n, null, { target: target });
+  persist();
   emit({ event: 'challenge_open', level: n, target: target });
   show('game');
   return true;
@@ -675,8 +700,8 @@ var SCREENS = ['home', 'levels'];
 function show(name) {
   clearTimeout(winTimer);
   if (chal && name !== 'game') {   // leaving a challenge: the real game in progress comes back as it was saved
-    chal = null;
-    begin(save.cur ? save.cur.level : firstOpen(), save.cur, null);
+    chal = null; delete save.chalGame; store();
+    begin(firstOpen(), curFor(firstOpen()), null);
   }
   screen = name;
   SCREENS.forEach(function (s) { $(s).hidden = s !== name; });
@@ -776,6 +801,11 @@ window.addEventListener('hashchange', function () { if (/^#defi-/.test(location.
 loadSave();
 startLevel(firstOpen(), curFor(firstOpen()));
 show('home');
+if (save.chalGame && !/^#defi-/.test(location.hash)) {   // a challenge in progress is resumed (no new challenge_open)
+  var cgm = save.chalGame;
+  begin(cgm.level, cgm, { target: cgm.target });
+  show('game');
+}
 if (/^#defi-/.test(location.hash)) openChallenge();
 
 // Test hooks. Solutions are never embedded: they live in tools/compte-rond/solutions.json.

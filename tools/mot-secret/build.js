@@ -13,7 +13,7 @@ const path = require('node:path');
 
 // The 20 levels: [answer, one-line reason it is easy or hard]. Lengths: 4 (1-5), 5 (6-11), 6 (12-16), 7 (17-20).
 const ANSWERS = [
-  'chat', 'pain', 'cafe', 'pont', 'cuve',
+  'chat', 'pain', 'cafe', 'pont', 'clef',
   'table', 'plage', 'fleur', 'carte', 'fruit', 'cycle',
   'chemin', 'pigeon', 'miroir', 'saison', 'bateau',
   'cuisine', 'prairie', 'musique', 'mystere',

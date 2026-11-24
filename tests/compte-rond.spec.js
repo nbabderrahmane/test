@@ -40,7 +40,13 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
       if (noStorage) {
         Object.defineProperty(window, 'localStorage', { get() { throw new DOMException('blocked', 'SecurityError'); } });
       } else {
-        try { if (raw !== null && !localStorage.getItem(key)) localStorage.setItem(key, raw); } catch (e) { /* ignore */ }
+        // the starting save is written only on the very first navigation of the tab (flag in sessionStorage), never after a reload
+        try {
+          if (raw !== null && !sessionStorage.getItem('__seeded')) {
+            sessionStorage.setItem('__seeded', '1');
+            if (!localStorage.getItem(key)) localStorage.setItem(key, raw);
+          }
+        } catch (e) { /* ignore */ }
       }
       if (config) window.MJ_CONFIG = config;
       if (share) navigator.share = d => { window.__shared.push(d.text); return Promise.resolve(); };
@@ -54,6 +60,8 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
   await page.waitForFunction(() => !!window.__game);
   return { context, page };
 }
+// a short pause lets the storage settle before a reload (Chromium on file:// can lag)
+const reload = async page => { await page.waitForTimeout(150); await page.reload(); };
 const state = page => page.evaluate(() => window.__game.state());
 const msgs = page => page.evaluate(() => new Promise(r => setTimeout(() => r(window.__msgs), 60)));
 const events = async (page, name) => (await msgs(page)).filter(m => m.event === name);
@@ -301,10 +309,11 @@ const allStars = n => JSON.stringify({ level: 20, max: 20, stars: new Array(20).
     await tapValue(page, 1); await tapOp(page, '/'); await tapValue(page, 9);
     assert.match(await text(page, '#msg'), /1 ÷ 9 ne tombe pas juste/);
     // equal values give zero: level 20 has two 25
-    await page.evaluate(() => window.__game.loadLevel(20));
-    const slot = await tapValue(page, 25); await tapOp(page, '-'); await tapValue(page, 25, slot);
-    assert.match(await text(page, '#msg'), /25 − 25 donnerait zéro/);
-    assert.equal((await state(page)).ops, 0);
+    await page.evaluate(() => window.__game.loadLevel(1));
+    await playSteps(page, [[3, '+', 1]]);   // two 4 on the table
+    const slot = await tapValue(page, 4); await tapOp(page, '-'); await tapValue(page, 4, slot);
+    assert.match(await text(page, '#msg'), /4 − 4 donnerait zéro/);
+    assert.equal((await state(page)).ops, 1);
     // legal ones still work after refusals, and the result replaces the two numbers
     await page.evaluate(() => window.__game.loadLevel(1));
     await tapValue(page, 8); await tapOp(page, '/'); await tapValue(page, 4);
@@ -417,7 +426,7 @@ const allStars = n => JSON.stringify({ level: 20, max: 20, stars: new Array(20).
     await playSteps(page, SOL[1].slice(0, 1));
     const before = await state(page);
     assert.equal(before.level, 2); assert.equal(before.ops, 1);
-    await page.reload(); await page.waitForFunction(() => !!window.__game);
+    await reload(page); await page.waitForFunction(() => !!window.__game);
     let s = await state(page);
     assert.equal(s.screen, 'home');
     assert.equal(await text(page, '#bGo'), 'Continuer · Niveau 2');
@@ -428,9 +437,9 @@ const allStars = n => JSON.stringify({ level: 20, max: 20, stars: new Array(20).
     assert.equal(s.total, 3);
     // the level can then be finished, and the save no longer holds a game in progress
     await playSteps(page, SOL[1].slice(1)); await winVisible(page);
-    assert.equal(JSON.parse(await stored(page)).cur, null);
+    assert.deepEqual(JSON.parse(await stored(page)).cur, {});
     // a won level is not resumed in its won state
-    await page.reload(); await page.waitForFunction(() => !!window.__game);
+    await reload(page); await page.waitForFunction(() => !!window.__game);
     assert.equal(await text(page, '#bGo'), 'Continuer · Niveau 3');
     // level grid: locked levels cannot be opened
     await tapSel(page, '#bLevels');
@@ -485,7 +494,7 @@ const allStars = n => JSON.stringify({ level: 20, max: 20, stars: new Array(20).
 
   // ---------------------------------------------------------------- sharing and challenge
   await test('share text has no solution; challenge link only with a base URL; events share', async () => {
-    const { context, page } = await open(undefined, { share: true, config: { shareBaseUrl: 'https://exemple.test/jeux/compte-rond/' }, rawSave: JSON.stringify({ level: 2, max: 2, stars: [3], cur: null }) });
+    const { context, page } = await open(undefined, { share: true, config: { shareBaseUrl: 'https://exemple.test/jeux/compte-rond/?token=SECRET&n=3#frag' }, rawSave: JSON.stringify({ level: 2, max: 2, stars: [3], cur: null }) });
     await tapSel(page, '#bGo');
     await playSteps(page, SOL[1]); await winVisible(page);
     await tapSel(page, '#bShare');
@@ -495,6 +504,7 @@ const allStars = n => JSON.stringify({ level: 20, max: 20, stars: new Array(20).
     assert.equal(shared[0], NAME + ' · Niveau 2 · ⭐⭐⭐ en 2 opérations');
     assert.ok(!/[=+×÷−x]/.test(shared[0].replace(NAME, '').replace(/[·]/g, '')), 'no solution in the share text');
     assert.ok(shared[1].startsWith(NAME + ' · Niveau 2 en 2 opérations. À toi de faire mieux ! https://exemple.test/jeux/compte-rond/#defi-2-2'), shared[1]);
+    assert.ok(!/token|SECRET|\?/.test(shared[1]), 'no query string from the configured base: ' + shared[1]);
     const frag = shared[1].split('#')[1];
     assert.match(frag, /^[A-Za-z0-9-]+$/);
     const ev = await msgs(page);
@@ -556,13 +566,13 @@ const allStars = n => JSON.stringify({ level: 20, max: 20, stars: new Array(20).
     await c.page.close();
     // target = the minimum (2) on level 1, played in 3 operations: exact but too long = lost, one result only, no replay
     c = await open(undefined, { context, hash: '#defi-1-2' });
-    const longer = findPath(LV[0].numbers, 3, s3 => s3.includes(LV[0].target), 3e6, LV[0].target);
+    const longer = findPath(LV[0].numbers, 2, s3 => !s3.includes(LV[0].target), 3e6, LV[0].target);
     assert.ok(longer);
-    await playSteps(c.page, longer); await winVisible(c.page);
+    await playSteps(c.page, longer); await winVisible(c.page);   // the challenge stops at its objective: 2 operations used, target missed
     assert.match(await text(c.page, '#wTitle'), /Pas cette fois/);
     assert.match(await text(c.page, '#wChal'), /Il fallait 2 opérations ou moins/);
     ev = await msgs(c.page);
-    assert.deepEqual(ev.filter(m => m.event === 'challenge_result').map(m => [m.level, m.score, m.target, m.won]), [[1, 3, 2, false]]);
+    assert.deepEqual(ev.filter(m => m.event === 'challenge_result').map(m => [m.level, m.score, m.target, m.won]), [[1, 2, 2, false]]);
     assert.equal(await stored(c.page), raw0);
     assert.ok(await c.page.locator('#bAgain').isHidden(), 'no Rejouer in a challenge result');
     assert.ok(await c.page.locator('#bChal').isHidden(), 'no Renvoyer when lost');
@@ -616,7 +626,7 @@ const allStars = n => JSON.stringify({ level: 20, max: 20, stars: new Array(20).
     assert.equal(await text(page, '#bGo'), 'Continuer · Niveau 3');
     await tapSel(page, '#bGo');
     assert.equal((await state(page)).level, 3);
-    await page.reload(); await page.waitForFunction(() => !!window.__game);
+    await reload(page); await page.waitForFunction(() => !!window.__game);
     assert.equal(await text(page, '#bGo'), 'Continuer · Niveau 3');
     await context.close();
   });
@@ -649,7 +659,7 @@ const allStars = n => JSON.stringify({ level: 20, max: 20, stars: new Array(20).
     await tapValue(page, 8); await tapOp(page, 'x');
     const before = await state(page);
     assert.ok(before.selected.a >= 0 && before.selected.op === 2);
-    await page.reload(); await page.waitForFunction(() => !!window.__game);
+    await reload(page); await page.waitForFunction(() => !!window.__game);
     await tapSel(page, '#bGo');
     const s = await state(page);
     assert.deepEqual(s.selected, before.selected); assert.deepEqual(s.numbers, before.numbers); assert.equal(s.ops, 1);
@@ -659,11 +669,77 @@ const allStars = n => JSON.stringify({ level: 20, max: 20, stars: new Array(20).
     // a lone selection (no move yet) is saved too
     await tapSel(page, '#bReset');
     await tapValue(page, 9);
-    await page.reload(); await page.waitForFunction(() => !!window.__game);
+    await reload(page); await page.waitForFunction(() => !!window.__game);
     await tapSel(page, '#bGo');
     assert.ok((await state(page)).selected.a >= 0);
     assert.match(await text(page, '#msg'), /^9 …/);
     await context.close();
+  });
+
+  await test('one game in progress per level: opening another level from the grid keeps the first one (and survives a reload)', async () => {
+    const { context, page } = await open(undefined, { rawSave: JSON.stringify({ level: 2, max: 2, stars: [3], cur: null }) });
+    await tapSel(page, '#bGo');
+    assert.equal((await state(page)).level, 2);
+    await playSteps(page, SOL[1].slice(0, 1));
+    await tapValue(page, LV[1].numbers[0]); await tapOp(page, '+');
+    const l2 = await state(page);
+    assert.equal(l2.ops, 1); assert.ok(l2.selected.a >= 0);
+    await tapSel(page, '#bMap'); await tapSel(page, '#grid .cell[data-level="1"]');
+    assert.equal((await state(page)).level, 1);
+    await playSteps(page, SOL[0].slice(0, 1));
+    const l1 = await state(page);
+    await tapSel(page, '#bMap'); await tapSel(page, '#grid .cell[data-level="2"]');
+    let s = await state(page);
+    assert.equal(s.level, 2); assert.equal(s.ops, 1); assert.deepEqual(s.numbers, l2.numbers); assert.deepEqual(s.selected, l2.selected);
+    await tapSel(page, '#bMap'); await tapSel(page, '#grid .cell[data-level="1"]');
+    s = await state(page); assert.equal(s.ops, 1); assert.deepEqual(s.numbers, l1.numbers);
+    await reload(page); await page.waitForFunction(() => !!window.__game);
+    await tapSel(page, '#bLevels'); await tapSel(page, '#grid .cell[data-level="1"]');
+    s = await state(page); assert.equal(s.ops, 1); assert.deepEqual(s.numbers, l1.numbers);
+    await tapSel(page, '#bMap'); await tapSel(page, '#grid .cell[data-level="2"]');
+    s = await state(page); assert.equal(s.ops, 1); assert.deepEqual(s.numbers, l2.numbers); assert.deepEqual(s.selected, l2.selected);
+    // winning level 1 clears only its own saved game
+    await tapSel(page, '#bMap'); await tapSel(page, '#grid .cell[data-level="1"]');
+    await playSteps(page, SOL[0].slice(1)); await winVisible(page);
+    const save = JSON.parse(await stored(page));
+    assert.deepEqual(Object.keys(save.cur), ['2']);
+    await context.close();
+  });
+
+  await test('challenge in progress is resumed after a reload; it stops, lost, when its objective is out of reach; one result each', async () => {
+    const { context, page } = await open(undefined, { hash: '#defi-9-4' });
+    await playSteps(page, SOL[8].slice(0, 2));
+    await reload(page); await page.waitForFunction(() => !!window.__game);
+    let s = await state(page);
+    assert.equal(s.screen, 'game'); assert.deepEqual(s.challenge, { target: 4, level: 9 }); assert.equal(s.ops, 2);
+    assert.match(await text(page, '#goal'), /Défi : cible en 4 op\. ou moins/);
+    await playSteps(page, SOL[8].slice(2)); await winVisible(page);
+    assert.equal((await events(page, 'challenge_result')).length, 1);
+    assert.equal((await events(page, 'challenge_open')).length, 0, 'no new challenge_open on a resume');
+    await reload(page); await page.waitForFunction(() => !!window.__game);
+    assert.equal((await state(page)).screen, 'home', 'a finished challenge is not resumed');
+    await page.close();
+    // the objective stops the game: target 2 on level 1, two operations that miss it = lost at once
+    const miss = findPath(LV[0].numbers, 2, s3 => !s3.includes(LV[0].target), 3e6, LV[0].target);
+    const c = await open(undefined, { context, hash: '#defi-1-2' });
+    await playSteps(c.page, miss.slice(0, 1));
+    assert.ok(!(await state(c.page)).won);
+    await reload(c.page); await c.page.waitForFunction(() => !!window.__game);
+    assert.equal((await state(c.page)).ops, 1, 'resumed mid-challenge');
+    await playSteps(c.page, miss.slice(1)); await winVisible(c.page);
+    s = await state(c.page);
+    assert.ok(s.won && s.stars === 0 && s.ops === 2);
+    assert.deepEqual((await events(c.page, 'challenge_result')).map(m => [m.level, m.score, m.target, m.won]), [[1, 2, 2, false]]);
+    assert.match(await text(c.page, '#wTitle'), /Pas cette fois/);
+    await context.close();
+  });
+
+  await test('own style of numbers: the big numbers are not the 25/50/75/100 plates of a TV game', async () => {
+    const tv = [25, 50, 75, 100], ours = [12, 15, 18, 20, 30, 36, 40, 45, 60];
+    assert.ok(LV.filter(L => L.numbers.some(n => tv.includes(n))).length <= 2, 'TV plates in too many levels');
+    assert.ok(LV.every(L => L.numbers.filter(n => tv.includes(n)).length <= 1));
+    assert.ok(LV.filter(L => L.numbers.some(n => ours.includes(n))).length >= 10, 'our own big numbers are used');
+    assert.ok(new Set(LV.flatMap(L => L.numbers.filter(n => n > 10))).size >= 6, 'variety of big numbers');
   });
 
   // ---------------------------------------------------------------- events
@@ -696,8 +772,8 @@ const allStars = n => JSON.stringify({ level: 20, max: 20, stars: new Array(20).
     }
     assert.ok(heavy, 'no heavy position found');
     // the biggest tile: multiply the largest numbers together
-    const bigNums = LV[19].numbers.slice();
-    const bigPath = findPath(bigNums, 4, s => Math.max(...s) >= 1e6, 3e6, LV[19].target);   // 7-digit tile
+    const bigNums = LV[17].numbers.slice();
+    const bigPath = findPath(bigNums, 4, s => Math.max(...s) >= 1e6, 3e6, LV[17].target);   // 7-digit tile
     assert.ok(bigPath, 'no 7 digit position');
     for (const [w, h] of VIEWPORTS) {
       const tag = `${w}x${h}`;
@@ -723,7 +799,7 @@ const allStars = n => JSON.stringify({ level: 20, max: 20, stars: new Array(20).
       assert.equal(s.ops, 5); assert.ok(s.canValidate, 'validate shown on the heavy position');
       checkFit(await measure(page), tag + ` heavy level ${heavyLevel}`); await shot(page, `${tag}-heavy`);
       // 7-digit tile
-      await page.evaluate(() => window.__game.loadLevel(20));
+      await page.evaluate(() => window.__game.loadLevel(18));
       await playSteps(page, bigPath);
       checkFit(await measure(page), tag + ' 7-digit tile'); await shot(page, `${tag}-bigtile`);
       // result card (3 stars) and a result card with a long text (lost challenge)
@@ -737,7 +813,7 @@ const allStars = n => JSON.stringify({ level: 20, max: 20, stars: new Array(20).
       checkFit(await measure(page), tag + ' challenge won'); await shot(page, `${tag}-defi-perdu`);
       await context.close();
       ({ context, page } = await open({ width: w, height: h }, { hash: '#defi-1-2' }));
-      await playSteps(page, findPath(LV[0].numbers, 3, s3 => s3.includes(LV[0].target), 3e6, LV[0].target)); await winVisible(page);
+      await playSteps(page, findPath(LV[0].numbers, 2, s3 => !s3.includes(LV[0].target), 3e6, LV[0].target)); await winVisible(page);
       checkFit(await measure(page), tag + ' challenge lost'); await shot(page, `${tag}-defi-perdu`);
       await context.close();
       ({ context, page } = await open({ width: w, height: h }, { rawSave: JSON.stringify({ level: 1, max: 1, stars: [], cur: null }) }));

@@ -25,8 +25,10 @@ function rng(seed) {
   };
 }
 const SMALL = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-const MID = [12, 15, 20, 25];
-const BIG = [25, 50, 75, 100];
+// Our own set of "big" numbers (not the plates of a well-known TV game): 12, 15, 18, 20, 30, 36, 40, 45, 60.
+const MID = [12, 15, 18, 20];
+const BIG = [20, 30, 40, 45, 60];
+const BIG2 = [12, 15, 18, 20, 30, 36, 40, 45, 60];
 function sample(r, pool, n) {
   const p = pool.slice(), out = [];
   while (out.length < n) out.push(p.splice(Math.floor(r() * p.length), 1)[0]);
@@ -36,8 +38,8 @@ const pools = {
   S: r => sample(r, SMALL.slice(0, 9), 6),
   M: r => sample(r, SMALL, 5).concat(sample(r, MID, 1)),
   B1: r => sample(r, SMALL, 5).concat(sample(r, BIG, 1)),
-  B2: r => sample(r, SMALL, 4).concat(sample(r, BIG, 2)),
-  B3: r => sample(r, SMALL, 3).concat(sample(r, BIG, 2)).concat(sample(r, MID, 1)),
+  B2: r => sample(r, SMALL, 4).concat(sample(r, BIG2, 2)),
+  B3: r => sample(r, SMALL, 3).concat(sample(r, BIG2, 3)),
 };
 
 // k = minimal operations ; pool ; tr = target range ; add = a +-only solution is required (and it is minimal) ;
@@ -52,17 +54,17 @@ const SPECS = [
   { k: 3, pool: 'M', tr: [30, 80], many: false },
   { k: 3, pool: 'M', tr: [40, 100], many: false },
   { k: 4, pool: 'M', tr: [50, 120], many: false },
-  { k: 3, pool: 'B1', tr: [60, 160], many: false },
-  { k: 4, pool: 'B1', tr: [80, 220], many: false },
-  { k: 4, pool: 'B1', tr: [100, 300], many: false },
-  { k: 3, pool: 'B2', tr: [100, 400], many: false },
-  { k: 4, pool: 'B2', tr: [150, 500], many: false },
-  { k: 5, pool: 'B1', tr: [100, 500], many: false },
-  { k: 4, pool: 'B2', tr: [200, 700], many: false },
-  { k: 5, pool: 'B2', tr: [200, 800], many: false },
-  { k: 4, pool: 'B3', tr: [300, 900], many: false },
-  { k: 5, pool: 'B2', tr: [300, 999], many: false },
-  { k: 5, pool: 'B3', tr: [400, 999], many: false },
+  { k: 3, pool: 'B1', tr: [40, 120], many: false },
+  { k: 4, pool: 'B1', tr: [60, 160], many: false },
+  { k: 4, pool: 'B1', tr: [80, 200], many: false },
+  { k: 3, pool: 'B2', tr: [60, 220], many: false },
+  { k: 4, pool: 'B2', tr: [90, 260], many: false },
+  { k: 5, pool: 'B1', tr: [100, 300], many: false },
+  { k: 4, pool: 'B2', tr: [120, 340], many: false },
+  { k: 5, pool: 'B2', tr: [150, 400], many: false },
+  { k: 4, pool: 'B3', tr: [150, 420], many: false },
+  { k: 5, pool: 'B2', tr: [180, 480], many: false },
+  { k: 5, pool: 'B3', tr: [200, 520], many: false },
 ];
 
 function makeLevel(idx) {

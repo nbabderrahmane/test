@@ -257,7 +257,7 @@ var GRIDS=[
   [["Chaussures",["sandale","botte","basket"]],["Sports",["volley","karaté","handball"]],["Légumes",["poireau","navet","courgette"]],["La famille",["tante","frère","sœur"]]],
   [["Dans le cartable",["crayon","règle","feuille"]],["Parties d'une plante",["racine","tige","graine"]],["Oiseaux",["hibou","vautour","poule"]],["À la ferme",["lapin","brebis","veau"]]],
   [["Fruits",["citron","pastèque","plantain"]],["Couleurs",["turquoise","doré","orange"]],["Féculents",["manioc","igname","patate"]],["Animaux sauvages",["singe","léopard","buffle"]]],
-  [["Percussions",["cymbale","maracas","batterie"]],["Pièces d'un véhicule",["moteur","frein","klaxon"]],["Matériel de sport",["raquette","haltère","ballon"]],["Au football",["but","arbitre","maillot"]]],
+  [["Percussions",["cymbale","maracas","batterie"]],["Pièces d'un véhicule",["moteur","frein","klaxon"]],["Matériel de sport",["raquette","haltère","ballon"]],["Au football",["but","arbitre","corner"]]],
   [["Matériel de sport",["corde","tapis","ballon"]],["Au football",["dribble","carton","gardien"]],["Métiers",["forgeron","potier","menuisier"]],["Jours de la semaine",["lundi","mardi","samedi"]]],
   [["Fruits",["raisin","datte","orange"]],["Couleurs",["pourpre","bordeaux","crème"]],["Fleurs",["orchidée","lys","rose"]],["Métiers",["coiffeur","infirmier","avocat"]]]
 ];
@@ -310,7 +310,10 @@ function shuffled(n, roll) {
 function famOf(id) { return Math.floor(id / 3); }
 
 // ---- persistence (always guarded: the game works without storage) -----------------
-var save = { max: 1, stars: [], cur: null };
+var save = { max: 1, stars: [], errs: [], acc: [], games: {}, chal: null };
+// stars: frozen at the first victory; errs: errors of that victory (capped at 3, base of the friend challenge);
+// acc: errors accumulated by lost games and challenges until the first victory (R11);
+// games: one game in progress per level (R12); chal: the friend challenge in progress (R15)
 function totalStars() { var t = 0; for (var i = 0; i < save.stars.length; i++) t += save.stars[i]; return t; }
 function intIn(v, lo, hi) { return typeof v === 'number' && v === Math.floor(v) && v >= lo && v <= hi; }
 // A saved game stores words, never tile numbers: nothing in the storage groups the words by family.
@@ -353,16 +356,24 @@ function cutToWords(c) {
 }
 function loadSave() {
   var i;
-  save.max = 1; save.stars = []; save.cur = null;
-  for (i = 0; i < N; i++) save.stars.push(0);
+  save.max = 1; save.stars = []; save.errs = []; save.acc = []; save.games = {}; save.chal = null;
+  for (i = 0; i < N; i++) { save.stars.push(0); save.errs.push(0); save.acc.push(0); }
   try {
     var s = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (s && typeof s === 'object') {
       if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = intIn(s.stars[i], 0, 3) ? s.stars[i] : 0;
+      if (Array.isArray(s.errs)) for (i = 0; i < N && i < s.errs.length; i++) save.errs[i] = intIn(s.errs[i], 0, 3) ? s.errs[i] : 0;
+      if (Array.isArray(s.acc)) for (i = 0; i < N && i < s.acc.length; i++) save.acc[i] = intIn(s.acc[i], 0, 99) ? s.acc[i] : 0;
       save.max = intIn(s.max, 1, N) ? s.max : 1;
       for (i = 0; i < N; i++) if (save.stars[i] > 0 && save.max < Math.min(N, i + 2)) save.max = Math.min(N, i + 2);
-      var vc = validCur(s.cur);
-      save.cur = vc ? cutToWords(vc) : null;
+      if (s.games && typeof s.games === 'object') {
+        for (var k in s.games) {
+          var vc = /^\d{1,2}$/.test(k) ? validCur(s.games[k]) : null;
+          if (vc && vc.n === +k) save.games[k] = cutToWords(vc);
+        }
+      }
+      var cc = s.chal && validCur(s.chal);
+      if (cc && intIn(s.chal.target, 0, 3) && cc.err <= s.chal.target) { save.chal = cutToWords(cc); save.chal.target = s.chal.target; }
     }
   } catch (e) { /* no storage: play without it */ }
 }
@@ -388,30 +399,40 @@ function remaining() {
 }
 function starsFor(err) { return err === 0 ? 3 : err <= 2 ? 2 : 1; }
 
+// errors carried over from earlier lost games and challenges of a level not won yet
+function baseOf(n) { return save.stars[n - 1] ? 0 : save.acc[n - 1]; }
+function settleAcc(n, err) { if (!save.stars[n - 1]) save.acc[n - 1] = Math.min(99, save.acc[n - 1] + err); }
 function newGame(n, roll, mode, target) {
-  g = { n: n, mode: mode, target: target, roll: roll, order: shuffled(n, roll), found: [], err: 0, tried: [], sel: [], status: 'play', stars: 0, emitted: false };
+  g = { n: n, mode: mode, target: target || 0, roll: roll, order: shuffled(n, roll), found: [], err: 0, tried: [], sel: [], status: 'play', stars: 0, first: false };
   newBand = -1; shake = false;
+}
+function startMsg() {
+  var b = g.mode === 'level' ? baseOf(g.n) : 0;
+  say(b > 0 ? 'Erreurs cumulées : ' + b : '', '');
 }
 function startLevel(n, roll, mode, target) {
   clearTimeout(winTimer);
   newGame(n, roll, mode || 'level', target);
-  msgText = ''; msgKind = '';
+  startMsg();
   persist();
   show('game');
 }
-function resume(saved) {
+// a saved game (words) is taken back; mode 'chal' for the friend challenge in progress
+function resume(saved, mode, target) {
   var c = validCur(saved);
   if (!c) { startLevel(saved && saved.n || 1, 0); return; }
   clearTimeout(winTimer);
-  g = { n: c.n, mode: 'level', target: 0, roll: c.roll, order: c.order, found: c.found, err: c.err, tried: c.tried, sel: c.sel, status: 'play', stars: 0, emitted: false };
-  newBand = -1; shake = false; msgText = ''; msgKind = '';
+  g = { n: c.n, mode: mode || 'level', target: target || 0, roll: c.roll, order: c.order, found: c.found, err: c.err, tried: c.tried, sel: c.sel, status: 'play', stars: 0, first: false };
+  newBand = -1; shake = false; startMsg();
   show('game');
 }
+function openLevel(n) { if (save.games[n]) resume(save.games[n]); else startLevel(n, 0); }
 function persist() {
-  if (g && g.mode === 'level') {
-    save.cur = g.status === 'play' ? { n: g.n, roll: g.roll, err: g.err, order: g.order.map(wordOf), found: g.found.slice(), tried: g.tried, sel: g.sel.map(wordOf) } : null;
-    store();
-  }
+  if (!g) return;
+  var cur = { n: g.n, roll: g.roll, err: g.err, order: g.order.map(wordOf), found: g.found.slice(), tried: g.tried, sel: g.sel.map(wordOf) };
+  if (g.mode === 'level') { if (g.status === 'play') save.games[g.n] = cur; else delete save.games[g.n]; }
+  else { if (g.status === 'play') { cur.target = g.target; save.chal = cur; } else save.chal = null; }
+  store();
 }
 
 function say(text, kind) { msgText = text; msgKind = kind || ''; }
@@ -449,10 +470,12 @@ function submit() {
     out = 'ok';
   } else {
     g.tried.push(key); g.err++; shake = true;
-    if (g.err > MAX_ERR) {
-      g.status = 'lost'; g.sel = []; say('Plus d’essais.', 'bad');
-    } else if (best === 2) say('Deux sur trois !' + (g.err === MAX_ERR ? ' Dernière chance.' : ''), 'warn');
-    else say('Pas ensemble.' + (g.err === MAX_ERR ? ' Dernière chance.' : ''), 'warn');
+    var limit = g.mode === 'chal' ? g.target : MAX_ERR;   // a challenge stops as soon as its goal is out of reach
+    var last = g.err === limit && limit > 0 ? ' Dernière chance.' : '';
+    if (g.err > limit) {
+      g.status = 'lost'; g.sel = []; say(g.mode === 'chal' ? 'Objectif manqué.' : 'Plus d’essais.', 'bad');
+    } else if (best === 2) say('Deux sur trois !' + last, 'warn');
+    else say('Pas ensemble.' + last, 'warn');
     out = best === 2 ? 'close' : 'wrong';
   }
   if (g.status === 'won') finishWin();
@@ -462,21 +485,26 @@ function submit() {
 }
 
 function finishWin() {
-  g.stars = starsFor(g.err);
   if (g.mode === 'level') {
-    save.stars[g.n - 1] = Math.max(save.stars[g.n - 1], g.stars);
-    save.max = Math.max(save.max, Math.min(N, g.n + 1));
-    emit({ event: 'level_complete', level: g.n, score: g.err, stars: g.stars });
+    var first = !save.stars[g.n - 1];
+    g.first = first;
+    if (first) {   // the stars are frozen at the first victory, whatever the errors of the earlier games
+      var total = baseOf(g.n) + g.err;
+      g.stars = starsFor(total);
+      save.stars[g.n - 1] = g.stars; save.errs[g.n - 1] = Math.min(3, total);
+      save.max = Math.max(save.max, Math.min(N, g.n + 1));
+      emit({ event: 'level_complete', level: g.n, score: total, stars: g.stars });
+    } else g.stars = save.stars[g.n - 1];
   } else {
-    emit({ event: 'challenge_result', level: g.n, score: g.err, target: g.target, won: g.err <= g.target });
+    settleAcc(g.n, g.err);
+    emit({ event: 'challenge_result', level: g.n, score: g.err, target: g.target, won: true });
   }
-  g.emitted = true;
   clearTimeout(winTimer);
   winTimer = setTimeout(showResult, 550);
 }
 function finishLost() {
   if (g.mode === 'chal') emit({ event: 'challenge_result', level: g.n, score: g.err, target: g.target, won: false });
-  g.emitted = true;
+  settleAcc(g.n, g.err);   // the errors of a lost game stay on the account of the level
   clearTimeout(winTimer);
   winTimer = setTimeout(showResult, 1100);
 }
@@ -493,7 +521,7 @@ function render() {
   var goal = $('goal');
   if (g.mode === 'chal') {
     goal.className = 'chal';
-    goal.textContent = 'Défi : ' + (g.target === 0 ? 'aucune erreur' : g.target === 1 ? '1 erreur au plus' : g.target + ' erreurs au plus');
+    goal.textContent = 'Défi · erreurs ' + g.err + ' / ' + g.target + ' au plus';
   } else {
     goal.className = '';
     goal.innerHTML = '<span>' + STAR + STAR + STAR + ' 0</span><span>' + STAR + STAR + ' 1-2</span><span>' + STAR + ' 3 erreurs</span>';
@@ -503,6 +531,8 @@ function render() {
     pips += '<svg class="' + (i < g.err ? 'used' : '') + '" viewBox="0 0 24 24"><circle class="p" cx="12" cy="12" r="9"/><path class="x" d="M8 8l8 8M16 8l-8 8"/></svg>';
   }
   $('pips').innerHTML = pips;
+  $('pips').hidden = g.mode === 'chal';   // one counter on screen: a challenge has its own
+  $('bMap').style.visibility = g.mode === 'chal' ? 'hidden' : '';   // a challenge is played to its end
   $('pips').setAttribute('aria-label', 'Erreurs : ' + Math.min(g.err, MAX_ERR) + ' sur ' + MAX_ERR);
 
   var h = '';
@@ -568,13 +598,19 @@ function showResult() {
   var won = g.status === 'won', chal = g.mode === 'chal', i;
   var good = won && (!chal || g.err <= g.target);
   $('wTitle').textContent = chal ? (good ? 'Défi relevé !' : 'Défi manqué') : won ? (g.err === 0 ? 'Sans faute !' : 'Bravo !') : 'Dommage';
-  $('wSub').textContent = chal ? 'Niveau ' + g.n + ' · objectif : ' + (g.target === 0 ? 'aucune erreur' : g.target + (g.target > 1 ? ' erreurs' : ' erreur') + ' au plus')
-    : 'Niveau ' + g.n;
+  var replay = !chal && won && !g.first;
+  $('wSub').textContent = chal ? 'Niveau ' + g.n + ' · objectif : ' + (g.target === 0 ? 'sans erreur' : g.target + (g.target > 1 ? ' erreurs' : ' erreur') + ' au plus')
+    : 'Niveau ' + g.n + (replay ? ' · pour le plaisir' : '');
   var st = won ? g.stars : 0, s = '';
   for (i = 1; i <= 3; i++) s += '<svg class="' + (st >= i ? 'on' : '') + '" viewBox="0 0 24 24"><use href="#star"/></svg>';
   $('wStars').innerHTML = s; $('wStars').hidden = chal;
   $('wRes').className = 'res' + (good ? '' : ' lost');
-  $('wRes').textContent = won ? (g.err === 0 ? 'Aucune erreur !' : errText(g.err)) : '4 erreurs : réessaie !';
+  var res;
+  if (chal) res = won ? (g.err === 0 ? 'Sans erreur !' : errText(g.err)) : 'Objectif manqué';
+  else if (replay || (!won && save.stars[g.n - 1])) res = 'Étoiles inchangées';
+  else if (won) res = save.acc[g.n - 1] > 0 ? 'Erreurs cumulées : ' + (save.acc[g.n - 1] + g.err) : (g.err === 0 ? 'Sans erreur !' : errText(g.err));
+  else res = 'Erreurs cumulées : ' + save.acc[g.n - 1];
+  $('wRes').textContent = res;
   // a challenge is played once per opening: no retry, only "Renvoyer le défi" (when met) and "Accueil"
   $('bNext').hidden = !(won && !chal);
   $('bNext').textContent = g.n < N ? 'Suivant' : 'Niveaux';
@@ -596,16 +632,16 @@ function shareText() {
 // (never its query string: the host app may put a token or a number there); otherwise no link.
 function shareBase() {
   var b = window.MJ_CONFIG && window.MJ_CONFIG.shareBaseUrl;
-  if (typeof b === 'string' && b) return b.split('#')[0];
   try {
-    var u = new URL(String(location.href));
+    var u = new URL(typeof b === 'string' && b ? b : String(location.href));
     if (/^https?:$/.test(u.protocol)) return u.origin + u.pathname;
   } catch (e) { /* no link */ }
   return '';
 }
 function challengeText() {
-  var base = shareBase(), link = base ? base + '#defi-' + g.n + '-' + g.err : '';
-  return NAME + ' · Niveau ' + g.n + ' en ' + errText(g.err) + '. Fais aussi bien, ou mieux !' + (link ? ' ' + link : '');
+  var sc = g.mode === 'chal' ? g.err : save.errs[g.n - 1];   // a replay never lowers the goal: the first victory counts
+  var base = shareBase(), link = base ? base + '#defi-' + g.n + '-' + sc : '';
+  return NAME + ' · Niveau ' + g.n + (sc === 0 ? ' sans erreur' : ' en ' + errText(sc)) + '. Fais aussi bien, ou mieux !' + (link ? ' ' + link : '');
 }
 function sendText(text, kind, btn) {
   var done = function () { emit({ event: 'share', kind: kind }); };
@@ -638,7 +674,20 @@ function sendText(text, kind, btn) {
   clip();
 }
 
-// A friend's challenge: #defi-<level>-<errors>. Never touches the saved run.
+// A friend's challenge: #defi-<level>-<errors>. It never touches the stars or the games in progress; it is
+// saved while it lasts (a reload takes it back) and counts in the errors of a level not won yet.
+function forfeitChal() {
+  var c = save.chal;
+  if (!c) return;
+  emit({ event: 'challenge_result', level: c.n, score: c.target + 1, target: c.target, won: false });
+  settleAcc(c.n, c.target + 1);
+  save.chal = null; store();
+}
+function resumeChal() {
+  var c = save.chal;
+  if (!c || !validCur(c)) { save.chal = null; return; }
+  resume(c, 'chal', c.target);
+}
 function openChallenge() {
   var h = String(location.hash || ''), m;
   try { if (h) history.replaceState(null, '', String(location.href).split('#')[0]); } catch (e) { /* ignore */ }
@@ -646,6 +695,7 @@ function openChallenge() {
   if (!m) return false;
   var n = +m[1], target = +m[2];
   if (n < 1 || n > N || target > MAX_ERR) return false;
+  forfeitChal();   // opening another link ends the challenge in progress, lost
   startLevel(n, 0, 'chal', target);
   emit({ event: 'challenge_open', level: n, target: target });
   return true;
@@ -676,16 +726,16 @@ onTap($('cells'), function (e) {
   var t = tapTarget(e, '.cell');
   if (t && !t.disabled) {
     var n = +t.getAttribute('data-level');
-    if (save.cur && save.cur.n === n) resume(save.cur); else startLevel(n, 0);
+    openLevel(n);
   }
 });
 onTap($('bOk'), function () { if (!$('bOk').disabled) submit(); });
 onTap($('bClear'), function () { if (!$('bClear').disabled) clearSel(); });
 onTap($('bMap'), function () { show('levels'); });
-onTap($('bGo'), function () { var n = nextLevel(); if (save.cur && save.cur.n === n) resume(save.cur); else startLevel(n, 0); });
+onTap($('bGo'), function () { openLevel(nextLevel()); });
 onTap($('bLevels'), function () { show('levels'); });
 onTap($('bLBack'), function () { show('home'); });
-onTap($('bNext'), function () { if (g.n < N) startLevel(g.n + 1, 0); else show('levels'); });
+onTap($('bNext'), function () { if (g.n < N) openLevel(g.n + 1); else show('levels'); });
 onTap($('bAgain'), function () { if (g.mode === 'level') startLevel(g.n, g.roll + 1); });
 onTap($('bBack'), function () { show(g && g.mode === 'chal' ? 'home' : 'levels'); });
 onTap($('bShare'), function () { sendText(shareText(), 'result', $('bShare')); });
@@ -729,7 +779,8 @@ window.__game = {
 // ---- start --------------------------------------------------------------------
 loadSave();
 show('home');
-if (/^#defi-/.test(location.hash)) openChallenge();
+var opened = /^#defi-/.test(location.hash) ? openChallenge() : false;
+if (!opened && save.chal) resumeChal();
 })();
 </script>
 </body>

@@ -105,3 +105,17 @@ Dans les jeux sans solution cachée (`compte-rond`, `semailles`, `course-des-pio
 - `les-familles` : la grille 18 a deux solutions (`maillot` est aussi du matériel de sport) : remplacer ; « sans erreur » au lieu de « en aucune erreur ».
 - `cap-sur` : Kinshasa et Brazzaville ne doivent pas être à 0 km l'une de l'autre (deux décimales) ; un test vérifie qu'aucune paire de villes n'est à moins de 5 km ; aucune ville dont le statut de capitale est en cours de changement n'est marquée capitale.
 - `compte-rond` : les grands nombres ne sont pas systématiquement 25, 50, 75, 100 : varier les jeux de nombres (par exemple 12, 15, 20, 30, 40, 60) pour avoir notre propre style ; régénérer en gardant la courbe.
+
+## Décisions après revue des quatre derniers jeux (24 novembre)
+
+**R17. Un chrono ne s'arrête pas.** Quand un jeu chronomètre une réponse, l'échéance est une heure d'horloge enregistrée au moment où la question s'affiche : quitter l'écran, cacher l'application ou recharger ne rend pas de temps. Au retour, si l'échéance est passée, la question est comptée « temps écoulé ».
+
+**R18. `course-des-pions` : la fiche est amendée.** Le dé domine ce jeu et n'est jamais biaisé ; la difficulté vient du nombre de pions de chaque camp (annoncé avant la partie), puis du nombre et de la qualité des adversaires. La règle « 2 pions (niveaux 1-10), 3 ensuite » est remplacée par la table mesurée de `docs/contenu/course-des-pions.md`. Les étoiles se comptent sur l'avance à l'arrivée. Un écran d'aide résume les règles (sortie sur 6, rejouer, trois essais, capture, refuges, arrivée au compte exact). Le mode à plusieurs est repris après rechargement.
+
+**R19. Un défi demande de gagner.** Dans les jeux contre un adversaire, un défi n'est relevé que si la partie est gagnée et l'objectif atteint ; l'objectif d'un lien est borné en bas par ce qui est acquis au départ. Un défi quitté est abandonné pour de bon.
+
+**R20. Quiz : des leurres honnêtes.** Une mauvaise réponse ne doit pas être défendable : dans `chanson-emojis`, les leurres d'une devinette excluent tout titre que ses emojis évoquent aussi (table d'exclusions par paire, testée). Pas de « Recommencer » en cours de niveau dans un quiz.
+
+**R21. Contenu des deux quiz.**
+- `cinq-sur-cinq` : aucune formulation qui dépende de l'avenir (« sa seule CAN » → « la CAN 1976 ») ; « Quel fut le premier pays africain à jouer une Coupe du monde, en 1934 ? » ; « La grande finale ». L'accent ne doit pas être le vert d'une marque connue.
+- `chanson-emojis` : retirer « Poker Face » et « Milord » ; refaire les emojis faibles relevés par la revue ; corriger la fiche (lieu de naissance de Corneille, année de « Dernière danse », emojis composés). La part d'Afrique francophone reste insuffisante (4 titres d'artistes d'Afrique francophone sur 60) : le modèle ne connaît pas assez de titres avec certitude — la liste doit être fournie par une équipe locale ; la fiche de contenu le dit en tête.

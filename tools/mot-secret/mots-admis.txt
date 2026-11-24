@@ -50,7 +50,6 @@ appeler
 arbitre
 arbre
 argent
-armee
 arret
 arreter
 arriere
@@ -116,7 +115,6 @@ biscuit
 bise
 blague
 blanc
-blesser
 bleu
 blog
 bloquer
@@ -255,7 +253,6 @@ chose
 chou
 chute
 cible
-cidre
 ciel
 cigogne
 cime
@@ -280,7 +277,6 @@ clocher
 clou
 clown
 club
-cochon
 coco
 code
 coeur
@@ -470,7 +466,6 @@ eviter
 examen
 exces
 exemple
-exil
 exister
 fable
 face
@@ -535,14 +530,12 @@ fort
 fortune
 fosse
 fossile
-fouet
 foule
 four
 fourmi
 fournir
 foyer
 fraise
-frapper
 frein
 frere
 frigo
@@ -556,7 +549,6 @@ fruit
 fuir
 fuite
 fumee
-fumer
 fusee
 gaffe
 gage
@@ -664,7 +656,6 @@ humeur
 hurler
 hutte
 hyene
-hymne
 idee
 igname
 image
@@ -680,7 +671,6 @@ iris
 irriter
 issue
 jambe
-jambon
 janvier
 jardin
 jaune
@@ -696,14 +686,12 @@ jouet
 joueur
 jour
 journal
-juger
 juillet
 juin
 jumelle
 jungle
 jupe
 jurer
-jury
 kilo
 kimono
 kiosque
@@ -723,7 +711,6 @@ lance
 lancer
 langue
 lapin
-lard
 larme
 lasso
 laurier
@@ -987,8 +974,6 @@ parc
 pardon
 parent
 parfum
-pari
-parier
 parking
 parler
 parole
@@ -1030,7 +1015,6 @@ permis
 peser
 petale
 petrir
-peuple
 peur
 phare
 phoque
@@ -1047,7 +1031,6 @@ pincee
 pincer
 pioche
 pion
-pipe
 piquer
 pirate
 pirogue
@@ -1088,7 +1071,6 @@ pois
 poisson
 poivre
 pole
-police
 polir
 pommade
 pomme
@@ -1113,7 +1095,6 @@ poumon
 pousser
 poussin
 poutre
-pouvoir
 prairie
 prenom
 present
@@ -1138,7 +1119,6 @@ quete
 queue
 quitter
 rabot
-race
 racine
 radeau
 radio
@@ -1167,7 +1147,6 @@ recolte
 refuser
 regaler
 regard
-region
 regle
 regner
 regret
@@ -1197,7 +1176,6 @@ reussir
 reve
 revenir
 rever
-rhum
 rhume
 ricaner
 ride
@@ -1403,7 +1381,6 @@ travers
 tremper
 tresor
 tresser
-tribu
 tricher
 tricot
 trio
@@ -1423,9 +1400,7 @@ tulle
 tunnel
 tuteur
 tuyau
-union
 univers
-urne
 usage
 user
 usine

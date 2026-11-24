@@ -53,7 +53,7 @@ const DAILY_COUNT = 120;
 const DAILY_COLORS = [6, 7, 8];
 const DAILY_BAND = [0.31, 0.54];          // random-player win rate of a daily level; the test accepts 28 % to 57 %
 const GAMES = 400;                        // random games per win-rate measurement
-const ATT_GAMES = 200;                    // attentive-player games per measurement
+const ATT_GAMES = 160;                    // attentive-player games per measurement
 const ATT_FLOOR = 0.10;                   // every level: the attentive player wins at least 10 % (spec decision 10)
 const TWO_MAX = 0.25;                     // mystery levels: share of two-move openings that lose the level
 const FATAL_MAX = 0.25;                   // share of first moves that may lose the level
@@ -190,12 +190,14 @@ function makeSearcher(caps) {
   return { search, heuristic };
 }
 
-// Status of a position: 'yes' (solvable), 'no' (unsolvable: the search ran out of positions without
-// any pruning heuristic, only the symmetry of equal empty tubes, so it covered every reachable
-// position) or 'unknown' (node budget exhausted). Weighted search: only the status matters.
+// Status of a position: 'yes' (solvable), 'no' (the search ran out of positions) or 'unknown' (node
+// budget exhausted). The search prunes (a finished tube is never broken, no pointless shuffle into an
+// empty tube), so 'no' is a very reliable verdict, not a formal proof: the level tests recount the
+// first and second moves with the unpruned QA solver (tools/qa/lib.js). Weighted search: only the
+// status matters.
 function status(tubesArr, caps, budget, weight) {
   const start = tubesArr.map(t => t.map(c => String.fromCharCode(97 + c)).join(''));
-  const r = makeSearcher(caps).search(start, weight || 3, budget || 150000, true);
+  const r = makeSearcher(caps).search(start, weight || 3, budget || 150000);
   return r.moves ? 'yes' : r.exhausted ? 'no' : 'unknown';
 }
 // First legal moves of a position and how many of them lose the level for good.
@@ -414,9 +416,9 @@ function makePool(spec) {
     }
     // decision 10: a level the attentive player can win (cheap first look, then the real measurement)
     const arnd = mulberry32(spec.seed + attempts * 6007);
-    const first = attentiveWinRate(tubes, caps, par, spec.mystery, arnd, 50);
-    if (first < spec.attMin - 0.12) continue;
-    const att = (first * 50 + attentiveWinRate(tubes, caps, par, spec.mystery, arnd, ATT_GAMES - 50) * (ATT_GAMES - 50)) / ATT_GAMES;
+    const first = attentiveWinRate(tubes, caps, par, spec.mystery, arnd, 40);
+    if (first < spec.attMin - 0.15) continue;
+    const att = (first * 40 + attentiveWinRate(tubes, caps, par, spec.mystery, arnd, ATT_GAMES - 40) * (ATT_GAMES - 40)) / ATT_GAMES;
     if (att < spec.attMin) continue;
     const win = naiveWinRate(tubes, caps, par, mulberry32(spec.seed ^ (attempts * 2654435761)), GAMES);
     pool.push({ tubes, caps, moves: sol.moves, par, optimal: sol.optimal, fatal: fm.fatal / fm.legal, win, att, d: difficulty(par, win) });
@@ -488,8 +490,8 @@ function poolSpecs() {
     const heavy = tubesN >= 12 || (cap === 5 && tubesN >= 10);
     specs.push({ id: `P${w}:${colors}:${cap}:${empty}`, kind: 'pool', world: w, colors, cap, empty, short: W.short, mystery: W.mystery,
       maxFatal: W.mystery ? 0 : FATAL_MAX, attMin: Math.max(ATT_FLOOR + 0.05, W.att / 100),
-      tries: tries || (heavy || (empty + W.short < 2 && W.mystery && colors >= 8) ? 16 : tubesN >= 9 ? 24 : 30),
-      maxAttempts: 300000, seed: BASE_SEED + 1000 * w + 31 * colors + cap + 7 * empty });
+      tries: tries || (heavy || (empty + W.short < 2 && W.mystery && colors >= 8) ? 14 : tubesN >= 9 ? 22 : 28),
+      maxAttempts: 120000, seed: BASE_SEED + 1000 * w + 31 * colors + cap + 7 * empty });
   };
   add(0, 2, 3, 1, 12); add(0, 3, 3, 2, 12); add(0, 4, 3, 2, 12); add(0, 5, 3, 2, 12);
   for (let c = 4; c <= 7; c++) add(0, c, 4, 2);

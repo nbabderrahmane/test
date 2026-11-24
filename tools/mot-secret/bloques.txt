@@ -3,3 +3,6 @@
 pape moine prier croix ange diable rite eglise noel pretre messe dieu asile vote greve drapeau douane general
 prison proces justice juge gendarme impot guerre arme armure fusil bombe combat ennemi tuer mort mourir battre
 gifler baiser alcool biere tabac sorcier sang bagarre larcin cracher poing poison amant sein soldat voleur
+# R16: alcool/tabac, armée/police/justice, violence, origine/politique, jeux d'argent, porc
+rhum cidre vin fumer pipe cigare armee juger jury police frapper blesser fouet race tribu hymne urne exil pari parier
+cochon jambon lard saucisse porc peuple pouvoir union region nation parti election patrie casino loto jeton
