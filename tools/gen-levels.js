@@ -30,35 +30,30 @@ const { Worker, isMainThread, parentPort } = require('worker_threads');
 const BASE_SEED = 20261124;
 const SHORT_CAP = 2;
 
-// The 10 levels of lot 1: kept as is (positions 1 to 10), with their original solutions.
-const FIXED = [
-  {cap:3,tubes:[[1,1,0],[0,0,1],[]],solution:[[1,2],[0,1],[2,0]]},
-  {cap:3,tubes:[[1,0,1],[1,0,2],[2,2,0],[],[]],solution:[[2,3],[1,2],[1,3],[0,1],[0,3],[0,1]]},
-  {cap:4,tubes:[[2,2,3,1],[0,3,0,1],[0,2,0,3],[1,1,3,2],[],[]],solution:[[3,4],[3,5],[1,3],[0,3],[0,5],[4,0],[1,4],[1,5],[2,5],[2,1],[4,1],[2,0],[2,1]]},
-  {cap:4,tubes:[[1,1,4,0],[2,1,1,2],[3,0,2,2],[3,4,0,4],[0,3,4,3],[],[]],solution:[[3,5],[2,6],[2,6],[1,6],[3,2],[3,5],[4,3],[4,5],[4,3],[2,4],[2,4],[2,3],[0,4],[0,5],[1,0],[1,0],[1,6]]},
-  {cap:4,tubes:[[0,3,2,4],[0,3,1,0],[1,4,1,3],[2,1,2,4],[2,3,4,0],[],[]],solution:[[3,5],[2,6],[0,5],[3,0],[2,3],[2,5],[3,2],[3,2],[0,3],[0,3],[0,6],[4,0],[4,5],[4,6],[4,3],[1,0],[1,2],[1,6],[1,0]]},
-  {cap:4,tubes:[[2,5,3,1],[5,5,1,0],[4,2,0,0],[4,3,1,2],[5,3,1,4],[3,0,4,2],[],[]],solution:[[2,6],[2,6],[5,7],[3,7],[2,7],[5,2],[5,6],[4,2],[3,4],[3,5],[3,2],[4,3],[4,3],[4,5],[1,6],[1,3],[4,1],[0,3],[0,5],[0,1],[0,7]]},
-  {cap:4,tubes:[[6,6,0,4],[0,4,4,2],[3,2,2,3],[5,0,5,3],[6,4,6,5],[5,3,1,1],[2,1,0,1],[],[]],solution:[[6,7],[5,7],[5,7],[2,5],[1,2],[1,8],[1,8],[6,1],[6,7],[2,6],[2,6],[2,6],[5,2],[5,2],[4,5],[3,2],[3,5],[3,1],[3,5],[0,8],[0,1],[4,0],[4,8],[4,0]]},
-  {cap:4,tubes:[[5,4,6,3],[3,0,4,2],[0,2,3,1],[0,1,5,1],[2,6,6,5],[2,3,4,1],[0,6,4,5],[],[]],solution:[[2,7],[0,2],[0,8],[5,7],[0,5],[6,0],[4,0],[4,8],[4,8],[1,4],[6,1],[6,8],[3,7],[3,0],[3,7],[3,6],[5,3],[5,3],[1,3],[1,3],[1,6],[5,1],[5,4],[2,1],[2,1],[2,4],[2,6]]},
-  {cap:4,tubes:[[2,1,4,7],[3,0,7,1],[5,4,6,5],[1,6,1,0],[6,3,4,3],[2,0,6,4],[7,7,5,0],[5,2,2,3],[],[]],solution:[[6,8],[5,9],[2,6],[2,5],[2,9],[6,2],[6,2],[3,8],[1,3],[1,6],[1,8],[7,1],[4,1],[4,9],[4,1],[5,4],[5,4],[5,8],[7,5],[7,5],[7,2],[3,7],[3,7],[3,4],[3,7],[0,6],[0,9],[0,7],[0,5]]},
-  {cap:4,tubes:[[5,2,4,4],[6,3,7,8],[1,6,0,3],[0,6,8,4],[5,5,8,3],[2,8,7,2],[2,7,1,0],[1,5,4,6],[3,1,7,0],[],[]],solution:[[8,9],[8,10],[6,9],[8,6],[4,8],[2,8],[2,9],[1,4],[1,10],[1,8],[7,1],[2,1],[6,2],[6,2],[6,10],[5,6],[5,10],[3,7],[5,3],[5,6],[4,5],[4,5],[3,5],[3,5],[3,1],[3,9],[7,3],[7,3],[7,4],[7,2],[0,3],[0,3],[0,6],[0,4]]}
-];
-
-// Worlds of 20 levels. colors = [first, last] number of colours reached along the world's curve.
+// Worlds of 20 levels, in the order they are played (reordered after the level QA so that the
+// measured difficulty never goes down from one world to the next).
+//   colors = [fewest, most] colours; m = target median of the composite difficulty.
 const WORLDS = [
-  { name: 'Le Tiroir',    mech: 'bases',                       cap: 4, empty: 2, short: 0, mystery: false, colors: [4, 9] },
-  { name: "L'Étagère",    mech: 'plus de couleurs',            cap: 4, empty: 2, short: 0, mystery: false, colors: [6, 10] },
-  { name: 'Le Grenier',   mech: 'tube haut',                   cap: 5, empty: 2, short: 0, mystery: false, colors: [4, 8] },
-  { name: 'Le Placard',   mech: 'un seul tube vide',           cap: 4, empty: 1, short: 0, mystery: false, colors: [4, 8] },
-  { name: 'La Cave',      mech: 'tube court',                  cap: 4, empty: 1, short: 1, mystery: false, colors: [4, 8] },
-  { name: 'La Brume',     mech: 'billes mystère',              cap: 4, empty: 2, short: 0, mystery: true,  colors: [4, 8] },
-  { name: "L'Atelier",    mech: 'haut + un seul vide',         cap: 5, empty: 1, short: 0, mystery: false, colors: [4, 8] },
-  { name: 'Le Garage',    mech: 'court + mystère',             cap: 4, empty: 1, short: 1, mystery: true,  colors: [5, 9] },
-  { name: 'Le Hangar',    mech: 'un seul vide + mystère',      cap: 4, empty: 1, short: 0, mystery: true,  colors: [5, 9] },
-  { name: 'Pile Poil',    mech: 'tout ensemble',               cap: 5, empty: 1, short: 1, mystery: true,  colors: [7, 10] },
+  { name: 'Le Tiroir',    mech: 'bases',                       cap: 4, empty: 2, short: 0, mystery: false, colors: [2, 7],  m: 30 },
+  { name: 'Le Grenier',   mech: 'tube haut',                   cap: 5, empty: 2, short: 0, mystery: false, colors: [4, 7],  m: 31 },
+  { name: 'La Brume',     mech: 'billes mystère',              cap: 4, empty: 2, short: 0, mystery: true,  colors: [5, 8],  m: 38 },
+  { name: 'La Cave',      mech: 'tube court',                  cap: 4, empty: 1, short: 1, mystery: false, colors: [5, 8],  m: 46 },
+  { name: "L'Étagère",    mech: 'plus de couleurs',            cap: 4, empty: 2, short: 0, mystery: false, colors: [7, 10], m: 55 },
+  { name: 'Le Placard',   mech: 'un seul tube vide',           cap: 4, empty: 1, short: 0, mystery: false, colors: [4, 7],  m: 62 },
+  { name: 'Le Garage',    mech: 'court + mystère',             cap: 4, empty: 1, short: 1, mystery: true,  colors: [7, 10], m: 66 },
+  { name: 'Le Hangar',    mech: 'un seul vide + mystère',      cap: 4, empty: 1, short: 0, mystery: true,  colors: [6, 9],  m: 68 },
+  { name: "L'Atelier",    mech: 'haut + un seul vide',         cap: 5, empty: 1, short: 0, mystery: false, colors: [5, 8],  m: 83 },
+  { name: 'Pile Poil',    mech: 'tout ensemble',               cap: 5, empty: 1, short: 1, mystery: true,  colors: [7, 10], m: 95 },
 ];
+// World 1: levels 1 to 5 can be small (height 3, so that the first steps stay gentle), levels 4 to 10 climb slowly (a random player loses
+// more and more often as colours are added, so 6 colours is already a lot for a first world).
+const W1_COLORS = [2, 3, 4, 4, 5, 5, 5, 6, 6, 6];
+const W1_TARGETS = [5, 8, 10, 12, 15, 18, 21, 24, 27, 30];
 const DAILY_COUNT = 120;
-const DAILY_COLORS = [7, 8, 9];
+const DAILY_COLORS = [6, 7, 8];
+const DAILY_BAND = [0.30, 0.55];          // random-player win rate of a daily level (spec: 25 % to 60 %)
+const GAMES = 400;                        // random games per win-rate measurement
+const FATAL_MAX = 0.25;                   // share of first moves that may lose the level
 
 function mulberry32(a) {
   return function () {
@@ -143,7 +138,8 @@ function makeSearcher(caps) {
   }
   const goalT = (t, i) => t.length === 0 || (t.length === caps[i] && mono(t));
 
-  function search(start, w, budget) {
+  // exact = no pruning heuristics (only the symmetry of equal empty tubes): needed to prove an optimum.
+  function search(start, w, budget, exact) {
     const open = new Heap(), best = new Map();
     let expanded = 0;
     const h0 = heuristic(start), k0 = keyOf(start);
@@ -163,7 +159,7 @@ function makeSearcher(caps) {
         const a = tubes[i];
         if (!a.length) continue;
         const aMono = mono(a);
-        if (aMono && a.length === caps[i] && !isShort[i]) continue;   // finished tube: never useful to break
+        if (!exact && aMono && a.length === caps[i] && !isShort[i]) continue;   // finished tube: never useful to break
         const ball = a[a.length - 1];
         let tried = 0;                                                 // bit per empty-tube capacity already tried
         for (let j = 0; j < tubes.length; j++) {
@@ -172,7 +168,7 @@ function makeSearcher(caps) {
           if (b.length >= caps[j]) continue;
           if (b.length === 0) {
             if ((tried >> caps[j]) & 1) continue;                      // symmetric empty tubes
-            if (aMono && caps[j] <= caps[i]) continue;                 // pointless shuffle
+            if (!exact && aMono && caps[j] <= caps[i]) continue;       // pointless shuffle
             tried |= 1 << caps[j];
           } else if (b[b.length - 1] !== ball) continue;
           const next = tubes.slice();
@@ -190,6 +186,60 @@ function makeSearcher(caps) {
   }
   return { search, heuristic };
 }
+
+// Status of a position: 'yes' (solvable), 'no' (proved unsolvable: the whole reachable space was
+// explored) or 'unknown' (node budget exhausted). Weighted search, only the status matters.
+function status(tubesArr, caps, budget, weight) {
+  const start = tubesArr.map(t => t.map(c => String.fromCharCode(97 + c)).join(''));
+  const r = makeSearcher(caps).search(start, weight || 3, budget || 150000);
+  return r.moves ? 'yes' : r.exhausted ? 'no' : 'unknown';
+}
+// First legal moves of a position and how many of them lose the level for good.
+function firstMoves(tubesArr, caps, budget) {
+  let legal = 0, fatal = 0, unknown = 0;
+  for (let a = 0; a < tubesArr.length; a++) for (let b = 0; b < tubesArr.length; b++) {
+    if (!canMove(tubesArr, caps, a, b)) continue;
+    legal++;
+    const t = tubesArr.map(x => x.slice());
+    t[b].push(t[a].pop());
+    const st = isWon(t, caps) ? 'yes' : status(t, caps, budget);
+    if (st === 'no') fatal++; else if (st === 'unknown') unknown++;
+  }
+  return { legal, fatal, unknown };
+}
+// Random player (same policy as tools/qa/sim.js "naive"): never undoes the previous move, likes
+// stacking on a colour, dislikes breaking a tube that is already one colour. Returns the win rate.
+function naiveWinRate(tubesArr, caps, par, rnd, games) {
+  const cap = Math.max(120, par * 4);
+  let won = 0;
+  for (let g = 0; g < games; g++) {
+    const t = tubesArr.map(x => x.slice());
+    let prev = null, k = 0;
+    for (;;) {
+      if (isWon(t, caps)) { won++; break; }
+      const mv = [];
+      for (let a = 0; a < t.length; a++) for (let b = 0; b < t.length; b++) if (canMove(t, caps, a, b)) mv.push([a, b]);
+      if (!mv.length || k >= cap) break;
+      const wts = mv.map(([a, b]) => {
+        if (prev && a === prev[1] && b === prev[0]) return 0;
+        let w = t[b].length ? 3 : 1;
+        const m = t[a].every(c => c === t[a][0]);
+        if (m && (t[b].length === 0 || t[a].length === t[b].length + 1)) w *= 0.15;
+        else if (m) w *= 0.5;
+        return w;
+      });
+      const sum = wts.reduce((x, y) => x + y, 0);
+      let pick;
+      if (sum === 0) pick = mv[Math.floor(rnd() * mv.length)];
+      else { let r = rnd() * sum, i = 0; while (r >= wts[i]) { r -= wts[i]; i++; } pick = mv[i]; }
+      t[pick[1]].push(t[pick[0]].pop());
+      prev = pick; k++;
+    }
+  }
+  return won / games;
+}
+// Composite difficulty: solution length + 40 x (1 - random-player win rate).
+const difficulty = (par, win) => par + 40 * (1 - win);
 
 // Returns {moves, optimal, expanded} or null (unsolvable, or too hard for the budgets below).
 function solve(tubesArr, caps) {
@@ -225,6 +275,7 @@ function deadRate(tubesArr, caps, par, rnd, runs) {
   return dead / runs;
 }
 
+
 // ---- generation --------------------------------------------------------------
 function randomLevel(spec, rnd) {
   const balls = [];
@@ -249,24 +300,59 @@ function looksGood(tubes) {
   }
   return true;
 }
-// Candidates of one slot: solved, verified, scored. Pure function of the spec (seeded).
+// Candidates of one pool (a world at a given colour count): solvable, verified, no trap at the first
+// move (spec decision 1), scored with the composite difficulty. Pure function of the spec (seeded).
 function makePool(spec) {
   const rnd = mulberry32(spec.seed);
   const pool = [], seen = new Set();
-  let guard = 0, attempts = 0;
-  while (pool.length < spec.tries && guard++ < spec.tries * (spec.empty + spec.short < 2 ? 3000 : 40)) {
+  let attempts = 0;
+  while (pool.length < spec.tries && attempts < spec.maxAttempts) {
+    attempts++;
     const { tubes, caps } = randomLevel(spec, rnd);
     const sig = JSON.stringify(tubes);
     if (seen.has(sig) || !looksGood(tubes)) continue;
     seen.add(sig);
+    const sol = solve(tubes, caps);
+    if (!sol || !verify(tubes, caps, sol.moves)) continue;
+    const fm = firstMoves(tubes, caps, 60000);
+    if (fm.unknown || fm.fatal / fm.legal > spec.maxFatal) continue;
+    const par = sol.moves.length;
+    const win = naiveWinRate(tubes, caps, par, mulberry32(spec.seed ^ (attempts * 2654435761)), GAMES);
+    pool.push({ tubes, caps, moves: sol.moves, par, optimal: sol.optimal, fatal: fm.fatal / fm.legal, win, d: difficulty(par, win) });
+  }
+  return { id: spec.id, attempts, pool };
+}
+// Daily pool: plain levels whose random-player win rate sits well inside the band (two independent
+// measurements, so that a recount with other seeds stays inside it too).
+function makeDailyPool(spec) {
+  const rnd = mulberry32(spec.seed);
+  const pool = [], seen = new Set();
+  let attempts = 0;
+  while (pool.length < spec.tries && attempts < spec.maxAttempts) {
     attempts++;
+    const { tubes, caps } = randomLevel(spec, rnd);
+    const sig = JSON.stringify(tubes);
+    if (seen.has(sig) || !looksGood(tubes)) continue;
+    seen.add(sig);
     const sol = solve(tubes, caps);
     if (!sol || !verify(tubes, caps, sol.moves)) continue;
     const par = sol.moves.length;
-    const dead = deadRate(tubes, caps, par, rnd, 30);
-    pool.push({ tubes, caps, moves: sol.moves, par, optimal: sol.optimal, dead });
+    const w1 = naiveWinRate(tubes, caps, par, mulberry32(spec.seed + attempts * 7919), GAMES);
+    if (w1 < DAILY_BAND[0] - 0.04 || w1 > DAILY_BAND[1] + 0.04) continue;
+    const w2 = naiveWinRate(tubes, caps, par, mulberry32(spec.seed + attempts * 104729 + 1), GAMES);
+    const win = (w1 + w2) / 2;
+    if (win < DAILY_BAND[0] || win > DAILY_BAND[1]) continue;
+    const fm = firstMoves(tubes, caps, 60000);
+    if (fm.unknown || fm.fatal / fm.legal > FATAL_MAX) continue;
+    pool.push({ tubes, caps, moves: sol.moves, par, optimal: sol.optimal, fatal: fm.fatal / fm.legal, win, d: difficulty(par, win) });
   }
   return { id: spec.id, attempts, pool };
+}
+// Shortest solution we can prove (spec decision 4: the star reference is the best known solution).
+function optimize(tubesArr, caps, par) {
+  const start = tubesArr.map(t => t.map(c => String.fromCharCode(97 + c)).join(''));
+  const r = makeSearcher(caps).search(start, 1, 6000000, true);
+  return r.moves && r.moves.length < par && verify(tubesArr, caps, r.moves) ? r.moves : null;
 }
 
 // ---- level strings -----------------------------------------------------------
@@ -283,96 +369,120 @@ function decode(str) {
   });
   return { par: +par, cap, caps, mystery: /m/.test(head), tubes };
 }
-const canon = level => level.tubes.map((t, i) => level.caps[i] + t.join(',')).sort().join('|');
+const canon = c => c.tubes.map((t, i) => c.caps[i] + t.join(',')).sort().join('|');
 
-// ---- slots --------------------------------------------------------------------
-// Sawtooth: groups of 5 levels; first of a group is a breather, the 5th the group's peak; peaks
-// rise through the world and the 20th is its hardest.
-function curve(i) {            // i = 0..19 within the world, returns d in [0.1, 1]
+// ---- pools and slots -------------------------------------------------------------
+// Sawtooth: groups of 5 levels; the first of a group is a breather, the 5th the group's peak; peaks
+// rise through the world and the 20th is its hardest. curve(i) is in [0.1, 1].
+function curve(i) {
   const g = Math.floor(i / 5), j = i % 5;
   const peak = 0.5 + 0.5 * g / 3;
   return 0.1 + (peak - 0.1) * j / 4;
 }
-function triesFor(tubesN, last) {
-  const base = tubesN <= 7 ? 40 : tubesN <= 9 ? 32 : tubesN <= 11 ? 24 : 16;
-  return last ? Math.round(base * 1.5) : base;
+const targetOf = (w, i) => (w === 0 && i < 10) ? W1_TARGETS[i] : (w === 0 ? 30 : WORLDS[w].m) * (0.84 + 0.36 * curve(i));
+function poolSpecs() {
+  const specs = [];
+  const add = (w, colors, cap, empty, tries) => {
+    const W = WORLDS[w], tubesN = colors + empty + W.short;
+    const heavy = tubesN >= 12 || (cap === 5 && tubesN >= 10);
+    specs.push({ id: `P${w}:${colors}:${cap}:${empty}`, kind: 'pool', world: w, colors, cap, empty, short: W.short, mystery: W.mystery,
+      maxFatal: W.mystery ? 0 : FATAL_MAX, tries: tries || (heavy || (empty + W.short < 2 && W.mystery && colors >= 8) ? 16 : tubesN >= 9 ? 24 : 30),
+      maxAttempts: 300000, seed: BASE_SEED + 1000 * w + 31 * colors + cap + 7 * empty });
+  };
+  add(0, 2, 3, 1, 12); add(0, 3, 3, 2, 12); add(0, 4, 3, 2, 12); add(0, 5, 3, 2, 12);
+  for (let c = 4; c <= 7; c++) add(0, c, 4, 2);
+  for (let w = 1; w < 10; w++) for (let c = WORLDS[w].colors[0]; c <= WORLDS[w].colors[1]; c++) add(w, c, WORLDS[w].cap, WORLDS[w].empty);
+  for (const c of DAILY_COLORS) specs.push({ id: 'D' + c, kind: 'daily', colors: c, cap: 4, empty: 2, short: 0, mystery: false,
+    tries: 70, maxAttempts: 200000, seed: BASE_SEED + 500000 + c * 977 });
+  return specs;
 }
-function levelSlots() {
-  const slots = [];
-  WORLDS.forEach((w, wi) => {
-    for (let i = 0; i < 20; i++) {
-      const n = wi * 20 + i + 1;
-      if (n <= FIXED.length) continue;
-      const d = curve(i);
-      const colors = w.colors[0] + Math.round(d * (w.colors[1] - w.colors[0]));
-      const tubesN = colors + w.empty + w.short;
-      slots.push({ id: 'L' + n, kind: 'level', n, world: wi, i, d, colors, cap: w.cap, empty: w.empty, short: w.short,
-        mystery: w.mystery, tries: triesFor(tubesN, i === 19), seed: BASE_SEED + n * 7919 });
-    }
-  });
-  return slots;
-}
-function dailySlots() {
-  const slots = [];
-  for (let k = 0; k < DAILY_COUNT; k++) {
-    const colors = DAILY_COLORS[k % DAILY_COLORS.length];
-    slots.push({ id: 'D' + k, kind: 'daily', n: k, colors, cap: 4, empty: 2, short: 0, mystery: false,
-      tries: triesFor(colors + 2, false), seed: BASE_SEED + 100000 + k * 7919 });
+// Pools a level may draw from.
+function allowed(w, i) {
+  if (w === 0) {
+    if (i === 0) return [`P0:2:3:1`];
+    if (i === 1) return [`P0:3:3:2`];
+    if (i === 2) return [`P0:4:3:2`];
+    if (i === 3) return [`P0:4:3:2`, `P0:5:3:2`];
+    if (i === 4) return [`P0:5:3:2`, `P0:4:4:2`, `P0:5:4:2`];
+    const out = [], c0 = i < 10 ? W1_COLORS[i] : 0;
+    for (let c = 4; c <= 7; c++) if (i < 10 ? Math.abs(c - c0) <= 1 : c >= 5 && c <= (i >= 15 ? 7 : 6)) out.push(`P0:${c}:4:2`);
+    return out;
   }
-  return slots;
+  const out = [];
+  for (let c = WORLDS[w].colors[0]; c <= WORLDS[w].colors[1]; c++) out.push(`P${w}:${c}:${WORLDS[w].cap}:${WORLDS[w].empty}`);
+  return out;
 }
 
-// ---- selection (sequential, uses the pools) ------------------------------------
-const scoreOf = c => c.par + 10 * c.dead;
-function pick(pool, q) {
-  const s = pool.slice().sort((a, b) => scoreOf(a) - scoreOf(b) || a.par - b.par);
-  return s[Math.min(s.length - 1, Math.floor(s.length * q))];
-}
-function select(pools) {
-  const warnings = [], used = new Set(), levels = [], solutions = [], optimal = [];
-  const take = (cand, spec) => {
-    const lv = { par: cand.par, cap: spec.cap, caps: cand.caps, mystery: spec.mystery, tubes: cand.tubes };
-    const k = canon(lv);
-    if (used.has(k)) throw new Error('duplicate level ' + spec.id);
-    used.add(k);
-    return lv;
-  };
-  FIXED.forEach(f => {
-    const caps = f.tubes.map(() => f.cap);
-    if (!verify(f.tubes, caps, f.solution)) throw new Error('fixed level has an invalid solution');
-    const lv = { par: f.solution.length, cap: f.cap, caps, mystery: false, tubes: f.tubes };
-    used.add(canon(lv));
-    levels.push(lv); solutions.push(f.solution); optimal.push(null);
-  });
-  const bySlot = {};
-  pools.forEach(p => { bySlot[p.id] = p; });
-  levelSlots().forEach(spec => {
-    const pool = bySlot[spec.id].pool, wStart = spec.world * 20;
-    const worldPars = levels.slice(wStart).map(l => l.par);
-    const prev = levels[levels.length - 1].par, worldMax = Math.max.apply(null, worldPars);
-    const j = spec.i % 5;
-    let cands, q;
-    if (spec.i === 19) { cands = pool.filter(c => c.par > worldMax); q = 1; }
-    else if (j === 0) { cands = pool.filter(c => c.par < prev); q = 0.15; }
-    else { cands = pool.filter(c => c.par > prev); q = 0.2 + 0.6 * j / 4; }
-    cands = cands.filter(c => !used.has(canon({ caps: c.caps, tubes: c.tubes })));
-    if (!cands.length) {
-      warnings.push(`level ${spec.n}: no candidate satisfies the curve (prev ${prev}, world max ${worldMax}); relaxed`);
-      cands = pool.filter(c => !used.has(canon({ caps: c.caps, tubes: c.tubes })));
-      q = j === 0 ? 0.1 : 0.9;
+// ---- selection (sequential, uses the pools) -------------------------------------
+const STEP = 1.17, STEP_ABS = 2.9;             // generator margins; the check allows 1.25 and +3
+function select(results) {
+  const warnings = [], used = new Set(), byId = {};
+  results.forEach(r => { byId[r.id] = r; });
+  const levels = [], meta = [];
+  let prevD = 0;
+  for (let w = 0; w < 10; w++) {
+    const W = WORLDS[w], worldD = [], worldPar = [];
+    for (let i = 0; i < 20; i++) {
+      const n = w * 20 + i + 1, target = targetOf(w, i);
+      const rising = (w === 0 && i > 0 && i < 10) || (i % 5 > 0), last = i === 19;
+      const maxD = Math.max.apply(null, worldD.concat([0])), maxPar = Math.max.apply(null, worldPar.concat([0]));
+      const maxFatal = i < 3 ? 0 : (W.mystery ? 0 : FATAL_MAX);
+      let cands = [];
+      allowed(w, i).forEach(id => byId[id].pool.forEach((c, k) => cands.push({ c, id, k })));
+      cands = cands.filter(x => x.c.fatal <= maxFatal && !used.has(canon(x.c)));
+      const rules = [
+        x => last ? (x.c.d > maxD + 3 && x.c.par > maxPar)
+          : rising ? (x.c.d > prevD + 0.5 && x.c.d <= Math.max(prevD * STEP, prevD + STEP_ABS))
+            : (i === 0 && w === 0) || x.c.d < prevD - 1,
+      ];
+      let pickFrom = cands.filter(rules[0]), relaxed = false;
+      if (!pickFrom.length) {
+        relaxed = true;
+        warnings.push(`level ${n}: no candidate satisfies the curve (previous ${prevD.toFixed(1)}, target ${target.toFixed(1)}); relaxed`);
+        pickFrom = last ? cands.filter(x => x.c.par > maxPar).sort((a, b) => b.c.d - a.c.d) : rising ? cands.filter(x => x.c.d > prevD) : cands.filter(x => x.c.d < prevD);
+        if (!pickFrom.length) pickFrom = cands;
+      }
+      if (!pickFrom.length) throw new Error('no candidate at all for level ' + n);
+      if (!(last && relaxed)) pickFrom.sort((a, b) => Math.abs(a.c.d - target) - Math.abs(b.c.d - target) || a.c.fatal - b.c.fatal || (a.id < b.id ? -1 : a.id > b.id ? 1 : a.k - b.k));
+      const ch = pickFrom[0].c;
+      used.add(canon(ch));
+      levels.push({ par: ch.par, cap: Math.max.apply(null, ch.caps), caps: ch.caps, mystery: W.mystery, tubes: ch.tubes, moves: ch.moves, optimal: ch.optimal });
+      meta.push({ d: ch.d, win: ch.win, fatal: ch.fatal, world: w, i });
+      worldD.push(ch.d); worldPar.push(ch.par);
+      prevD = ch.d;
     }
-    if (!cands.length) throw new Error('no candidate at all for level ' + spec.n);
-    const c = pick(cands, q);
-    levels.push(take(c, spec)); solutions.push(c.moves); optimal.push(c.optimal);
-  });
-  const daily = [], dailySolutions = [];
-  dailySlots().forEach(spec => {
-    const cands = bySlot[spec.id].pool.filter(c => !used.has(canon({ caps: c.caps, tubes: c.tubes })));
-    if (!cands.length) throw new Error('no candidate for ' + spec.id);
-    const c = pick(cands, 0.5);
-    daily.push(take(c, spec)); dailySolutions.push(c.moves);
-  });
-  return { levels, solutions, optimal, daily, dailySolutions, warnings };
+  }
+  // daily levels: spread over the colour counts, deterministic order
+  const dailyPools = DAILY_COLORS.map(c => byId['D' + c].pool.filter(x => !used.has(canon(x))));
+  const daily = [], dailyMeta = [];
+  for (let k = 0; k < DAILY_COUNT; k++) {
+    const pool = dailyPools[k % DAILY_COLORS.length];
+    const ch = pool.shift();
+    if (!ch) throw new Error('daily pool exhausted at ' + k);
+    used.add(canon(ch));
+    daily.push({ par: ch.par, cap: 4, caps: ch.caps, mystery: false, tubes: ch.tubes, moves: ch.moves, optimal: ch.optimal });
+    dailyMeta.push({ d: ch.d, win: ch.win, fatal: ch.fatal });
+  }
+  return { levels, meta, daily, dailyMeta, warnings };
+}
+const median = a => { const s = a.slice().sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+// Checks the curve rules on the final numbers (after the solutions were shortened). Returns problems.
+function check(res) {
+  const out = [];
+  let prev = null;
+  const meds = [];
+  for (let w = 0; w < 10; w++) {
+    const m = res.meta.slice(w * 20, w * 20 + 20), p = res.levels.slice(w * 20, w * 20 + 20).map(l => l.par);
+    const d = m.map((x, i) => x.d - (res.levels[w * 20 + i].par0 - res.levels[w * 20 + i].par));   // par shrank: so does d
+    meds.push(median(d));
+    for (let i = 0; i < 20; i++) {
+      if (prev !== null && i < 19 && d[i] > Math.max(prev * 1.25, prev + 3)) out.push(`level ${w * 20 + i + 1}: peak ${d[i].toFixed(1)} after ${prev.toFixed(1)}`);
+      prev = d[i];
+    }
+    if (Math.max.apply(null, d) !== d[19] || Math.max.apply(null, p) !== p[19]) out.push(`world ${w + 1}: level 20 is not the hardest`);
+  }
+  for (let w = 1; w < 10; w++) if (meds[w] < meds[w - 1] || meds[w] > 1.3 * meds[w - 1]) out.push(`worlds ${w}-${w + 1}: median ${meds[w - 1].toFixed(1)} -> ${meds[w].toFixed(1)}`);
+  return out;
 }
 
 // ---- output -------------------------------------------------------------------
@@ -385,37 +495,38 @@ function renderBlock(res) {
     `/*LEVELS:END*/`;
 }
 function table(res) {
-  const out = [];
+  const out = ['| Monde | Nom | Mécaniques | Hauteur | Vides | Couleurs | Solution min / médiane / max | Difficulté médiane | Victoire au hasard (moy.) | Premiers coups fatals (max) |', '|---|---|---|---|---|---|---|---|---|---|'];
   WORLDS.forEach((w, wi) => {
-    const ls = res.levels.slice(wi * 20, wi * 20 + 20);
-    out.push(`World ${wi + 1} ${w.name} (${w.mech}) : ` + ls.map(l => l.par).join(' '));
-    const o = res.optimal.slice(wi * 20, wi * 20 + 20).filter(x => x === true).length;
-    out.push(`   proven optimal: ${o}/${wi === 0 ? 10 : 20} generated levels`);
-    out.push('   colours: ' + ls.map(l => new Set(l.tubes.flat()).size).join(' ') + ' | tubes: ' + ls.map(l => l.tubes.length).join(' '));
+    const ls = res.levels.slice(wi * 20, wi * 20 + 20), m = res.meta.slice(wi * 20, wi * 20 + 20);
+    const pars = ls.map(l => l.par), cols = ls.map(l => new Set(l.tubes.flat()).size);
+    const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
+    out.push(`| ${wi + 1} | ${w.name} | ${w.mech} | ${wi === 0 ? '4 (3 aux niveaux 1 à 4)' : w.cap} | ${w.empty}${w.short ? ' + 1 tube court' : ''} | ${Math.min(...cols)}-${Math.max(...cols)} | ${Math.min(...pars)} / ${median(pars)} / ${Math.max(...pars)} | ${median(m.map(x => x.d)).toFixed(0)} | ${(100 * avg(m.map(x => x.win))).toFixed(0)} % | ${(100 * Math.max(...m.map(x => x.fatal))).toFixed(0)} % |`);
   });
-  out.push('Daily pars: ' + res.daily.map(l => l.par).join(' '));
+  const dp = res.daily.map(l => l.par), dm = res.dailyMeta;
+  out.push(`| Jour (120) | | 4 de haut, 2 vides | 4 | 2 | ${Math.min(...res.daily.map(l => new Set(l.tubes.flat()).size))}-${Math.max(...res.daily.map(l => new Set(l.tubes.flat()).size))} | ${Math.min(...dp)} / ${median(dp)} / ${Math.max(...dp)} | ${median(dm.map(x => x.d)).toFixed(0)} | ${(100 * Math.min(...dm.map(x => x.win))).toFixed(0)}-${(100 * Math.max(...dm.map(x => x.win))).toFixed(0)} % | ${(100 * Math.max(...dm.map(x => x.fatal))).toFixed(0)} % |`);
+  out.push('', 'Difficulté par niveau : ' + res.meta.map(x => x.d.toFixed(0)).join(' '));
   return out.join('\n');
 }
 
-// ---- parallel pools -----------------------------------------------------------
-function runPools(specs, jobs) {
+// ---- parallel work: pools, then optimal solutions ------------------------------------
+function runJobs(jobs, nWorkers, label) {
   return new Promise((resolve, reject) => {
-    const results = new Array(specs.length);
+    if (!jobs.length) return resolve([]);
+    const results = new Array(jobs.length);
     let next = 0, done = 0;
     const workers = [];
     const feed = w => {
-      if (next >= specs.length) { w.terminate(); return; }
-      const idx = next++;
-      w.__idx = idx;
-      w.postMessage(specs[idx]);
+      if (next >= jobs.length) return;
+      w.__idx = next;
+      w.postMessage(jobs[next++]);
     };
-    for (let k = 0; k < Math.min(jobs, specs.length); k++) {
+    for (let k = 0; k < Math.min(nWorkers, jobs.length); k++) {
       const w = new Worker(__filename);
       w.on('message', r => {
         results[w.__idx] = r;
         done++;
-        if (done % 25 === 0 || done === specs.length) console.error(`  ${done}/${specs.length} slots solved`);
-        if (done === specs.length) { workers.forEach(x => x.terminate()); resolve(results); } else feed(w);
+        if (done % 10 === 0 || done === jobs.length) console.error(`  ${label}: ${done}/${jobs.length}`);
+        if (done === jobs.length) { workers.forEach(x => x.terminate()); resolve(results); } else feed(w);
       });
       w.on('error', reject);
       workers.push(w);
@@ -425,17 +536,28 @@ function runPools(specs, jobs) {
 }
 
 if (!isMainThread) {
-  parentPort.on('message', spec => parentPort.postMessage(makePool(spec)));
+  parentPort.on('message', job => {
+    if (job.kind === 'opt') parentPort.postMessage({ id: job.id, moves: optimize(job.tubes, job.caps, job.par) });
+    else parentPort.postMessage(job.kind === 'daily' ? makeDailyPool(job) : makePool(job));
+  });
 } else if (require.main === module) {
   (async () => {
     const t0 = Date.now();
     const jobsArg = process.argv.indexOf('--jobs');
     const jobs = jobsArg > 0 ? +process.argv[jobsArg + 1] : os.cpus().length;
-    const specs = levelSlots().concat(dailySlots());
-    console.error(`solving ${specs.length} slots on ${jobs} workers...`);
-    const pools = await runPools(specs, jobs);
+    const specs = poolSpecs();
+    console.error(`solving ${specs.length} pools on ${jobs} workers...`);
+    const pools = await runJobs(specs, jobs, 'pools');
+    pools.forEach(p => { const s = specs.find(x => x.id === p.id); if (p.pool.length < s.tries) console.error(`WARNING pool ${p.id}: ${p.pool.length}/${s.tries} candidates after ${p.attempts} attempts`); });
     const res = select(pools);
-    res.warnings.forEach(w => console.error('WARNING ' + w));
+    // spec decision 4: shortest known solution as the star reference
+    const all = res.levels.concat(res.daily);
+    all.forEach(l => { l.par0 = l.par; });
+    const shorter = await runJobs(all.map((l, k) => ({ kind: 'opt', id: k, tubes: l.tubes, caps: l.caps, par: l.par })), jobs, 'optimal');
+    let improved = 0;
+    shorter.forEach((r, k) => { if (r.moves) { all[k].moves = r.moves; all[k].par = r.moves.length; improved++; } });
+    console.error(`${improved} of ${all.length} reference solutions shortened by the optimal search`);
+    res.warnings.concat(check(res).map(x => 'CHECK ' + x)).forEach(w => console.error('WARNING ' + w));
     console.log(table(res));
     console.error(`done in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
     if (process.argv.includes('--write')) {
@@ -445,9 +567,9 @@ if (!isMainThread) {
       if (!re.test(html)) throw new Error('LEVELS markers not found in ' + file);
       fs.writeFileSync(file, html.replace(re, () => renderBlock(res)));
       fs.writeFileSync(path.join(__dirname, 'solutions.json'),
-        JSON.stringify({ levels: res.solutions, daily: res.dailySolutions }) + '\n');
+        JSON.stringify({ levels: res.levels.map(l => l.moves), daily: res.daily.map(l => l.moves) }) + '\n');
       console.error('written: games/tri-couleurs/index.html and tools/solutions.json');
     }
   })().catch(e => { console.error(e); process.exit(1); });
 }
-module.exports = { makePool, levelSlots, dailySlots, solve, verify, isWon, canMove, encode, decode, WORLDS };
+module.exports = { status, firstMoves, naiveWinRate, difficulty, mulberry32, randomLevel, looksGood, makePool, solve, optimize, verify, isWon, canMove, encode, decode, WORLDS };

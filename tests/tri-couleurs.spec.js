@@ -16,26 +16,15 @@ const KEY = 'mj:tri-couleurs:v1';
 const SHOTS = process.env.SHOTS || '';
 const MOBILE = { hasTouch: true, isMobile: true, deviceScaleFactor: 2 };
 const SOL = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'tools', 'solutions.json'), 'utf8'));
+const P = n => SOL.levels[n - 1].length;     // moves of the reference solution of level n
 
-// The 10 levels of lot 1: they must stay the levels 1 to 10.
-const LOT1 = [
-  [[1, 1, 0], [0, 0, 1], []],
-  [[1, 0, 1], [1, 0, 2], [2, 2, 0], [], []],
-  [[2, 2, 3, 1], [0, 3, 0, 1], [0, 2, 0, 3], [1, 1, 3, 2], [], []],
-  [[1, 1, 4, 0], [2, 1, 1, 2], [3, 0, 2, 2], [3, 4, 0, 4], [0, 3, 4, 3], [], []],
-  [[0, 3, 2, 4], [0, 3, 1, 0], [1, 4, 1, 3], [2, 1, 2, 4], [2, 3, 4, 0], [], []],
-  [[2, 5, 3, 1], [5, 5, 1, 0], [4, 2, 0, 0], [4, 3, 1, 2], [5, 3, 1, 4], [3, 0, 4, 2], [], []],
-  [[6, 6, 0, 4], [0, 4, 4, 2], [3, 2, 2, 3], [5, 0, 5, 3], [6, 4, 6, 5], [5, 3, 1, 1], [2, 1, 0, 1], [], []],
-  [[5, 4, 6, 3], [3, 0, 4, 2], [0, 2, 3, 1], [0, 1, 5, 1], [2, 6, 6, 5], [2, 3, 4, 1], [0, 6, 4, 5], [], []],
-  [[2, 1, 4, 7], [3, 0, 7, 1], [5, 4, 6, 5], [1, 6, 1, 0], [6, 3, 4, 3], [2, 0, 6, 4], [7, 7, 5, 0], [5, 2, 2, 3], [], []],
-  [[5, 2, 4, 4], [6, 3, 7, 8], [1, 6, 0, 3], [0, 6, 8, 4], [5, 5, 8, 3], [2, 8, 7, 2], [2, 7, 1, 0], [1, 5, 4, 6], [3, 1, 7, 0], [], []],
-];
-const LOT1_PAR = [3, 6, 13, 17, 19, 21, 24, 27, 29, 34];
-// What each world adds: [cap, empty tubes, short tubes, mystery].
+// What each world adds, in play order: [cap, empty tubes, short tubes, mystery].
 const WORLD_RULES = [
-  [4, 2, 0, false], [4, 2, 0, false], [5, 2, 0, false], [4, 1, 0, false], [4, 1, 1, false],
-  [4, 2, 0, true], [5, 1, 0, false], [4, 1, 1, true], [4, 1, 0, true], [5, 1, 1, true],
+  [4, 2, 0, false], [5, 2, 0, false], [4, 2, 0, true], [4, 1, 1, false], [4, 2, 0, false],
+  [4, 1, 0, false], [4, 1, 1, true], [4, 1, 0, true], [5, 1, 0, false], [5, 1, 1, true],
 ];
+const QA = require('../tools/qa/lib');
+const { runAll } = require('./helpers/analysis');
 
 let browser;
 const problems = [];   // console errors, page errors, unexpected requests (all pages)
@@ -183,7 +172,7 @@ function checkFit(m, tag) {
     console.log(`        size: ${size} bytes (${(size / 1024).toFixed(1)} KB)`);
   });
 
-  await test('hooks: 200 levels in 10 worlds, 120 daily levels, lot 1 levels kept, no solutions in __game', async () => {
+  await test('hooks: 200 levels in 10 worlds, 120 daily levels, world rules, curve shape, no solutions in __game', async () => {
     const { context, page } = await open();
     const info = await page.evaluate(() => ({
       levels: window.__game.levels, daily: window.__game.daily, solutions: window.__game.solutions,
@@ -199,11 +188,6 @@ function checkFit(m, tag) {
     assert.equal(SOL.levels.length, 200);
     assert.equal(SOL.daily.length, 120);
 
-    // levels 1 to 10 are the lot 1 levels, unchanged
-    for (let i = 0; i < 10; i++) {
-      assert.deepEqual(info.levels[i].tubes, LOT1[i], `level ${i + 1} changed`);
-      assert.equal(info.levels[i].par, LOT1_PAR[i], `level ${i + 1} par changed`);
-    }
     // consistency of every level / daily level
     const all = info.levels.concat(info.daily);
     const seen = new Set();
@@ -218,7 +202,7 @@ function checkFit(m, tag) {
       const key = l.tubes.map((t, k) => l.caps[k] + t.join(',')).sort().join('|');
       assert.ok(!seen.has(key), tag + ': duplicate');
       seen.add(key);
-      if (i >= 10) {   // the 10 first ones are the lot 1 ones, checked above
+      {
         assert.ok(l.tubes.every(t => t.length === 0 || new Set(t).size > 1 || t.length < 3), tag + ': looks sorted');
       }
     });
@@ -226,7 +210,7 @@ function checkFit(m, tag) {
     let maxColors = 0;
     info.levels.forEach((l, i) => {
       const w = Math.floor(i / 20);
-      if (i < 10) return;                       // lot 1 levels follow the lot 1 table
+      if (i < 5) { assert.ok(l.cap === (i < 2 ? 3 : l.cap) && (l.cap === 3 || l.cap === 4), `level ${i + 1}: the first levels are 3 or 4 high`); return; }
       const [cap, empty, short, myst] = WORLD_RULES[w];
       assert.equal(l.cap, cap, `level ${i + 1}: height`);
       assert.equal(l.tubes.filter((t, k) => !t.length && l.caps[k] === cap).length, empty, `level ${i + 1}: empty tubes`);
@@ -242,16 +226,10 @@ function checkFit(m, tag) {
     info.daily.forEach((l, i) => assert.equal(SOL.daily[i].length, l.par, `daily ${i}: par = solution length`));
     // sawtooth: the 20th is the hardest of its world, the first is gentle, breathers inside the world
     const pars = info.levels.map(l => l.par);
-    for (let i = 1; i < 10; i++) assert.ok(pars[i] > pars[i - 1], 'levels 1-10 keep growing: ' + pars.slice(0, 10));
     for (let w = 0; w < 10; w++) {
       const p = pars.slice(w * 20, w * 20 + 20);
       assert.equal(Math.max(...p), p[19], `world ${w + 1}: level 20 is not the hardest (${p})`);
       assert.equal(p.filter(x => x === p[19]).length, 1, `world ${w + 1}: hardest level is not unique`);
-      if (w > 0) {
-        const prev = pars.slice((w - 1) * 20, w * 20);
-        assert.ok(p[0] < prev[19], `world ${w + 1}: first level is not easier than the end of world ${w}`);
-        assert.ok(p[0] <= p.slice(1).sort((a, b) => a - b)[9], `world ${w + 1}: first level is not in the easy half`);
-      }
       let breathers = 0;
       for (let i = 1; i < 20; i++) if (p[i] < p[i - 1]) breathers++;
       assert.ok(breathers >= 2, `world ${w + 1}: no breathing space (${p})`);
@@ -260,6 +238,85 @@ function checkFit(m, tag) {
     const dpars = info.daily.map(l => l.par);
     console.log(`        pars: world 1 ${pars.slice(0, 20)} | world 10 ${pars.slice(180)} | daily ${Math.min(...dpars)}-${Math.max(...dpars)}`);
     await context.close();
+  });
+
+  // ---------------------------------------------------------------- level quality (decisions after the level QA)
+  // Independent recount on the data embedded in the game file: first moves and optimal length with the
+  // QA solver, win rate of a random player with another implementation and other seeds.
+  const DATA = QA.loadAll();
+  const ALL = DATA.levels.map((l, i) => ({ id: 'N' + (i + 1), n: i + 1, w: Math.floor(i / 20), pos: i % 20, l, par: DATA.sol.levels[i].length }))
+    .concat(DATA.daily.map((l, i) => ({ id: 'J' + i, daily: true, l, par: DATA.sol.daily[i].length })));
+  let measured = null;
+  const recount = async () => {
+    if (measured) return measured;
+    const t = Date.now();
+    const [first, win, opt] = await Promise.all([
+      runAll(ALL.map(x => ({ type: 'first', id: x.id, raw: x.l.raw }))),
+      runAll(ALL.map((x, k) => ({ type: 'win', id: x.id, raw: x.l.raw, par: x.par, seed: 90001 + 17 * k, games: 800 }))),
+      runAll(ALL.map(x => ({ type: 'opt', id: x.id, raw: x.l.raw, maxNodes: 400000 }))),
+    ]);
+    measured = ALL.map((x, k) => ({ ...x, first: first[k], win: win[k].win, opt: opt[k], d: x.par + 40 * (1 - win[k].win) }));
+    console.log(`        recount of ${ALL.length} levels: ${((Date.now() - t) / 1000).toFixed(0)} s`);
+    return measured;
+  };
+  const median = a => { const v = a.slice().sort((x, y) => x - y), m = v.length >> 1; return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2; };
+
+  await test('decision 1: no trap at the first move (<= 25 % of first moves lose, 0 % for the first 3 levels of a world and for mystery levels)', async () => {
+    const M = await recount();
+    const worst = {};
+    M.forEach(x => {
+      assert.equal(x.first.unknown, 0, `${x.id}: a first move could not be decided`);
+      const frac = x.first.fatal / x.first.legal;
+      const limit = x.daily ? 0.25 : (x.pos < 3 || x.l.mystery) ? 0 : 0.25;
+      assert.ok(frac <= limit, `${x.id}: ${x.first.fatal}/${x.first.legal} first moves lose (limit ${limit * 100} %)`);
+      if (!x.daily) worst[x.w] = Math.max(worst[x.w] || 0, frac);
+    });
+    console.log('        worst first-move trap per world: ' + Object.keys(worst).map(w => `${+w + 1}:${Math.round(worst[w] * 100)}%`).join(' '));
+  });
+
+  await test('decision 2: the measured difficulty (length + random-player win rate) climbs in steps with breathers, worlds never get easier', async () => {
+    const M = (await recount()).filter(x => !x.daily);
+    const TOL = 1.5;                                       // sampling noise of the recount
+    const med = [];
+    for (let w = 0; w < 10; w++) {
+      const W = M.slice(w * 20, w * 20 + 20), d = W.map(x => x.d);
+      med.push(median(d));
+      assert.ok(d[19] >= Math.max(...d) - TOL, `world ${w + 1}: level 20 is not the hardest (${d.map(Math.round)})`);
+      assert.equal(Math.max(...W.map(x => x.par)), W[19].par, `world ${w + 1}: level 20 is not the longest`);
+      for (let i = 0; i < 20; i++) {
+        const prev = w * 20 + i > 0 ? M[w * 20 + i - 1].d : null;
+        if (prev === null) continue;
+        const x = d[i];
+        if (i < 19) assert.ok(x <= Math.max(prev * 1.25, prev + 3) + TOL, `level ${w * 20 + i + 1}: difficulty ${x.toFixed(1)} after ${prev.toFixed(1)} (peak of more than 25 %)`);
+        if (i % 5 === 0 && !(w === 0 && i < 10)) assert.ok(x < prev + TOL, `level ${w * 20 + i + 1}: no breather (${x.toFixed(1)} after ${prev.toFixed(1)})`);
+        else if (i < 19) assert.ok(x > prev - TOL, `level ${w * 20 + i + 1}: difficulty drops inside a rising run`);
+      }
+    }
+    for (let w = 1; w < 10; w++) {
+      assert.ok(med[w] >= med[w - 1], `median of world ${w + 1} (${med[w].toFixed(1)}) is below world ${w} (${med[w - 1].toFixed(1)})`);
+      assert.ok(med[w] <= 1.3 * med[w - 1], `median of world ${w + 1} (${med[w].toFixed(1)}) is more than 30 % above world ${w} (${med[w - 1].toFixed(1)})`);
+    }
+    console.log('        median difficulty per world: ' + med.map(m => m.toFixed(0)).join(' '));
+  });
+
+  await test('decision 3: daily levels are homogeneous (random player wins 25 % to 60 % of the games)', async () => {
+    const D = (await recount()).filter(x => x.daily);
+    assert.equal(D.length, 120);
+    D.forEach(x => assert.ok(x.win >= 0.25 && x.win <= 0.60, `${x.id}: random player wins ${(100 * x.win).toFixed(1)} %`));
+    console.log(`        daily win rates: ${Math.round(100 * Math.min(...D.map(x => x.win)))}-${Math.round(100 * Math.max(...D.map(x => x.win)))} %`);
+  });
+
+  await test('decision 4: the star reference is the shortest solution (A* recount)', async () => {
+    const M = await recount();
+    let proven = 0;
+    M.forEach(x => {
+      if (x.opt.status !== 'solved') return;
+      proven++;
+      assert.ok(x.par <= x.opt.len, `${x.id}: reference ${x.par} is longer than the optimum ${x.opt.len}`);
+      assert.equal(x.par, x.opt.len, `${x.id}: reference ${x.par} is shorter than the optimum ${x.opt.len}?!`);
+    });
+    assert.ok(proven >= 0.9 * M.length, `only ${proven}/${M.length} optima could be recomputed`);
+    console.log(`        optimum recomputed and equal to the reference on ${proven}/${M.length} levels`);
   });
 
   // ---------------------------------------------------------------- every level is winnable
@@ -332,7 +389,7 @@ function checkFit(m, tag) {
   // ---------------------------------------------------------------- mechanics
   await test('mystery: a hidden ball shows no colour and no symbol, is revealed when uncovered and stays revealed', async () => {
     const { context, page } = await open();
-    const n = 101;                                          // first level of the mystery world
+    const n = 41;                                           // first level of the first mystery world
     const s0 = await page.evaluate(k => window.__game.loadLevel(k), n);
     assert.equal(s0.mystery, true);
     assert.deepEqual(s0.hidden, s0.tubes.map(t => Math.max(0, t.length - 1)), 'only the top ball is visible');
@@ -392,7 +449,7 @@ function checkFit(m, tag) {
   await test('short tube: holds 2 balls, refuses a third one (state and taps)', async () => {
     const { context, page } = await open();
     const levels = await page.evaluate(() => window.__game.levels);
-    const n = 81;                                           // first level of the short-tube world
+    const n = 61;                                           // first level of the short-tube world
     const L = levels[n - 1];
     const s = L.caps.findIndex(c => c < L.cap);
     assert.ok(s >= 0 && L.caps[s] === 2, 'fixture: a tube of capacity 2');
@@ -422,7 +479,9 @@ function checkFit(m, tag) {
   await test('the 10 colours have 10 distinct symbols and colours', async () => {
     const { context, page } = await open();
     // find a level that uses colour 9 and make sure all its colours are drawn differently
-    const n = 20 * 2 - 1 + 1;                               // level 40: end of world 2
+    const all = await page.evaluate(() => window.__game.levels);
+    const n = all.findIndex(l => new Set(l.tubes.flat()).size === 10) + 1;
+    assert.ok(n > 0, 'fixture: a level with 10 colours');
     await page.evaluate(k => window.__game.loadLevel(k), n);
     const st = await state(page);
     assert.equal(new Set(st.tubes.flat()).size, 10, 'fixture: 10 colours on screen');
@@ -437,11 +496,14 @@ function checkFit(m, tag) {
   await test('illegal moves (other colour, full tube, empty source) leave the state untouched', async () => {
     const { context, page } = await open();
     const levels = await page.evaluate(() => window.__game.levels);
-    const L = levels[2];                                    // level 3: every non-empty tube is full at start
-    const full = L.tubes.findIndex(t => t.length === L.cap);
+    const pickN = levels.findIndex((l, i) => i >= 3 && l.cap === 4 && l.tubes.some(t => !t.length) &&
+      l.tubes.some((t, a) => l.tubes.some((u, b) => a !== b && t.length === l.cap && u.length === l.cap && t[l.cap - 1] === u[l.cap - 1]))) + 1;
+    assert.ok(pickN > 3, 'fixture: a level with two full tubes with the same top colour and an empty tube');
+    const L = levels[pickN - 1];                            // every non-empty tube is full at start
+    const full = L.tubes.findIndex((t, a) => t.length === L.cap && L.tubes.some((u, b) => a !== b && u.length === L.cap && u[L.cap - 1] === t[L.cap - 1]));
     const sameTopFull = L.tubes.findIndex((t, i) => i !== full && t.length === L.cap && t[t.length - 1] === L.tubes[full][L.cap - 1]);
     assert.ok(sameTopFull >= 0, 'fixture: need two full tubes with the same top colour');
-    const before = await page.evaluate(() => window.__game.loadLevel(3));
+    const before = await page.evaluate(k => window.__game.loadLevel(k), pickN);
     await tapMove(page, full, sameTopFull);                 // same colour but full tube
     let s = await state(page);
     assert.deepEqual(s.tubes, before.tubes);
@@ -497,7 +559,7 @@ function checkFit(m, tag) {
     await context.close();
   });
 
-  for (const [label, from, to] of [['lot 1 levels', 1, 10], ['short-tube levels', 81, 100], ['mystery levels', 101, 120]]) {
+  for (const [label, from, to] of [['first levels', 1, 20], ['short-tube levels', 61, 80], ['mystery levels', 141, 160]]) {
     await test(`dead end (${label}): the game says so and offers undo / restart`, async () => {
       const { context, page } = await open();
       const levels = await page.evaluate(() => window.__game.levels);
@@ -641,9 +703,9 @@ function checkFit(m, tag) {
 
     // mystery level
     ({ context, page } = await open());
-    await page.evaluate(k => window.__game.loadLevel(k), 101);
+    await page.evaluate(k => window.__game.loadLevel(k), 41);
     const first = await state(page);
-    await page.evaluate(m => m.forEach(([f, t]) => window.__game.applyMove(f, t)), SOL.levels[100].slice(0, 8));
+    await page.evaluate(m => m.forEach(([f, t]) => window.__game.applyMove(f, t)), SOL.levels[40].slice(0, 8));
     const m1 = await state(page);
     assert.ok(m1.hidden.reduce((a, b) => a + b, 0) < first.hidden.reduce((a, b) => a + b, 0), 'fixture: something was revealed');
     await page.reload();
@@ -662,7 +724,7 @@ function checkFit(m, tag) {
     await context.close();
 
     // challenge on a locked level
-    ({ context, page } = await open({ width: 360, height: 640 }, { hash: '#defi-7-30' }));
+    ({ context, page } = await open({ width: 360, height: 640 }, { hash: `#defi-7-${P(7) + 6}` }));
     await tapMoves(page, SOL.levels[6].slice(0, 5));
     const c1 = await state(page);
     await page.reload();
@@ -672,8 +734,8 @@ function checkFit(m, tag) {
     assert.equal(s.level, 7);
     assert.equal(s.moves, 5);
     assert.deepEqual(s.tubes, c1.tubes);
-    assert.equal(s.challenge.target, 30);
-    assert.match(await page.locator('#chal').textContent(), /Objectif : 30/);
+    assert.equal(s.challenge.target, P(7) + 6);
+    assert.match(await page.locator('#chal').textContent(), new RegExp('Objectif : ' + (P(7) + 6)));
     const st = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY);
     assert.equal(st.level, 1); assert.equal(st.max, 1);
     await tapMoves(page, SOL.levels[6].slice(5));
@@ -681,6 +743,100 @@ function checkFit(m, tag) {
     await page.reload();                                         // won: nothing left to resume
     await page.waitForFunction(() => !!window.__game);
     assert.equal((await state(page)).screen, 'home');
+    await context.close();
+  });
+
+  await test('badly started game: a discreet message after 2x the reference, or after 3 returns to a known position', async () => {
+    const { context, page } = await open();
+    const levels = await page.evaluate(() => window.__game.levels);
+    // (a) a long game with no repeated position
+    const n = 22, L = levels[n - 1], par = SOL.levels[n - 1].length;
+    const seen = new Set(), t = L.tubes.map(x => x.slice()), walk = [];
+    let seed = 12345;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+    const key = u => u.map(x => x.join(',')).join('|');
+    seen.add(key(t));
+    while (walk.length < 2 * par + 1) {
+      const opts = [];
+      for (let a = 0; a < t.length; a++) for (let b = 0; b < t.length; b++) {
+        if (!canMove(t, L.caps, a, b)) continue;
+        const u = t.map(x => x.slice()); u[b].push(u[a].pop());
+        if (!seen.has(key(u)) && !done(u, L.caps) && !noMove(u, L.caps)) opts.push([a, b, u]);
+      }
+      assert.ok(opts.length, 'fixture: the walk got stuck');
+      const [a, b, u] = opts[Math.floor(rnd() * opts.length)];
+      walk.push([a, b]); seen.add(key(u)); t[b].push(t[a].pop());
+    }
+    await page.evaluate(k => window.__game.loadLevel(k), n);
+    await page.evaluate(m => m.forEach(([a, b]) => window.__game.applyMove(a, b)), walk.slice(0, 2 * par));
+    assert.doesNotMatch(await page.locator('#msg').textContent(), /mal engagée/, 'no message at exactly 2x');
+    await page.evaluate(m => window.__game.applyMove(m[0], m[1]), walk[2 * par]);
+    assert.match(await page.locator('#msg').textContent(), /mal engagée.*Annule.*recommence/i);
+    assert.ok(await page.locator('#bUndo').isEnabled());
+    await shot(page, 'nudge');
+
+    // (b) three returns to a known position, well under 2x the reference
+    let cyc = null;
+    for (let i = 3; i < 60 && !cyc; i++) {
+      const l = levels[i], e = l.tubes.findIndex((x, k) => !x.length && l.caps[k] === l.cap);
+      const a = l.tubes.findIndex(x => x.length >= 2 && x[x.length - 1] === x[x.length - 2]);
+      if (e >= 0 && a >= 0 && SOL.levels[i].length >= 8) cyc = { n: i + 1, a, e };
+    }
+    assert.ok(cyc, 'fixture: a level where a ball can go to the empty tube and back');
+    await page.evaluate(k => window.__game.loadLevel(k), cyc.n);
+    const go = (x, y) => page.evaluate(([f, t]) => window.__game.applyMove(f, t), [x, y]);
+    await go(cyc.a, cyc.e);                                 // new position
+    await go(cyc.e, cyc.a);                                 // back to the start: 1st return
+    await go(cyc.a, cyc.e);                                 // 2nd
+    assert.doesNotMatch(await page.locator('#msg').textContent(), /mal engagée/);
+    await go(cyc.e, cyc.a);                                 // 3rd return to a known position
+    assert.match(await page.locator('#msg').textContent(), /mal engagée/);
+    assert.ok((await state(page)).moves <= 2 * SOL.levels[cyc.n - 1].length, 'under 2x the reference');
+
+    // (c) undo then redo is not a return
+    await page.evaluate(k => window.__game.loadLevel(k), cyc.n);
+    for (let k = 0; k < 5; k++) {
+      await page.evaluate(([a, e]) => window.__game.applyMove(a, e), [cyc.a, cyc.e]);
+      await page.locator('#bUndo').tap();
+    }
+    assert.doesNotMatch(await page.locator('#msg').textContent(), /mal engagée/, 'undo/redo must not trigger the message');
+    await context.close();
+  });
+
+  await test('mystery: Rejouer and any new game of a level hide the balls again; one game keeps them revealed', async () => {
+    const { context, page } = await open();
+    const n = 41, sol = SOL.levels[n - 1];
+    const s0 = await page.evaluate(k => window.__game.loadLevel(k), n);
+    const sum = s => s.hidden.reduce((a, b) => a + b, 0);
+    await page.evaluate(m => m.forEach(([a, b]) => window.__game.applyMove(a, b)), sol.slice(0, 6));
+    const mid = await state(page);
+    assert.ok(sum(mid) < sum(s0), 'fixture: something was revealed');
+    await page.locator('#bReset').tap();                    // Recommencer: still revealed
+    assert.deepEqual((await state(page)).hidden, mid.hidden);
+    await page.reload();                                    // reload: still revealed
+    await page.waitForFunction(() => !!window.__game);
+    await page.locator('#bGo').tap();
+    assert.deepEqual((await state(page)).hidden, mid.hidden);
+    // leaving for another level and coming back is a new game: hidden again
+    await page.evaluate(k => window.__game.loadLevel(k), 42);
+    const again = await page.evaluate(k => window.__game.loadLevel(k), n);
+    assert.deepEqual(again.hidden, s0.hidden, 'a new game of the level starts hidden');
+    // win, then Rejouer: hidden again
+    await page.evaluate(m => m.forEach(([a, b]) => window.__game.applyMove(a, b)), sol.slice(0, 6));
+    await page.evaluate(m => m.forEach(([a, b]) => window.__game.applyMove(a, b)), sol.slice(6));
+    assert.equal((await state(page)).won, true);
+    await page.locator('#win').waitFor({ state: 'visible' });
+    await page.locator('#bAgain').tap();
+    const re = await state(page);
+    assert.deepEqual(re.hidden, s0.hidden, 'Rejouer hides the balls again');
+    assert.equal(await page.locator('.ball.hid').count(), sum(s0));
+    await context.close();
+  });
+
+  await test('ranks: "Maniaque" is now "Perfectionniste"', async () => {
+    assert.ok(!/Maniaque/.test(fs.readFileSync(FILE, 'utf8')));
+    const { context, page } = await open({ width: 360, height: 640 }, { save: { level: 78, max: 78, stars: stars(77, 3), best: stars(77, 30), cur: null, rankSeen: 5 } });
+    assert.equal((await page.locator('#hRankN').textContent()).trim(), 'Perfectionniste');
     await context.close();
   });
 
@@ -1063,7 +1219,7 @@ function checkFit(m, tag) {
     assert.equal(sh2[sh2.length - 1].text.match(/https?:\/\/\S+/)[0], `${base}#defi-jour-${dayNum(20)}-${s.moves}`);
     await context.close();
 
-    // no config: the current address is the base
+    // no config and a file: address: no link at all (a link to a local file is useless)
     const b = await open();
     await b.page.evaluate(() => {
       window.__shared = [];
@@ -1074,26 +1230,46 @@ function checkFit(m, tag) {
     await b.page.locator('#win').waitFor({ state: 'visible' });
     await b.page.locator('#bChal').tap();
     const t2 = (await b.page.evaluate(() => window.__shared))[0].text;
-    assert.ok(t2.includes(`${URL}#defi-1-3`), t2);
+    assert.ok(!/https?:|file:|#defi/.test(t2) && t2.includes(`${P(1)} coups`), 'no link without a base: ' + t2);
     await b.context.close();
+
+    // no config but served over http(s): the current address is the base
+    const ctx = await browser.newContext({ ...MOBILE, viewport: { width: 360, height: 640 } });
+    await ctx.route('http://pile.test/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: fs.readFileSync(FILE, 'utf8') }));
+    const hp = await ctx.newPage();
+    hp.on('pageerror', e => problems.push('pageerror(http): ' + e.message));
+    await hp.goto('http://pile.test/jeux/pile-poil/index.html');
+    await hp.waitForFunction(() => !!window.__game);
+    await hp.evaluate(() => {
+      window.__shared = [];
+      Object.defineProperty(navigator, 'share', { configurable: true, value: d => { window.__shared.push(d); return Promise.resolve(); } });
+    });
+    await hp.evaluate(k => window.__game.loadLevel(k), 1);
+    await tapMoves(hp, SOL.levels[0]);
+    await hp.locator('#win').waitFor({ state: 'visible' });
+    await hp.locator('#bChal').tap();
+    const t3 = (await hp.evaluate(() => window.__shared))[0].text;
+    assert.ok(t3.includes(`http://pile.test/jeux/pile-poil/index.html#defi-1-${P(1)}`), t3);
+    await ctx.close();
   });
 
   await test('challenge: opened by the link (even on a locked level), banner, won, lost, and nothing saved', async () => {
-    // won: level 7 is locked, the target is 30 moves, the solution has 24
-    let { context, page } = await open({ width: 360, height: 640 }, { hash: '#defi-7-30' });
+    // won: level 7 is locked, the target is 6 moves above the solution
+    let { context, page } = await open({ width: 360, height: 640 }, { hash: `#defi-7-${P(7) + 6}` });
     let s = await state(page);
     assert.equal(s.screen, 'game');
     assert.equal(s.level, 7);
-    assert.deepEqual(s.challenge, { target: 30, level: 7, day: 0 });
+    assert.deepEqual(s.challenge, { target: P(7) + 6, level: 7, day: 0 });
     assert.ok(await page.locator('#chal').isVisible());
-    assert.match(await page.locator('#chal').textContent(), /Objectif : 30 coups ou moins/);
-    assert.deepEqual(await events(page, 'challenge_open'), [{ source: 'mini-jeu', game: 'tri-couleurs', event: 'challenge_open', level: 7, target: 30 }]);
+    assert.match(await page.locator('#chal').textContent(), new RegExp(`Objectif : ${P(7) + 6} coups ou moins`));
+    assert.ok(await page.locator('#goal').isHidden(), 'one objective on screen: the star reference is hidden');
+    assert.deepEqual(await events(page, 'challenge_open'), [{ source: 'mini-jeu', game: 'tri-couleurs', event: 'challenge_open', level: 7, target: P(7) + 6 }]);
     assert.equal(await page.evaluate(() => location.hash), '', 'the link is consumed');
     await shot(page, 'challenge-banner');
     await tapMoves(page, SOL.levels[6]);
     await page.locator('#win').waitFor({ state: 'visible' });
     assert.match(await page.locator('#wChal').textContent(), /Défi relevé/);
-    assert.deepEqual(await events(page, 'challenge_result'), [{ source: 'mini-jeu', game: 'tri-couleurs', event: 'challenge_result', level: 7, moves: 24, target: 30, won: true }]);
+    assert.deepEqual(await events(page, 'challenge_result'), [{ source: 'mini-jeu', game: 'tri-couleurs', event: 'challenge_result', level: 7, moves: P(7), target: P(7) + 6, won: true }]);
     assert.ok((await events(page, 'badge')).some(e => e.id === 'defi'), 'first challenge won: badge');
     assert.match(await page.locator('#bChal').textContent(), /Renvoyer/);
     assert.equal((await page.locator('#bNext').textContent()).trim(), 'Accueil');
@@ -1101,22 +1277,23 @@ function checkFit(m, tag) {
     assert.equal(stored.stars[6] || 0, 0, 'a locked level played for a challenge is not recorded');
     assert.equal(stored.max, 1, 'and does not unlock anything');
     await page.locator('#bAgain').tap();                        // "Rejouer" keeps the challenge
-    assert.match(await page.locator('#chal').textContent(), /Objectif : 30 coups ou moins/);
+    assert.match(await page.locator('#chal').textContent(), new RegExp(`Objectif : ${P(7) + 6} coups ou moins`));
     await context.close();
 
-    // lost: target 20, solution 24
-    ({ context, page } = await open({ width: 360, height: 640 }, { hash: '#defi-7-20' }));
+    // lost: the target is 4 moves under the solution
+    ({ context, page } = await open({ width: 360, height: 640 }, { hash: `#defi-7-${P(7) - 4}` }));
     await tapMoves(page, SOL.levels[6]);
     await page.locator('#win').waitFor({ state: 'visible' });
-    assert.match(await page.locator('#wChal').textContent(), /Raté de 4 coups/);
-    assert.deepEqual(await events(page, 'challenge_result'), [{ source: 'mini-jeu', game: 'tri-couleurs', event: 'challenge_result', level: 7, moves: 24, target: 20, won: false }]);
+    assert.match(await page.locator('#wChal').textContent(), /^À 4 coups près$/);
+    assert.doesNotMatch(await page.locator('#wRec').textContent(), /étoiles en/, 'no second objective on the win screen');
+    assert.deepEqual(await events(page, 'challenge_result'), [{ source: 'mini-jeu', game: 'tri-couleurs', event: 'challenge_result', level: 7, moves: P(7), target: P(7) - 4, won: false }]);
     assert.equal((await events(page, 'badge')).filter(e => e.id === 'defi').length, 0);
     assert.match(await page.locator('#bChal').textContent(), /Renvoyer/, 'offers to send the challenge back');
     await shot(page, 'challenge-lost');
     await context.close();
 
     // an unlocked level: normal play, the result is saved
-    ({ context, page } = await open({ width: 360, height: 640 }, { save: { level: 3, max: 3, stars: [3, 3], best: [3, 6], cur: null }, hash: '#defi-3-13' }));
+    ({ context, page } = await open({ width: 360, height: 640 }, { save: { level: 3, max: 3, stars: [3, 3], best: [3, 6], cur: null }, hash: `#defi-3-${P(3)}` }));
     s = await state(page);
     assert.equal(s.level, 3);
     await tapMoves(page, SOL.levels[2]);
@@ -1158,7 +1335,7 @@ function checkFit(m, tag) {
 
   // ---------------------------------------------------------------- host events
   await test('host events: only the listed ones, with only the listed fields', async () => {
-    const { context, page } = await open({ width: 360, height: 640 }, { hash: '#defi-2-9' });
+    const { context, page } = await open({ width: 360, height: 640 }, { hash: `#defi-2-${P(2) + 3}` });
     await tapMoves(page, SOL.levels[1]);                         // challenge result + level_complete
     await page.locator('#win').waitFor({ state: 'visible' });
     await page.evaluate(d => window.__game.setToday(d), dateOf(60));
