@@ -818,6 +818,98 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     await context.close();
   });
 
+  // ------------------------------------------------------------------------------------- common rules R5, R6, touch
+  await test('R6: "Continuer" always points at the first level not finished; replaying an old level does not move it', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { save: { max: 5, level: 5, stars: [3, 2, 3, 1] } });
+    assert.match(await page.locator('#bGo').textContent(), /Niveau 5/);
+    await tap(page, '#bLevels');
+    await tap(page, '.cell[data-level="2"]');
+    let s = await state(page);
+    assert.equal(s.level, 2); assert.equal(s.screen, 'game');
+    await page.evaluate(seed => window.__game.seed(seed), SEEDS.win[1]);
+    await playOut(page);
+    await page.locator('#res').waitFor({ state: 'visible' });
+    await tap(page, '#act-home');
+    assert.match(await page.locator('#bGo').textContent(), /Niveau 5/, 'after winning an old level');
+    const sv = await stored(page);
+    assert.equal(sv.stars[1], 3, 'the best result of the old level is kept'); assert.equal(sv.max, 5);
+    await tap(page, '#bGo');
+    assert.equal((await state(page)).level, 5);
+    // a game left in progress on an old level comes back from the grid, not from "Continuer"
+    await tap(page, '#bMap'); await tap(page, '.cell[data-level="3"]');
+    await playSteps(page, 4);
+    const mid = (await state(page)).game;
+    await tap(page, '#bMap'); await tap(page, '#bLBack');
+    assert.match(await page.locator('#bGo').textContent(), /Niveau 5/);
+    await tap(page, '#bLevels'); await tap(page, '.cell[data-level="3"]');
+    assert.deepEqual((await state(page)).game, mid, 'the game of level 3 is resumed from the grid');
+    await context.close();
+  });
+
+  await test('R5: nothing in the page shows the dice or the generator state', async () => {
+    const { context, page } = await open();
+    await tap(page, '#bGo');
+    await page.evaluate(() => window.__game.seed(123456789));
+    await playSteps(page, 8);
+    const s = await state(page);
+    const html = await page.evaluate(() => document.documentElement.outerHTML);
+    for (const v of ['123456789', String(s.game.rng), String(s.game.rng2)]) assert.ok(!html.includes(v), 'generator value in the DOM: ' + v);
+    assert.ok(!/data-(seed|rng|next|solution)/.test(html));
+    await context.close();
+  });
+
+  await test('one gesture, one reaction: a double tap or a long press never throws twice or plays a pion hidden under the finger', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { instant: false });
+    const cdp = await context.newCDPSession(page);
+    const press = async (x, y, ms) => {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+      await page.waitForTimeout(ms);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    };
+    await page.evaluate(() => window.__game.loadLevel(7));
+    const base = clone((await state(page)).game);
+    const craft = async (pos, v) => {
+      const S = clone(base); S.pos[0] = pos; S.pos[1] = [-1, -1, -1]; S.turn = 0; S.roll = 0; S.tries = 0; S.rng = rngFor(v, S);
+      await page.evaluate(g => window.__game.setGame(g), S);
+      const q = { rng: S.rng }; E.rnd(q, 'rng');
+      return q.rng;
+    };
+    // 1. a 6 that plays itself (the player throws again at once): a second tap 250 ms later is the same gesture
+    let after = await craft([-1, -1], 6);
+    await tap(page, '#die');
+    await page.waitForTimeout(250);
+    await tap(page, '#die');
+    await page.waitForTimeout(700);
+    let s = await state(page);
+    assert.equal(s.game.rng, after, 'one throw only');
+    assert.ok(s.game.pos[0].includes(0) && s.roll === 0 && s.turn === 0);
+    // 2. long press on the die (800 ms): one throw, no pion played
+    after = await craft([3, 10], 2);
+    let c = await centre(page, '#die');
+    await press(c[0], c[1], 800);
+    s = await state(page);
+    assert.equal(s.game.rng, after); assert.equal(s.phase, 'pick'); assert.deepEqual(s.game.pos[0], [3, 10]);
+    // 3. long press on a pion: played once
+    c = await page.evaluate(() => { const q = document.querySelector('.pion.go[data-i="1"]').getBoundingClientRect(); return [q.left + q.width / 2, q.top + q.height / 2]; });
+    await press(c[0], c[1], 800);
+    s = await state(page);
+    assert.deepEqual(s.game.pos[0], [3, 12], 'one pion, played once');
+    // 4. the die lying exactly over the place where a pion appears: the press that threw does not also play it
+    after = await craft([3, 10], 2);
+    const P = await page.evaluate(() => { const q = document.querySelector('.pion[data-p="0"][data-i="1"]').getBoundingClientRect(); return [q.left + q.width / 2, q.top + q.height / 2]; });
+    await page.evaluate(([x, y]) => { const d = document.getElementById('die'); d.style.cssText = `position:fixed;z-index:99;left:${x - 34}px;top:${y - 34}px`; }, P);
+    await page.touchscreen.tap(P[0], P[1]);
+    s = await state(page);
+    assert.equal(s.phase, 'pick');
+    await page.evaluate(() => { document.getElementById('die').style.pointerEvents = 'none'; });   // the die goes away, the pion is now under the finger
+    await page.touchscreen.tap(P[0], P[1]);
+    assert.deepEqual((await state(page)).game.pos[0], [3, 10], 'a second tap in the same place right away does not play the pion');
+    await page.waitForTimeout(450);
+    await page.touchscreen.tap(P[0], P[1]);
+    assert.deepEqual((await state(page)).game.pos[0], [3, 12], 'a deliberate tap later does');
+    await context.close();
+  });
+
   // ------------------------------------------------------------------------------------- several on this phone
   await test('"à plusieurs sur ce téléphone": 2 to 4 players, one die for all, tap by tap to a winner, outside the run', async () => {
     const { context, page } = await open();

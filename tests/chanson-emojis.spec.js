@@ -519,7 +519,7 @@ function checkFit(m, tag) {
 
   await test('R4: the shared link is origin + pathname + fragment only (query string never leaks), also with MJ_CONFIG', async () => {
     const clipOf = async (page, kind) => {
-      await page.evaluate(() => { window.__clip = []; navigator.clipboard.writeText = t => { window.__clip.push(t); return Promise.resolve(); }; });
+      await page.evaluate(() => { window.__clip = []; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: t => { window.__clip.push(t); return Promise.resolve(); } } }); });
       await page.locator('#bGo').tap();
       await play(page, 'rrr');
       await page.locator(kind).tap();

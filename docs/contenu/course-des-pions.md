@@ -31,24 +31,40 @@
 ## Fin de partie, étoiles, classement
 - **Le premier joueur qui rentre tous ses pions gagne** ; la partie s'arrête là. Un niveau est réussi par une victoire.
 - Le **classement** de fin (1er, 2e…) est donné par l'ordre d'arrivée puis par la progression des pions.
-- **Étoiles** (selon l'avance sur le meilleur adversaire, en cases restant à parcourir quand le joueur finit) : 1 étoile pour une victoire, 2 étoiles avec 2 cases d'avance par pion (4 cases à 2 pions, 6 à 3 pions) ou plus, 3 étoiles avec 5 cases d'avance par pion (10 cases à 2 pions, 15 à 3 pions) ou plus. Le critère de 3 étoiles est affiché avant de jouer.
+- **Étoiles** (selon l'avance sur le meilleur adversaire, en cases restant à parcourir quand le joueur finit) : 1 étoile pour une victoire, 2 étoiles avec 2 cases d'avance par pion (en comptant le plus grand nombre de pions de la partie : 4 cases à 2 pions, 6 à 3 pions) ou plus, 3 étoiles avec 5 cases d'avance par pion (10 ou 15 cases) ou plus. Le critère de 3 étoiles est affiché avant de jouer.
 - **Score du défi : nombre de tours pour gagner** (un 6 qui fait rejouer reste dans le même tour). Le défi est relevé si on gagne en autant de tours ou moins.
 
-## Parcours : 20 niveaux (fixes)
-Difficulté : le nombre d'adversaires et la qualité de leur jeu. Jamais le dé. Force des adversaires de 0 (au hasard) à 5 (le plus avisé : il capture, rentre, évite les cases où il peut être pris, guette les pions devant lui).
+## Parcours : 20 niveaux (fixes), la difficulté par l'asymétrie de pions
+Le dé n'est jamais biaisé. Le levier est le nombre de pions à ramener, annoncé avant la partie (« Toi : 1 pion · Adversaire : 3 pions »), puis le nombre d'adversaires et la qualité de leur jeu (force 0 : au hasard ; 5 : le plus avisé, qui capture, rentre, évite les cases où il peut être pris et guette les pions devant lui). Au début le joueur a moins de pions que ses adversaires (niveaux 1 à 11), puis autant (12 à 20).
 
-| Niveaux | Pions | Adversaires (force) |
-|---|---|---|
-| 1-2 | 2 | 1 (0) |
-| 3-5 | 2 | 1 (1, 2, 3) |
-| 6-9 | 2 | 2 (1·1, 2·2, 3·2, 2·2) |
-| 10 | 2 | 2 (4·3) |
-| 11-13 | 3 | 2 (2·2, 3·3, 4·3) |
-| 14-15 | 3 | 3 (2·2·2, 3·3·2) |
-| 16-17 | 3 | 3 (4·3·3, 3·3·3) |
-| 18-20 | 3 | 3 (4·4·3, 5·4·4, 5·5·5) |
+Taux de victoire mesurés avec le joueur de test (`tools/course-des-pions/player.js`, hors du jeu) sur 1 000 parties par niveau (`node tools/course-des-pions/sim.js 1000 --md`). Le test de la suite les recalcule sur 400 parties avec d'autres graines et tolère ±7 points. Respirations : niveaux 7, 12 et 18.
 
-Les respirations sont les niveaux 6, 9, 11, 14 et 17 (un adversaire de plus ou un pion de plus, mais des adversaires moins forts).
+| Niveau | Toi (pions) | Adversaires : pions chacun (force) | Victoires mesurées | Étoiles 3/2/1 (% des victoires) | Durée estimée |
+|---|---|---|---|---|---|
+| 1 | 1 | 1 × 3 pions (0) | 99 % | 94 / 2 / 4 | 0.6 min |
+| 2 | 1 | 1 × 2 pions (0) | 91 % | 80 / 8 / 12 | 0.6 min |
+| 3 | 1 | 1 × 2 pions (2) | 88 % | 79 / 8 / 12 | 0.6 min |
+| 4 | 1 | 1 × 2 pions (5) | 87 % | 79 / 9 / 12 | 0.6 min |
+| 5 | 1 | 2 × 2 pions (2·2) | 81 % | 74 / 10 / 16 | 0.8 min |
+| 6 | 1 | 2 × 2 pions (5·5) | 78 % | 73 / 9 / 18 | 0.8 min |
+| 7 | 2 | 1 × 3 pions (2) | 83 % | 70 / 11 / 19 | 1.0 min |
+| 8 | 2 | 1 × 3 pions (5) | 80 % | 62 / 15 / 23 | 1.0 min |
+| 9 | 2 | 2 × 3 pions (2·2) | 74 % | 67 / 11 / 22 | 1.5 min |
+| 10 | 2 | 2 × 3 pions (5·5) | 68 % | 61 / 14 / 25 | 1.5 min |
+| 11 | 2 | 3 × 3 pions (5·5·5) | 61 % | 59 / 16 / 25 | 2.1 min |
+| 12 | 3 | 1 × 3 pions (0) | 68 % | 55 / 12 / 32 | 1.2 min |
+| 13 | 3 | 1 × 3 pions (3) | 55 % | 42 / 17 / 41 | 1.2 min |
+| 14 | 3 | 1 × 3 pions (5) | 53 % | 43 / 14 / 43 | 1.2 min |
+| 15 | 3 | 2 × 3 pions (0·0) | 52 % | 42 / 16 / 42 | 1.7 min |
+| 16 | 3 | 2 × 3 pions (2·2) | 48 % | 51 / 14 / 35 | 1.8 min |
+| 17 | 3 | 2 × 3 pions (3·3) | 39 % | 39 / 18 / 42 | 1.8 min |
+| 18 | 2 | 2 × 2 pions (0·0) | 47 % | 42 / 14 / 44 | 1.1 min |
+| 19 | 3 | 3 × 3 pions (3·3·2) | 34 % | 46 / 17 / 38 | 2.4 min |
+| 20 | 3 | 3 × 3 pions (4·4·3) | 29 % | 48 / 15 / 37 | 2.4 min |
+
+Fourchette visée : niveaux 1-2 au moins 85 %, descente régulière jusqu'à environ 30 % au niveau 20, jamais moins de 25 %.
+
+Défi : l'objectif d'un lien doit être atteignable (de 1, 3 ou 6 tours selon 1, 2 ou 3 pions du joueur, jusqu'à 99) ; hors bornes le lien est ignoré. Un défi se joue une fois par ouverture : ni « Rejouer », ni « Recommencer », ni « Annuler ».
 
 ## Mode « à plusieurs sur ce téléphone »
 Depuis l'accueil, 2 à 4 joueurs (2 pions chacun), hors parcours : pas d'étoiles, pas de sauvegarde, pas d'événement. Chacun joue à son tour sur le même écran ; le dé affiché indique qui l'a lancé. Le premier qui rentre ses 2 pions gagne.
@@ -59,5 +75,7 @@ Depuis l'accueil, 2 à 4 joueurs (2 pions chacun), hors parcours : pas d'étoile
 3. Un 6 fait toujours rejouer, une capture ou une arrivée à la maison non.
 4. Partie arrêtée à la première arrivée ; le classement des perdants est donné par leur progression.
 5. Le joueur du parcours joue toujours le Corail ▲ ; ses adversaires sont Sarcelle, Lilas, Citron.
-6. « Annuler » revient au début de la dernière relance du joueur (le même dé reviendra : le générateur est restauré avec la position).
+6. « Annuler » reprend le choix d'un pion, seulement jusqu'au lancer suivant (le dé déjà vu reste le même, aucun dé futur n'est dévoilé) ; les tours des adversaires attendent un instant après un choix du joueur. Pas d'« Annuler » en défi.
 7. « Accélérer » (×2) raccourcit les tours des adversaires ; réglage mémorisé.
+8. « Continuer » ouvre toujours le premier niveau non terminé ; une partie laissée en cours sur un autre niveau se reprend depuis la grille.
+9. La graine d'une nouvelle partie vient de l'horloge ; elle est enregistrée avec la partie pour une reprise à l'identique.
