@@ -26,8 +26,8 @@ Un lot n'est livré que revue et contrôles passés.
 7. **Texte en français**, court. Code et commentaires en anglais.
 8. **Couleurs jamais seules** : chaque couleur porte aussi un symbole (daltonisme, écrans faibles).
 9. **Une action, une réponse immédiate** ; annuler et recommencer toujours possibles ; aucune impasse sans issue visible.
-10. **Crochets de test** : `window.__game` expose l'état (`state()`), les niveaux (`levels`), et `loadLevel(n)`.
-11. **Crochet d'intégration** : à chaque niveau gagné, `window.parent.postMessage({source:'mini-jeu', game, event:'level_complete', level, moves}, '*')`. Rien d'autre ne sort.
+10. **Crochets de test** : `window.__game` expose l'état (`state()`), les niveaux (`levels`), et `loadLevel(n)`. Les solutions ne sont jamais embarquées dans le jeu.
+11. **Crochet d'intégration** : le jeu ne parle à la page hôte que par `window.parent.postMessage({source:'mini-jeu', game, event, …}, '*')`, avec les seuls événements listés dans la fiche du jeu, sans donnée personnelle. Rien d'autre ne sort.
 
 ## Ressorts à intégrer (issus de l'étude)
 Sessions de 1 à 3 min · difficulté progressive, premiers niveaux très faciles · reprise instantanée là où on s'est arrêté · partage du résultat sans spoiler (`navigator.share`, repli presse-papiers) · le simple d'abord.
