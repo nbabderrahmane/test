@@ -162,18 +162,20 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     assert.deepEqual(info.fns, new Array(6).fill('function'));
     assert.ok(!info.keys.some(k => /solution|seeds|win/i.test(k)), 'solutions exposed: ' + info.keys);
     info.levels.forEach((l, i) => {
-      assert.equal(l.k, i < 10 ? 2 : 3, `level ${i + 1}: pions`);
+      assert.ok(l.h >= 1 && l.h <= 3 && l.o >= 2 && l.o <= 3, `level ${i + 1}: pions ${l.h} vs ${l.o}`);
       assert.ok(l.opp.length >= 1 && l.opp.length <= 3);
-      if (i) assert.ok(l.opp.length >= info.levels[i - 1].opp.length, `level ${i + 1}: fewer opponents than before`);
     });
+    // the handicap: the player has fewer pions to bring home than the opponents at first, as many later
+    assert.ok(info.levels.slice(0, 11).every(l => l.h < l.o), 'levels 1-11: fewer pions for the player');
+    assert.ok(info.levels.slice(11).every(l => l.h === 3) && info.levels.slice(11, 17).every(l => l.h === l.o), 'later: as many pions');
+    assert.equal(info.levels[0].h, 1);
     const counts = info.levels.map(l => l.opp.length);
-    assert.deepEqual([counts[0], counts[5], counts[13]], [1, 2, 3]);
-    // strength never decreases from one run of opponents to the next (breathers when a new opponent or pion arrives are allowed)
+    assert.ok(counts[0] === 1 && counts[18] === 3 && counts[19] === 3, 'one opponent first, three at the end');
     const strength = info.levels.map(l => l.opp.reduce((a, b) => a + b, 0) / l.opp.length);
     assert.ok(strength[19] > strength[0] + 3, 'last level not tougher than the first');
     for (const k of ['mode', 'level', 'phase', 'game', 'over', 'turn', 'roll']) assert.ok(k in info.st, 'state() lacks ' + k);
     await context.close();
-    console.log('        opponents per level: ' + info.levels.map(l => l.opp.join('')).join(' '));
+    console.log('        level table (you vs each opponent, strengths): ' + info.levels.map(l => `${l.h}v${l.o}:${l.opp.join('')}`).join(' '));
   });
 
   // ------------------------------------------------------------------------------------- the die
@@ -315,16 +317,31 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     assert.ok(duel(5, 0, 3, 2500) > 0.56, 'tier 5 should beat tier 0');
     assert.ok(duel(3, 0, 3, 2500) > 0.52, 'tier 3 should beat tier 0');
     assert.ok(duel(1, 0, 3, 2500) > 0.5, 'tier 1 should beat tier 0');
+  });
+
+  await test('difficulty curve: measured win rates (400 games per level, tolerance +-7 points against the table of the doc), >= 85 % first, regular descent with breathers, never under 25 %', async () => {
+    const md = fs.readFileSync(path.join(__dirname, '..', 'docs', 'contenu', 'course-des-pions.md'), 'utf8');
+    const table = {};
+    md.split('\n').forEach(l => { const m = /^\|\s*(\d+)\s*\|\s*(\d)\s*\|[^|]*\|\s*(\d+) %/.exec(l); if (m) table[+m[1]] = { h: +m[2], rate: +m[3] / 100 }; });
+    assert.equal(Object.keys(table).length, 20, 'the doc lists the 20 levels with their measured rate');
     const rates = [];
     for (let n = 1; n <= 20; n++) {
-      let w = 0; const G = 250;
-      for (let s = 1; s <= G; s++) { const S = E.levelGame(n, 7000 + s); playGame(S); if (S.winner === 0) w++; }
+      let w = 0; const G = 400;
+      for (let s = 1; s <= G; s++) { const S = E.levelGame(n, 50000 + 13 * s); playGame(S); if (S.winner === 0) w++; }
       rates.push(w / G);
+      assert.equal(table[n].h, E.LEVELS[n - 1].h, `doc table: pions of level ${n}`);
+      assert.ok(Math.abs(rates[n - 1] - table[n].rate) <= 0.07, `level ${n}: measured ${(100 * rates[n - 1]).toFixed(0)} % against ${100 * table[n].rate} % in the doc`);
     }
-    rates.forEach((r, i) => assert.ok(r > 0.15 && r < 0.85, `level ${i + 1}: the test player wins ${(100 * r).toFixed(0)} %`));
+    assert.ok(rates[0] >= 0.85 && rates[1] >= 0.85, `levels 1-2: ${rates[0]}, ${rates[1]}`);
+    rates.forEach((r, i) => assert.ok(r >= 0.25, `level ${i + 1}: ${(100 * r).toFixed(0)} % is under 25 %`));
+    assert.ok(rates[19] >= 0.25 && rates[19] <= 0.36, `level 20: ${(100 * rates[19]).toFixed(0)} %, about 30 % expected`);
     const avg = (a, b) => rates.slice(a, b).reduce((x, y) => x + y, 0) / (b - a);
-    assert.ok(avg(0, 5) > avg(5, 10) + 0.08 && avg(5, 10) > avg(14, 20) + 0.05 && avg(10, 14) > avg(14, 20) + 0.02, 'win rate must fall with the number of opponents');
-    console.log('        win rate of the test player per level: ' + rates.map(r => Math.round(100 * r)).join(' ') + ' %');
+    const blocks = [avg(0, 4), avg(4, 8), avg(8, 12), avg(12, 16), avg(16, 20)];
+    for (let i = 1; i < 5; i++) assert.ok(blocks[i] < blocks[i - 1] - 0.05, `blocks of four levels must keep falling: ${blocks.map(b => b.toFixed(2))}`);
+    let breathers = 0;
+    for (let i = 1; i < 20; i++) { assert.ok(rates[i - 1] - rates[i] <= 0.2, `level ${i + 1}: drop of more than 20 points`); if (rates[i] >= rates[i - 1] + 0.02) breathers++; }
+    assert.ok(breathers >= 3, 'at least 3 breathers: ' + breathers);
+    console.log('        measured win rate per level: ' + rates.map(r => Math.round(100 * r)).join(' ') + ' %');
   });
 
   // ------------------------------------------------------------------------------------- first launch
@@ -340,8 +357,9 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     assert.equal(await page.locator('#die').getAttribute('class'), 'ready');
     const hint = (await page.locator('#msg').textContent()).trim();
     assert.match(hint, /dé/i); assert.ok(hint.split(/[.!?]/).filter(Boolean).length <= 1, 'at most one sentence of explanation: ' + hint);
-    assert.equal(await page.locator('.pion').count(), 4, '2 pions x 2 players');
-    assert.match(await page.locator('#goal').textContent(), /10 cases d’avance/, 'the star criterion is shown before playing');
+    assert.equal(await page.locator('.pion').count(), 4, '1 pion for you, 3 for the opponent');
+    assert.equal((await page.locator('#vs').textContent()).trim(), 'Toi : 1 pion · Adversaire : 3 pions', 'the handicap is announced before the game');
+    assert.match(await page.locator('#goal').textContent(), /15 cases d’avance/, 'the star criterion is shown before playing');
     await context.close();
   });
 
@@ -356,7 +374,7 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
       await page.evaluate(seed => window.__game.seed(seed), SEEDS.win[n - 1]);
       const L = (await page.evaluate(() => window.__game.levels))[n - 1];
       s = await state(page);
-      assert.equal(s.game.k, L.k); assert.equal(s.game.np, L.opp.length + 1);
+      assert.deepEqual(s.game.ks, [L.h].concat(L.opp.map(() => L.o))); assert.equal(s.game.np, L.opp.length + 1);
       assert.deepEqual(s.game.tiers, [null].concat(L.opp));
       const steps = await playOut(page);
       s = await state(page);
@@ -389,7 +407,7 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
   // ------------------------------------------------------------------------------------- gameplay details
   await test('one legal move plays itself, a choice is offered with highlighted pions, a blocked turn passes with a message', async () => {
     const { context, page } = await open();
-    await page.evaluate(() => window.__game.loadLevel(3));
+    await page.evaluate(() => window.__game.loadLevel(7));
     // 1. a 6 with two pions in base: one choice -> played alone
     await page.evaluate(seed => window.__game.seed(seed), 1);
     let S = clone((await state(page)).game);
@@ -400,7 +418,7 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     assert.ok(s.game.pos[0].some(p => p === 0) || s.game.pos[0].some(p => p > 0), 'the pion left the base without any other tap');
     assert.equal(await page.locator('.pion.go').count() >= 0, true);
     // 2. two pions on the track: the player must choose; both are highlighted, with their destination
-    S = clone(s.game); S.turn = 0; S.roll = 0; S.tries = 0; S.pos[0] = [3, 10]; S.pos[1] = [-1, -1]; S.rng = rngFor(2, S);
+    S = clone(s.game); S.turn = 0; S.roll = 0; S.tries = 0; S.pos[0] = [3, 10]; S.pos[1] = [-1, -1, -1]; S.rng = rngFor(2, S);
     await page.evaluate(g => window.__game.setGame(g), S);
     await tap(page, '#die');
     s = await state(page);
@@ -422,7 +440,7 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     await context.close();
     // 3. a throw that cannot be played: message, then the turn passes (real timing)
     const b = await open({ width: 360, height: 640 }, { instant: false });
-    await b.page.evaluate(() => window.__game.loadLevel(3));
+    await b.page.evaluate(() => window.__game.loadLevel(7));
     let T = clone((await state(b.page)).game);
     T.pos[0] = [24, 25]; T.rng = rngFor(5, T);
     await b.page.evaluate(g => window.__game.setGame(g), T);
@@ -434,11 +452,11 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
 
   await test('capture by taps: the opponent goes back to its base; on a refuge nobody is captured', async () => {
     const { context, page } = await open();
-    await page.evaluate(() => window.__game.loadLevel(3));
+    await page.evaluate(() => window.__game.loadLevel(7));
     let S = clone((await state(page)).game);
     S.pos[0] = [5, 14]; S.roll = 0; S.turn = 0;
     const q = posAt(S.seats[1], cell(S, 0, 9).xy);
-    S.pos[1] = [q, -1]; S.rng = rngFor(4, S);
+    S.pos[1] = [q, -1, -1]; S.rng = rngFor(4, S);
     await page.evaluate(g => window.__game.setGame(g), S);
     await tap(page, '#die');
     assert.equal((await state(page)).phase, 'pick');
@@ -448,7 +466,7 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     assert.equal(s.game.caps, 1, 'one capture'); assert.equal(s.game.pos[0][0], 9);
     // refuge: the same, on the 4th cell of the human path (a corner)
     const t = REF.PATHS[2].findIndex((x, k) => k > 4 && REF.SAFE.has(REF.key(x.xy)) && !x.lane);
-    S = clone(s.game); S.turn = 0; S.roll = 0; S.tries = 0; S.pos[0] = [t - 3, 12]; S.pos[1] = [posAt(S.seats[1], REF.PATHS[2][t].xy), -1]; S.caps = 0; S.rng = rngFor(3, S);
+    S = clone(s.game); S.turn = 0; S.roll = 0; S.tries = 0; S.pos[0] = [t - 3, 12]; S.pos[1] = [posAt(S.seats[1], REF.PATHS[2][t].xy), -1, -1]; S.caps = 0; S.rng = rngFor(3, S);
     await page.evaluate(g => window.__game.setGame(g), S);
     await tap(page, '#die');
     const ds = await state(page);
@@ -460,25 +478,41 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     await context.close();
   });
 
-  await test('undo: back to the start of the last human throw (same die), nothing to undo at the start', async () => {
-    const { context, page } = await open();
-    await page.evaluate(() => window.__game.loadLevel(5));
-    await page.evaluate(() => window.__game.seed(31));
+  await test('undo: takes back the choice of a pion until the next throw only (no die beyond the one already seen); never in a challenge', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { instant: false });
+    await page.evaluate(() => window.__game.loadLevel(7));
+    const S = clone((await state(page)).game);
+    S.pos[0] = [3, 10]; S.pos[1] = [-1, -1, -1]; S.turn = 0; S.roll = 0; S.tries = 0; S.rng = rngFor(2, S);
+    await page.evaluate(g => window.__game.setGame(g), S);
     assert.equal((await state(page)).canUndo, false);
     assert.equal(await page.locator('#bUndo').isDisabled(), true);
-    const start = (await state(page)).game;
-    await playSteps(page, 6);
+    await tap(page, '#die');
     let s = await state(page);
-    assert.equal(s.canUndo, true);
-    const d0 = s.game.pos;
-    // go back until the start
-    for (let k = 0; k < 20 && (await state(page)).canUndo; k++) await tap(page, '#bUndo');
+    assert.equal(s.phase, 'pick');
+    const afterOne = { rng: S.rng }; E.rnd(afterOne, 'rng');
+    const c = await page.evaluate(() => { const q = document.querySelector('.pion.go[data-i="1"]').getBoundingClientRect(); return [q.left + q.width / 2, q.top + q.height / 2]; });
+    await page.touchscreen.tap(c[0], c[1]);
     s = await state(page);
-    assert.deepEqual(s.game, start, 'back to the very start, rng included');
-    // the same throws come again
-    await playSteps(page, 6);
-    assert.deepEqual((await state(page)).game.pos, d0, 'same game after the undo');
+    assert.equal(s.game.pos[0][1], 12);
+    assert.equal(s.canUndo, true, 'the choice can be taken back');
+    assert.equal(s.game.rng, afterOne.rng, 'only the die already seen has been drawn: nothing to learn about the next ones');
+    await tap(page, '#bUndo');
+    s = await state(page);
+    assert.deepEqual(s.game.pos[0], [3, 10]); assert.equal(s.roll, 2); assert.equal(s.phase, 'pick'); assert.equal(s.game.rng, afterOne.rng);
+    assert.equal(s.canUndo, false);
+    // choose again, differently, and let the opponent throw: the window is closed
+    const c0 = await page.evaluate(() => { const q = document.querySelector('.pion.go[data-i="0"]').getBoundingClientRect(); return [q.left + q.width / 2, q.top + q.height / 2]; });
+    await page.touchscreen.tap(c0[0], c0[1]);
+    assert.equal((await state(page)).game.pos[0][0], 5);
+    await page.waitForFunction(r => window.__game.state().game.rng !== r, afterOne.rng, { timeout: 4000 });
+    assert.equal((await state(page)).canUndo, false, 'once somebody threw, no undo');
+    assert.equal(await page.locator('#bUndo').isDisabled(), true);
     await context.close();
+    // a challenge has neither "Annuler" nor "Recommencer"
+    const b = await open({ width: 360, height: 640 }, { hash: '#defi-7-30' });
+    assert.equal(await b.page.locator('footer').isHidden(), true);
+    assert.equal((await state(b.page)).canUndo, false);
+    await b.context.close();
   });
 
   await test('restart: a new game of the same level with a new seed; "Annuler" and "Recommencer" always possible', async () => {
@@ -509,6 +543,7 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     assert.match(await page.locator('#wSub').textContent(), new RegExp('tu finis ' + (lose.rank === 1 ? '1er' : lose.rank + 'e')));
     assert.equal(await page.locator('#wStars').isHidden(), true);
     assert.equal(await page.locator('#act-share').count(), 0, 'no sharing a defeat');
+    assert.equal(await page.locator('#act-again').textContent(), 'Réessayer');
     const sv = await stored(page);
     assert.equal(sv.max, 6, 'a defeat unlocks nothing'); assert.equal(sv.stars[5] || 0, 0); assert.equal(sv.cur, null);
     assert.equal((await events(page, 'level_complete')).length, 0);
@@ -546,14 +581,14 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
   });
 
   // ------------------------------------------------------------------------------------- save
-  await test('resume: a game in progress is taken back exactly after a reload, undo included, and can be finished', async () => {
-    const { context, page } = await open();
+  await test('resume: a game in progress (seed included) is taken back exactly after a reload and can be finished', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { save: { max: 12, stars: new Array(11).fill(1) } });
+    assert.match(await page.locator('#bGo').textContent(), /Niveau 12/);
     await tap(page, '#bGo');
-    await page.evaluate(() => window.__game.loadLevel(12));
-    await page.evaluate(() => window.__game.seed(77));
     await playSteps(page, 14);
     const a = await state(page);
     assert.ok(a.turns[0] > 3);
+    assert.ok(a.seed !== 0 && a.seed === (await stored(page)).cur.seed, 'the seed of the game is in the save');
     await page.reload();
     await page.waitForFunction(() => !!window.__game);
     await page.evaluate(() => window.__game.instant(true));
@@ -563,15 +598,15 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     await tap(page, '#bGo');
     b = await state(page);
     assert.deepEqual(b.game, a.game, 'identical position, dice generator and turn');
-    assert.equal(b.undoDepth, a.undoDepth);
+    assert.equal(b.seed, a.seed, 'same seed after the reload');
     assert.equal(b.canUndo, a.canUndo);
     await playOut(page);
     assert.ok((await state(page)).over);
     // an opponent in the middle of its turn plays on after a reload (real timing)
-    const c = await open({ width: 360, height: 640 }, { instant: false });
-    await c.page.evaluate(() => window.__game.loadLevel(3));
+    const c = await open({ width: 360, height: 640 }, { instant: false, save: { max: 7, stars: new Array(6).fill(1) } });
+    await tap(c.page, '#bGo');
     const G = clone((await state(c.page)).game);
-    G.turn = 1; G.roll = 6; G.turns[1] = 2; G.pos[1] = [-1, -1];
+    G.turn = 1; G.roll = 6; G.turns[1] = 2; G.pos[1] = [-1, -1, -1];
     await c.page.evaluate(g => window.__game.setGame(g), G);
     await c.page.reload();
     await c.page.waitForFunction(() => !!window.__game);
@@ -634,7 +669,8 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
 
   await test('challenge: link built from MJ_CONFIG or the http(s) address, letters/digits/hyphens only, none on a file', async () => {
     const base = 'https://example.test/jeux/ronde-vive/';
-    const { context, page } = await open({ width: 360, height: 640 }, { config: { shareBaseUrl: base } });
+    // R4: the link is origin + pathname + fragment, even when the base given by the host carries a query string
+    const { context, page } = await open({ width: 360, height: 640 }, { config: { shareBaseUrl: base + '?token=SECRET123&n=7' } });
     await page.evaluate(() => { window.__shared = []; Object.defineProperty(navigator, 'share', { configurable: true, value: d => { window.__shared.push(d); return Promise.resolve(); } }); });
     await tap(page, '#bGo');
     await page.evaluate(seed => window.__game.seed(seed), SEEDS.win[0]);
@@ -644,7 +680,7 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     const link = text.match(/https?:\/\/\S+/)[0];
     assert.equal(link, `${base}#defi-1-${exp.turns}`);
     assert.match(link.split('#')[1], /^[A-Za-z0-9-]+$/);
-    assert.ok(!/seed|graine|solution/i.test(text));
+    assert.ok(!/seed|graine|solution|SECRET|token|\?/i.test(text), 'no query string in the shared text: ' + text);
     assert.deepEqual(await events(page, 'share'), [{ source: 'mini-jeu', game: 'course-des-pions', event: 'share', kind: 'challenge' }]);
     await context.close();
     const b = await open();
@@ -657,17 +693,18 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     assert.ok(!/https?:|file:|#defi/.test(t2) && t2.includes(` ${exp.turns} tour`), 'no link on a local file: ' + t2);
     await b.context.close();
     const ctx = await browser.newContext({ ...MOBILE, viewport: { width: 360, height: 640 } });
-    await ctx.route('http://ronde.test/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: fs.readFileSync(FILE, 'utf8') }));
+    await ctx.route(/^http:\/\/ronde\.test\//, r => r.fulfill({ status: 200, contentType: 'text/html', body: fs.readFileSync(FILE, 'utf8') }));
     const hp = await ctx.newPage();
     hp.on('pageerror', e => problems.push('pageerror(http): ' + e.message));
-    await hp.goto('http://ronde.test/jeux/index.html');
+    await hp.goto('http://ronde.test/jeux/index.html?token=SECRET456&n=3');
     await hp.waitForFunction(() => !!window.__game);
     await hp.evaluate(() => { window.__game.instant(true); window.__shared = []; Object.defineProperty(navigator, 'share', { configurable: true, value: d => { window.__shared.push(d); return Promise.resolve(); } }); });
     await tap(hp, '#bGo');
     await hp.evaluate(seed => window.__game.seed(seed), SEEDS.win[0]);
     await playOut(hp);
     await tap(hp, '#act-chal');
-    assert.ok((await hp.evaluate(() => window.__shared))[0].text.includes(`http://ronde.test/jeux/index.html#defi-1-${exp.turns}`));
+    const t3 = (await hp.evaluate(() => window.__shared))[0].text;
+    assert.ok(t3.includes(`http://ronde.test/jeux/index.html#defi-1-${exp.turns}`) && !/SECRET|token/.test(t3), 'the address query is never shared: ' + t3);
     await ctx.close();
   });
 
@@ -699,6 +736,9 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     await page.locator('#res').waitFor({ state: 'visible' });
     assert.match(await page.locator('#wTitle').textContent(), /Défi relevé/);
     assert.match(await page.locator('#wChal').textContent(), /égales ou bats/);
+    assert.deepEqual(await page.locator('#acts .btn').allTextContents(), ['Renvoyer le défi', 'Accueil'], 'R3: a challenge is played once per opening');
+    assert.equal(await page.locator('#act-again').count(), 0);
+    assert.equal(await page.locator('footer').isHidden(), true, 'no Recommencer / Annuler in a challenge');
     assert.deepEqual(await events(page, 'challenge_result'), [{ source: 'mini-jeu', game: 'course-des-pions', event: 'challenge_result', level: 7, score: target, target, won: true }]);
     assert.equal((await events(page, 'level_complete')).length, 0, 'a challenge is not a level result');
     const after = await stored(page);
@@ -715,16 +755,18 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     await page.locator('#res').waitFor({ state: 'visible' });
     assert.match(await page.locator('#wChal').textContent(), /de trop/);
     assert.deepEqual((await events(page, 'challenge_result')).map(e => [e.score, e.target, e.won]), [[target, target - 1, false]]);
-    assert.equal(await page.locator('#act-again').textContent(), 'Réessayer');
-    await tap(page, '#act-again');
-    s = await state(page);
-    assert.equal(s.mode, 'chal'); assert.equal(s.over, false);
-    // lost game in a challenge
+    assert.deepEqual(await page.locator('#acts .btn').allTextContents(), ['Accueil'], 'lost challenge: nothing to retry');
+    assert.equal(await page.locator('#act-again').count(), 0);
+    // a new opening of the link is a new challenge: a lost game this time
+    await tap(page, '#act-home');
+    await page.evaluate(h => { location.hash = h; }, `#defi-7-${target}`);
     await page.evaluate(seed => window.__game.seed(seed), SEEDS.lose[7].seed);
     await playOut(page);
     await page.locator('#res').waitFor({ state: 'visible' });
     assert.match(await page.locator('#wChal').textContent(), /Défi raté/);
-    assert.equal((await events(page, 'challenge_result')).pop().won, false);
+    const res = await events(page, 'challenge_result');
+    assert.deepEqual(res.map(e => e.won), [false, false], 'one challenge_result per opening');
+    assert.equal((await events(page, 'challenge_open')).length, 2);
     await context.close();
     // a challenge in progress survives a reload (even locked), the run still untouched
     ({ context, page } = await open({ width: 360, height: 640 }, {}, {}));
@@ -741,7 +783,7 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
   });
 
   await test('challenge: malformed fragments are ignored without error, a pasted link opens a challenge on an open page', async () => {
-    for (const h of ['#defi-999-3', '#defi-abc', '#defi-0-3', '#defi-5-0', '#defi-5', '#defi-1-2-3', '#defi--4', '#defi-3-99999', '#autre', '#defi-7-x']) {
+    for (const h of ['#defi-999-3', '#defi-abc', '#defi-0-3', '#defi-5-0', '#defi-5', '#defi-1-2-3', '#defi--4', '#defi-3-99999', '#autre', '#defi-7-x', '#defi-15-5', '#defi-3-100']) {
       const { context, page } = await open({ width: 360, height: 640 }, { hash: h });
       const s = await state(page);
       assert.equal(s.mode, 'level', 'junk link accepted: ' + h); assert.equal(s.screen, 'home');
@@ -850,12 +892,12 @@ const cell = (S, p, pos) => REF.whereIs(S.seats[p], pos);
     console.log('        estimated minutes (normal / accelerated): ' + Object.keys(est).map(n => `L${n} ${est[n].normal.toFixed(1)}/${est[n].fast.toFixed(1)}`).join('  '));
     // the button really shortens the wait: a human throw and the opponent's answer, in real time
     const { context, page } = await open({ width: 360, height: 640 }, { instant: false });
-    await page.evaluate(() => window.__game.loadLevel(1));
+    await page.evaluate(() => window.__game.loadLevel(7));
     let rng = 1;
     for (;; rng++) { const q = { rng }; if ([0, 1].every(() => Math.floor(E.rnd(q, 'rng') * 6) + 1 <= 4)) break; }
     const round = async () => {
       const S = clone((await state(page)).game);
-      S.pos = [[10, -1], [10, -1]]; S.turn = 0; S.roll = 0; S.tries = 0; S.turns = [1, 0]; S.rng = rng; S.rng2 = 3;
+      S.pos = [[10, -1], [10, -1, -1]]; S.turn = 0; S.roll = 0; S.tries = 0; S.turns = [1, 0]; S.rng = rng; S.rng2 = 3;
       await page.evaluate(g => window.__game.setGame(g), S);
       const t0 = Date.now();
       await tap(page, '#die');

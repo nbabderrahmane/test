@@ -69,6 +69,12 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
   await page.waitForFunction(() => !!window.__game);
   return { context, page };
 }
+// reload and wait for the NEW page (a marker set on the old one must be gone)
+async function reload(page) {
+  await page.evaluate(() => { window.__old = true; });
+  await page.reload();
+  await page.waitForFunction(() => !!window.__game && !window.__old);
+}
 const state = page => page.evaluate(() => window.__game.state());
 const msgs = page => page.evaluate(() => new Promise(r => setTimeout(() => r(window.__msgs), 40)));
 const events = async (page, name) => (await msgs(page)).filter(m => m.event === name);
@@ -391,8 +397,7 @@ function checkFit(m, tag) {
     await tapWords(page, [fam(6, 0)[1], fam(6, 2)[1]], false);    // two words selected
     const before = await state(page);
     assert.equal(before.found.length, 1); assert.equal(before.errors, 1); assert.equal(before.selected.length, 2);
-    await page.reload();
-    await page.waitForFunction(() => !!window.__game);
+    await reload(page);
     assert.equal((await state(page)).screen, 'home');
     assert.match(await page.locator('#bGo').textContent(), /Continuer · Niveau 6/);
     await page.locator('#bGo').tap();
@@ -410,8 +415,7 @@ function checkFit(m, tag) {
     const { context, page } = await open();
     await load(page, 1);
     await solveByTaps(page, 1);
-    await page.reload();
-    await page.waitForFunction(() => !!window.__game);
+    await reload(page);
     assert.match(await page.locator('#bGo').textContent(), /Continuer · Niveau 2/);
     assert.equal((await page.locator('#hStars').textContent()).trim(), '3');
     await page.locator('#bGo').tap();
@@ -731,8 +735,7 @@ function checkFit(m, tag) {
     await page.locator('#bMap').tap();
     await page.locator('#bLBack').tap();
     assert.match(await page.locator('#bGo').textContent(), /Continuer · Niveau 3/);
-    await page.reload();
-    await page.waitForFunction(() => !!window.__game);
+    await reload(page);
     assert.match(await page.locator('#bGo').textContent(), /Continuer · Niveau 3/);
     await page.locator('#bGo').tap();
     assert.equal((await state(page)).level, 3);

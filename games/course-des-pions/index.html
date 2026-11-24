@@ -43,6 +43,7 @@ header{display:flex;align-items:center;gap:8px;padding:6px 12px 2px;flex:none}
 #goal span{margin-left:4px;overflow:hidden;text-overflow:ellipsis}
 #goal.chal{color:var(--gold);font-weight:700}
 
+#vs{flex:none;text-align:center;font-size:12px;color:var(--dim);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 12px;min-height:16px}
 #bwrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;margin:2px 4px}
 #board{position:relative;width:300px;height:300px;border-radius:18px;background:#1A2340;flex:none}
 .t{position:absolute;width:var(--c);height:var(--c);padding:2px}
@@ -176,7 +177,7 @@ footer{flex:none;display:flex;gap:10px;padding:4px 12px 10px}
 .cell{position:relative;min-height:48px;border-radius:14px;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;overflow:hidden}
 .cell .n{font-weight:800;font-size:19px;line-height:1;font-variant-numeric:tabular-nums}
 .cell .n svg{width:18px;height:18px;fill:#66739A}
-.cell .m{font-size:10px;color:var(--dim);line-height:1}
+.cell .m{font-size:9px;color:var(--dim);line-height:1}
 .cell .s{display:flex;gap:1px}
 .cell .s svg{width:14px;height:14px;fill:var(--off)}
 .cell .s svg.on{fill:var(--gold)}
@@ -217,6 +218,7 @@ footer{flex:none;display:flex;gap:10px;padding:4px 12px 10px}
     <div class="ttl"><span id="lvl">Niveau 1</span><div id="goal"></div></div>
     <button class="icon" id="bFast" aria-label="Accélérer les adversaires" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M3 5l8 7-8 7zM12 5l8 7-8 7z"/></svg><small id="fastT">×1</small></button>
   </header>
+  <div id="vs"></div>
   <div id="bwrap"><div id="board"></div></div>
   <div id="dock">
     <button id="die" aria-label="Lancer le dé"></button>
@@ -254,7 +256,7 @@ footer{flex:none;display:flex;gap:10px;padding:4px 12px 10px}
   <section class="scr" id="levels" hidden>
     <div class="top">
       <button class="icon" id="bLBack" aria-label="Accueil"><svg class="st" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
-      <div class="tt"><h1>Niveaux</h1><div class="sub">2 pions, puis 3 dès le niveau 11</div></div>
+      <div class="tt"><h1>Niveaux</h1><div class="sub">Pions : toi contre chaque adversaire</div></div>
       <div class="total" aria-label="Étoiles gagnées"><svg viewBox="0 0 24 24"><use href="#star"/></svg><span id="gTotal">0/60</span></div>
     </div>
     <div id="grid"></div>
@@ -295,6 +297,7 @@ var ENGINE = (function () {
   var REFUGE = {};
   [0, 4, 6, 10, 12, 16, 18, 22].forEach(function (i) { REFUGE[i] = 1; });   // 4 corners + 4 entry cells
   var SEATS = { 2: [2, 0], 3: [2, 3, 0], 4: [2, 3, 0, 1] };                 // board side of each player, clockwise order
+  var TURNS_MIN = { 1: 1, 2: 3, 3: 6 }, TURNS_MAX = 99;   // reachable scores of a challenge, by number of pions of the player
   var STAR3 = 5, STAR2 = 2;     // lead (in cells per pion) over the best opponent for 3 and 2 stars
 
   // [pions, opponent strengths]; strength 0 plays at random ... 5 plays carefully (see TIERS).
@@ -488,7 +491,7 @@ var ENGINE = (function () {
     return best;
   }
 
-  return { RING: RING, HOME: HOME, GATE: GATE, REFUGE: REFUGE, SEATS: SEATS, LEVELS: LEVELS, TIERS: TIERS, STAR3: STAR3, STAR2: STAR2,
+  return { RING: RING, HOME: HOME, GATE: GATE, REFUGE: REFUGE, SEATS: SEATS, LEVELS: LEVELS, TIERS: TIERS, STAR3: STAR3, STAR2: STAR2, TURNS_MIN: TURNS_MIN, TURNS_MAX: TURNS_MAX,
     rnd: rnd, roll: roll, ringIdx: ringIdx, newGame: newGame, levelGame: levelGame, hotGame: hotGame, legal: legal, apply: apply,
     onTrack: onTrack, finish: finish, progress: progress, remain: remain, lead: lead, starsFor: starsFor, ranking: ranking, choose: choose };
 })();
@@ -524,6 +527,10 @@ function freshSeed() {
 
 // ---- persistence (always guarded: the game works without storage) ---------------------------------
 var save = { max: 1, level: 1, stars: [], best: [], cur: null, chal: null, fast: false };
+function frontier() {   // the first level not finished yet: what "Continuer" opens
+  for (var i = 0; i < N; i++) if (!save.stars[i]) return i + 1;
+  return N;
+}
 function totalStars() { var t = 0; for (var i = 0; i < N; i++) t += save.stars[i] || 0; return t; }
 function int(v, lo, hi) { v = Math.floor(+v); return isFinite(v) && v >= lo && v <= hi ? v : null; }
 function cleanState(s, cfgLike) {   // a saved game is only taken back when it is whole and coherent
@@ -566,7 +573,7 @@ function cleanPack(o, n) {   // {S, undo: [S...]} for level n (0 = none expected
   if (!S || S.over) return null;
   var undo = [];
   if (Array.isArray(o.undo)) o.undo.slice(-10).forEach(function (u) { var c = cleanState(u, cfg); if (c && !c.over) undo.push({ rng: c.rng, st: c }); });
-  return { S: S, undo: undo };
+  return { S: S, undo: undo, seed: o.seed | 0 };
 }
 function loadSave() {
   var i;
@@ -575,18 +582,19 @@ function loadSave() {
   try {
     var s = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (!s || typeof s !== 'object') return;
-    var mx = int(s.max, 1, N), lv = int(s.level, 1, N);
+    var mx = int(s.max, 1, N);
     save.max = mx === null ? 1 : mx;
-    save.level = Math.min(lv === null ? 1 : lv, save.max);
     if (Array.isArray(s.stars)) for (i = 0; i < N && i < s.stars.length; i++) save.stars[i] = int(s.stars[i], 0, 3) || 0;
     if (Array.isArray(s.best)) for (i = 0; i < N && i < s.best.length; i++) save.best[i] = int(s.best[i], 0, 9999) || 0;
     save.fast = s.fast === true;
-    if (s.cur && s.cur.level === save.level) { var c = cleanPack(s.cur, save.level); if (c) save.cur = { level: save.level, S: c.S, undo: c.undo.map(function (u) { return u.st; }) }; }
+    var cl = s.cur && int(s.cur.level, 1, N);
+    if (cl) { var c = cleanPack(s.cur, cl); if (c) save.cur = { level: cl, seed: c.seed, S: c.S, undo: c.undo.map(function (u) { return u.st; }) }; }
     if (s.chal && int(s.chal.level, 1, N) && int(s.chal.target, 1, 999)) {
       var d = cleanPack(s.chal, s.chal.level);
-      if (d) save.chal = { level: s.chal.level, target: s.chal.target, S: d.S, undo: d.undo.map(function (u) { return u.st; }) };
+      if (d) save.chal = { level: s.chal.level, target: s.chal.target, seed: d.seed, S: d.S, undo: d.undo.map(function (u) { return u.st; }) };
     }
   } catch (e) { /* no usable storage: play without it */ }
+  save.level = frontier();
 }
 function store() {
   try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) { /* ignore */ }
@@ -598,7 +606,7 @@ var G = null, screen = 'home', timer = 0, note = null, noteTimer = 0;
 function humanAt(p) { return G.S.tiers[p] === null; }
 function persist() {
   if (!G || G.kind === 'hot') return;
-  var pack = { level: G.level, S: G.over ? null : G.S, undo: G.undo.slice(-10).map(function (u) { return u.st; }) };
+  var pack = { level: G.level, seed: G.seed, S: G.S.over ? null : G.S, undo: G.undo.slice(-10).map(function (u) { return u.st; }) };
   if (G.kind === 'level') save.cur = G.S.over ? null : pack;
   else { pack.target = G.target; save.chal = G.S.over ? null : pack; }
   store();
@@ -618,15 +626,14 @@ function begin(g) {
 }
 function startLevel(n, pack) {
   var g = newGameFor('level', n);
-  if (pack) { g.S = pack.S; g.undo = pack.undo.map(function (s) { return { rng: s.rng, st: s }; }); g.seed = 0; }
+  if (pack) { g.S = pack.S; g.undo = pack.undo.map(function (s) { return { rng: s.rng, st: s }; }); g.seed = pack.seed; }
   else { save.cur = null; }
   begin(g);
-  if (!pack) { save.level = n; if (n > save.max) save.max = n; }
   persist(); store();
 }
 function startChal(n, target, pack) {
   var g = newGameFor('chal', n, { target: target });
-  if (pack) { g.S = pack.S; g.undo = pack.undo.map(function (s) { return { rng: s.rng, st: s }; }); g.seed = 0; }
+  if (pack) { g.S = pack.S; g.undo = pack.undo.map(function (s) { return { rng: s.rng, st: s }; }); g.seed = pack.seed; }
   begin(g);
   persist();
 }
@@ -638,7 +645,7 @@ function replay() {   // a new game of the same kind (new seed)
 }
 
 // ---- pacing: delays shrink when "accelerate" is on; the test hook removes them ----------------------
-var T = { botRoll: 230, botMove: 300, auto: 220, none: 600, after: 100, end: 500 };
+var T = { botRoll: 230, botMove: 300, auto: 220, none: 600, after: 100, end: 500, undoWin: 450 };
 var fast = false;
 function wait(ms, fn) {
   var my = gen;
@@ -658,7 +665,7 @@ function step() {
   var S = G.S, p = S.turn, human = humanAt(p);
   refresh();
   if (S.roll === 0) {
-    if (human) { snap(); refresh(); return; }
+    if (human) { refresh(); return; }
     wait(T.botRoll, doRoll);
     return;
   }
@@ -677,15 +684,18 @@ function step() {
 }
 function doRoll() {
   if (!G || G.S.over || G.S.roll !== 0) return;
+  G.undo = [];
   ENGINE.roll(G.S);
   say('');
   persist();
   dieSpin = true;
   step();
 }
-function resolve(mv) {
+function resolve(mv, choice) {
   var S = G.S, before = S.pos.map(function (r) { return r.slice(); });
   var six = S.roll === 6, p0 = S.turn;
+  // taking a choice back is only possible until the next throw (nobody has seen a die beyond the one already shown)
+  if (choice && G.kind !== 'chal') G.undo = [{ rng: S.rng, st: clone(S) }];
   if (mv) ENGINE.apply(S, mv);
   ENGINE.finish(S, !!mv);
   if (mv && mv.cap.length) say('Pion renvoyé à sa base !', 'warn', 1500);
@@ -695,26 +705,17 @@ function resolve(mv) {
   movePions(before);
   refresh();
   if (S.over) { wait(T.end, finishGame); return; }
-  wait(T.after, step);
-}
-function snap() {   // state at the start of each human throw: what "Annuler" goes back to
-  var S = G.S, top = G.undo[G.undo.length - 1];
-  if (top && top.rng === S.rng) return;
-  G.undo.push({ rng: S.rng, st: clone(S) });
-  if (G.undo.length > 10) G.undo.shift();
-  persist();
+  wait(T.after + (choice && G.kind !== 'chal' ? T.undoWin : 0), step);
 }
 function canUndo() {
-  if (!G || G.S.over || !G.undo.length) return false;
-  var top = G.undo[G.undo.length - 1];
-  return top.rng !== G.S.rng || G.S.roll !== 0 ? true : G.undo.length >= 2;
+  return !!G && G.kind !== 'chal' && !G.S.over && G.undo.length === 1 && G.undo[0].st.rng === G.S.rng;
 }
 function undo() {
   if (!canUndo()) return;
-  var top = G.undo[G.undo.length - 1];
-  if (top.rng === G.S.rng && G.S.roll === 0) { G.undo.pop(); top = G.undo[G.undo.length - 1]; }
+  var top = G.undo[0];
   gen++; clearTimeout(timer);
   G.S = clone(top.st);
+  G.undo = [];
   say('');
   persist();
   drawn = null;
@@ -728,7 +729,7 @@ function tapPion(p, i) {
   if (!G || screen !== 'game' || G.S.over || G.S.roll === 0 || p !== G.S.turn || !humanAt(p)) return;
   var mv = ENGINE.legal(G.S, p, G.S.roll), k;
   if (mv.length < 2) return;
-  for (k = 0; k < mv.length; k++) if (G.S.pos[p][mv[k].i] === G.S.pos[p][i]) { clearTimeout(timer); resolve(mv[k]); return; }
+  for (k = 0; k < mv.length; k++) if (G.S.pos[p][mv[k].i] === G.S.pos[p][i]) { clearTimeout(timer); resolve(mv[k], true); return; }
 }
 
 // ---- end of a game ---------------------------------------------------------------------------------
@@ -743,9 +744,9 @@ function finishGame() {
       if (stars > (save.stars[n - 1] || 0)) save.stars[n - 1] = stars;
       if (!result.prevBest || turns < result.prevBest) save.best[n - 1] = turns;
       if (n < N) save.max = Math.max(save.max, n + 1);
-      save.level = save.max;
       ev.push({ event: 'level_complete', level: n, score: turns, stars: stars });
     }
+    save.level = frontier();
     save.cur = null;
   } else if (G.kind === 'chal') {
     result.chalOk = win && turns <= G.target;
@@ -780,9 +781,9 @@ function showResult() {
     c.className = 'cres' + (r.chalOk ? '' : ' lost');
   }
   if (hot) acts = [['again', 'Rejouer', 'acc'], ['home', 'Accueil', 'line']];
-  else if (r.kind === 'chal') acts = [['again', 'Réessayer', 'acc'], ['home', 'Accueil', 'line']];
+  else if (r.kind === 'chal') acts = r.chalOk ? [['chal', 'Renvoyer le défi', 'acc'], ['home', 'Accueil', 'line']] : [['home', 'Accueil', 'acc']];   // a challenge is played once per opening
   else if (r.win) acts = [['next', result.level < N ? 'Suivant' : 'Niveaux', 'acc'], [['again', 'Rejouer', 'line'], ['share', 'Partager', 'line']], ['chal', 'Défier un ami', 'line']];
-  else acts = [['again', 'Rejouer', 'acc'], ['menu', 'Niveaux', 'line']];
+  else acts = [['again', 'Réessayer', 'acc'], ['menu', 'Niveaux', 'line']];
   $('acts').innerHTML = acts.map(function (a) {
     if (typeof a[0] === 'string') return '<button class="btn ' + a[2] + '" data-act="' + a[0] + '" id="act-' + a[0] + '">' + a[1] + '</button>';
     return '<div class="row">' + a.map(function (b) { return '<button class="btn ' + b[2] + '" data-act="' + b[0] + '" id="act-' + b[0] + '">' + b[1] + '</button>'; }).join('') + '</div>';
@@ -794,10 +795,13 @@ function showResult() {
 // ---- sharing ---------------------------------------------------------------------------------------
 function starsText(s) { var st = ''; while (s--) st += '⭐'; return st; }
 function shareText() { return NAME + ' · Niveau ' + result.level + ' · ' + starsText(result.stars) + ' en ' + plural(result.turns, 'tour'); }
-function shareBase() {
+function shareBase() {   // origin + pathname only: never the query string of the host page
   var b = window.MJ_CONFIG && window.MJ_CONFIG.shareBaseUrl;
-  if (typeof b !== 'string' || !b) b = /^https?:/i.test(String(location.href)) ? String(location.href) : '';
-  return b.split('#')[0];
+  if (typeof b !== 'string' || !b) b = String(location.href);
+  try {
+    var u = new URL(b);
+    return /^https?:$/.test(u.protocol) ? u.origin + u.pathname : '';
+  } catch (e) { return ''; }
 }
 function challengeText() {
   var base = shareBase(), link = base ? base + '#defi-' + result.level + '-' + result.turns : '';
@@ -838,7 +842,7 @@ function openChallenge() {
   try { if (h) history.replaceState(null, '', String(location.href).split('#')[0]); } catch (e) { /* ignore */ }
   if (!m) return false;
   var n = +m[1], target = +m[2];
-  if (n < 1 || n > N || target < 1) return false;
+  if (n < 1 || n > N || target < ENGINE.TURNS_MIN[ENGINE.LEVELS[n - 1].h] || target > ENGINE.TURNS_MAX) return false;
   save.chal = null;
   startChal(n, target);
   show('game');
@@ -986,6 +990,9 @@ function refresh() {
   if (hot) goal.innerHTML = '<span>Rentre tes pions le premier</span>';
   else if (G.kind === 'chal') goal.innerHTML = '<span>Objectif : ' + plural(G.target, 'tour') + ' ou moins</span>';
   else goal.innerHTML = starSvg(1) + starSvg(1) + starSvg(1) + '<span>' + ENGINE.STAR3 * S.k + ' cases d’avance</span>';
+  var kk = S.ks, same = kk.slice(1).every(function (x) { return x === kk[1]; });
+  $('vs').textContent = hot ? 'Chacun : ' + plural(kk[0], 'pion') : 'Toi : ' + plural(kk[0], 'pion') + ' · ' + (kk.length === 2 ? 'Adversaire' : (kk.length - 1) + ' adversaires') + ' : ' + plural(kk[1], 'pion') + (kk.length > 2 && same ? ' chacun' : '');
+  document.querySelector('footer').hidden = G.kind === 'chal';
   $('tn').textContent = hot ? S.turns[over ? S.winner : p] : S.turns[0];
   // die
   var d = $('die'), v = S.roll || S.last, ready = !over && S.roll === 0 && human;
@@ -1043,8 +1050,8 @@ function renderLevels() {
   for (var n = 1; n <= N; n++) {
     var s = save.stars[n - 1] || 0, open = n <= save.max, L = ENGINE.LEVELS[n - 1];
     html += '<button class="cell' + (n === save.level ? ' cur' : '') + (s ? ' ok' : '') + '" data-level="' + n + '"' + (open ? '' : ' disabled') +
-      ' aria-label="Niveau ' + n + ', ' + L.h + ' contre ' + L.o + ' pions, ' + plural(L.opp.length, 'adversaire') + (open ? ', ' + plural(s, 'étoile') : ', verrouillé') + '">' +
-      '<span class="n">' + (open ? n : LOCK) + '</span><span class="m">contre ' + L.opp.length + '</span><span class="s">' + starSvg(s >= 1) + starSvg(s >= 2) + starSvg(s >= 3) + '</span></button>';
+      ' aria-label="Niveau ' + n + ', ' + L.h + ' pions contre ' + L.o + ', ' + plural(L.opp.length, 'adversaire') + (open ? ', ' + plural(s, 'étoile') : ', verrouillé') + '">' +
+      '<span class="n">' + (open ? n : LOCK) + '</span><span class="m">' + L.h + ' vs ' + L.o + ' pions</span><span class="m">' + L.opp.length + ' adv.</span><span class="s">' + starSvg(s >= 1) + starSvg(s >= 2) + starSvg(s >= 3) + '</span></button>';
   }
   $('grid').innerHTML = html;
   $('gTotal').textContent = totalStars() + '/' + (N * 3);
@@ -1059,14 +1066,14 @@ function renderHot() {
   $('hotl').innerHTML = h;
 }
 function goContinue() {
-  var n = save.level;
+  var n = frontier();
   if (G && G.kind === 'level' && G.level === n && !G.S.over) { show('game'); return; }
   startLevel(n, save.cur && save.cur.level === n ? save.cur : null);
   show('game');
 }
 function pickLevel(n) {
   if (G && G.kind === 'level' && G.level === n && !G.S.over) { show('game'); return; }
-  startLevel(n);
+  startLevel(n, save.cur && save.cur.level === n ? save.cur : null);
   show('game');
 }
 function openGrid() {
@@ -1081,13 +1088,26 @@ document.addEventListener('pointerdown', function () { pressing = true; }, true)
 ['pointerup', 'pointercancel'].forEach(function (ev) {
   document.addEventListener(ev, function () { pressing = false; lastUp = Date.now(); }, true);
 });
+// One gesture, one reaction: a press never also acts on what appears under the finger a moment later,
+// and a double tap on the die or on a pion is one action. (No delay in the test hook's instant mode.)
+var lastTap = { t: 0, x: 0, y: 0, k: '' };
+function allow(kind, e) {
+  var now = Date.now(), x = e && e.clientX || 0, y = e && e.clientY || 0;
+  if (!instant && lastTap.k) {
+    var dt = now - lastTap.t;
+    if (lastTap.k === kind && (kind === 'die' || kind === 'pion') && dt < 350) return false;
+    if (lastTap.k !== kind && dt < 350 && Math.abs(x - lastTap.x) < 60 && Math.abs(y - lastTap.y) < 60) return false;
+  }
+  lastTap = { t: now, x: x, y: y, k: kind };
+  return true;
+}
 function onTap(el, fn) {
   var down = false;
   el.addEventListener('pointerdown', function () { down = true; });
   el.addEventListener('pointerleave', function () { down = false; });
   el.addEventListener('pointercancel', function () { down = false; });
-  el.addEventListener('pointerup', function (e) { if (!down) return; down = false; fn(e); });
-  el.addEventListener('click', function (e) { if (!stray()) fn(e); });
+  el.addEventListener('pointerup', function (e) { if (!down) return; down = false; if (allow('ui', e)) fn(e); });
+  el.addEventListener('click', function (e) { if (!stray() && allow('ui', e)) fn(e); });
 }
 function closestAttr(node, attr) {
   while (node && node !== document.body) {
@@ -1097,15 +1117,15 @@ function closestAttr(node, attr) {
   return null;
 }
 // the die and the pions answer on the press itself (one gesture, one reaction)
-$('die').addEventListener('pointerdown', function () { tapDie(); });
-$('die').addEventListener('click', function () { if (!stray()) tapDie(); });
+$('die').addEventListener('pointerdown', function (e) { if (allow('die', e)) tapDie(); });
+$('die').addEventListener('click', function (e) { if (!stray() && allow('die', e)) tapDie(); });
 board.addEventListener('pointerdown', function (e) {
   var t = closestAttr(e.target, 'data-p');
-  if (t) tapPion(+t.getAttribute('data-p'), +t.getAttribute('data-i'));
+  if (t && allow('pion', e)) tapPion(+t.getAttribute('data-p'), +t.getAttribute('data-i'));
 });
 board.addEventListener('click', function (e) {
   var t = closestAttr(e.target, 'data-p');
-  if (t && !stray()) tapPion(+t.getAttribute('data-p'), +t.getAttribute('data-i'));
+  if (t && !stray() && allow('pion', e)) tapPion(+t.getAttribute('data-p'), +t.getAttribute('data-i'));
 });
 onTap($('grid'), function (e) { var c = closestAttr(e.target, 'data-level'); if (c && !c.disabled) pickLevel(+c.getAttribute('data-level')); });
 onTap($('hotl'), function (e) { var c = closestAttr(e.target, 'data-np'); if (c) { startHot(+c.getAttribute('data-np')); show('game'); } });
@@ -1143,7 +1163,7 @@ fast = save.fast;
   if (cg) { screen = 'game'; startChal(cg.level, cg.target, cg); show('game'); }
   else {
     save.chal = null;
-    startLevel(save.level, save.cur && save.cur.level === save.level ? save.cur : null);
+    if (save.cur) startLevel(save.cur.level, save.cur); else startLevel(save.level);
     show('home');
   }
   if (/^#defi-/.test(location.hash)) openChallenge();

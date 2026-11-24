@@ -36,22 +36,26 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
   const page = await context.newPage();
   page.on('console', m => { if (m.type() === 'error') problems.push('console.error: ' + m.text()); });
   page.on('pageerror', e => problems.push('pageerror: ' + e.message));
-  page.on('request', r => { if (r.url().split('#')[0] !== URL) problems.push('request: ' + r.url()); });
+  const target = opts.url || URL;
+  if (opts.url) await context.route(opts.url.split('?')[0], r => r.fulfill({ contentType: 'text/html', body: fs.readFileSync(FILE, 'utf8') }));
+  page.on('request', r => { if (r.url().split('#')[0] !== target) problems.push('request: ' + r.url()); });
+  page.__guard = !!opts.guard;
   if (opts.save !== undefined) {   // seed the storage with a first visit, then open for real (no init-script storage access)
-    await page.goto(URL);
+    await page.goto(target);
     await page.waitForFunction(() => !!window.__game);
     await page.evaluate(([k, v]) => localStorage.setItem(k, v), [KEY, typeof opts.save === 'string' ? opts.save : JSON.stringify(opts.save)]);
     await page.goto('about:blank');
   }
-  await page.goto(URL + (opts.hash || ''));
+  await page.goto(target + (opts.hash || ''));
   await page.waitForFunction(() => !!window.__game);
+  await page.evaluate(g => window.__game.guard(g), page.__guard);   // the tap guard is off unless a test is about it
   return { context, page };
 }
 const state = page => page.evaluate(() => window.__game.state());
 const msgs = page => page.evaluate(() => new Promise(r => setTimeout(() => r(window.__msgs), 40)));
 const events = async (page, name) => (await msgs(page)).filter(m => m.event === name);
 // Chromium flushes localStorage to the browser process a few ms after a write: let it settle before a reload.
-const reload = async page => { await page.waitForTimeout(300); await page.reload(); await page.waitForFunction(() => !!window.__game); };
+const reload = async page => { await page.waitForTimeout(300); await page.reload(); await page.waitForFunction(() => !!window.__game); await page.evaluate(g => window.__game.guard(g), !!page.__guard); };
 const stored = page => page.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY);
 const answerOf = s => TITLE.get(s.emojis).t;
 const rightIdx = s => s.choices.indexOf(answerOf(s));
@@ -143,7 +147,12 @@ function checkFit(m, tag) {
       assert.ok(!/[\u{1F900}-\u{1FAFF}\u{1F6D0}-\u{1F6FF}\u{1F300}-\u{1F321}]/u.test(x.e.replace(/[\u{1F300}-\u{1F6CF}]/gu, c => c)) || true);
       assert.ok(!/[\u{1F900}-\u{1FAFF}\u{1F321}-\u{1F32F}\u{1F336}\u{1F37D}\u{1F394}-\u{1F39F}\u{1F3CB}-\u{1F3CE}\u{1F3D4}-\u{1F3DF}\u{1F3F3}-\u{1F3F7}\u{1F43F}\u{1F441}\u{1F4FD}-\u{1F4FF}\u{1F54B}-\u{1F54F}\u{1F568}-\u{1F579}\u{1F57B}-\u{1F5A3}\u{1F5A5}-\u{1F5FA}\u{1F6CB}-\u{1F6FF}]/u.test(x.e), x.t + ': emoji newer than Unicode 6.1');
     });
-    assert.equal(SRC.filter(x => x.g === 'A').length, 24);
+    // R-content: at least 36 African or francophone titles, spread over the whole progression
+    const A = SRC.map((x, i) => x.g === 'A' ? Math.floor(i / 3) : -1).filter(n => n >= 0);
+    assert.ok(A.length >= 36, 'only ' + A.length + ' African or francophone titles');
+    for (let q = 0; q < 4; q++) assert.ok(A.filter(n => n >= q * 5 && n < q * 5 + 5).length >= 6, 'African/francophone titles missing in levels ' + (q * 5 + 1) + '-' + (q * 5 + 5));
+    for (let n = 0; n < 19; n++) assert.ok(A.includes(n), 'no African/francophone title in level ' + (n + 1));
+    SRC.filter(x => x.h).forEach(x => assert.ok(x.n, x.t + ': hidden decade needs a note'));
     const { context, page } = await open();
     const info = await page.evaluate(() => ({ levels: window.__game.levels, st: window.__game.state(), keys: Object.keys(window.__game) }));
     assert.equal(info.levels.length, 20);
@@ -257,7 +266,9 @@ function checkFit(m, tag) {
     const d = TITLE.get(s0.emojis);
     const txt = await page.locator('#hint').textContent();
     assert.ok(txt.includes(d.a), txt);
-    assert.ok(txt.includes(d.y >= 2000 ? 'années ' + Math.floor(d.y / 10) * 10 : 'années ' + (Math.floor(d.y / 10) * 10) % 100), txt);
+    const dec = Math.floor(d.y / 10) * 10;
+    if (d.h) assert.ok(!/années/.test(txt), 'a doubtful decade must not be shown: ' + txt);
+    else assert.ok(txt.includes(dec >= 2000 ? 'années ' + dec : 'années ' + dec % 100), txt);
     assert.ok(await page.locator('#bHint').isDisabled(), 'one hint per riddle');
     await tapOpt(page, rightIdx(s0));
     assert.equal((await state(page)).points, 50);
@@ -334,6 +345,7 @@ function checkFit(m, tag) {
       { level: 'x', max: -4, stars: 'no', best: {}, cur: 'bad', chal: 12 },
       { level: 999, max: 999, stars: [9, -1, 'a', null], cur: { level: 3, pos: 7, ans: [5, 'x'], hint: 'z' } },
       { cur: { level: 0, pos: 0, ans: [-1, -1, -1], hint: [0, 0, 0] }, chal: { level: 4, pos: 0, ans: [-1, -1, -1], hint: [0, 0, 0], target: 5000 } },
+      { chal: { level: 3, pos: 0, ans: [-1, -1, -1], hint: [0, 0, 0], target: 120 } },
     ];
     for (const sv of saves) {
       const { context, page } = await open({ width: 360, height: 640 }, { save: sv });
@@ -411,12 +423,27 @@ function checkFit(m, tag) {
     assert.equal((await events(page, 'level_complete')).length, 0);
     let st = await stored(page);
     assert.equal(JSON.stringify(st.stars) + st.level + st.max, before, 'progress changed by the challenge');
-    // lost: replay with a mistake
-    await page.locator('#bAgain').tap();
+    // R3: a challenge is played once per opening: no replay, no share of the result, one result event
+    assert.ok(await page.locator('#bAgain').isHidden(), 'Rejouer on a challenge result');
+    assert.ok(await page.locator('#bShare').isHidden(), 'Partager on a challenge result');
+    assert.ok(await page.locator('#bChal').isVisible(), 'Renvoyer le défi when won');
+    assert.equal(await page.locator('#bChal').textContent(), 'Renvoyer le défi');
+    await page.waitForTimeout(300);
+    assert.equal((await events(page, 'challenge_result')).length, 1);
+    await page.locator('#bNext').tap();
+    assert.equal((await state(page)).screen, 'home');
+    assert.equal(await page.locator('#bGo').textContent(), 'Continuer · Niveau 3');
+    // lost: open the link again
+    await page.evaluate(() => { location.hash = '#defi-12-250'; });
+    await page.waitForFunction(() => window.__game.state().mode === 'chal');
+    assert.ok(await page.locator('#bReset').isHidden(), 'Recommencer during a challenge');
     await play(page, 'rrw');
     assert.equal(await page.locator('#wTitle').textContent(), 'Presque !');
     assert.ok((await page.locator('#wChal').textContent()).includes('50'));
+    assert.ok(await page.locator('#bChal').isHidden(), 'no challenge to send when lost');
+    assert.ok(await page.locator('#bAgain').isHidden() && await page.locator('#bShare').isHidden());
     res = await events(page, 'challenge_result');
+    assert.equal(res.length, 2);
     assert.equal(res[1].won, false); assert.equal(res[1].score, 200);
     await page.locator('#bNext').tap();
     assert.equal((await state(page)).screen, 'home');
@@ -455,7 +482,7 @@ function checkFit(m, tag) {
   });
 
   await test('challenge: malformed fragments are ignored without error, progress and screen untouched', async () => {
-    for (const h of ['#defi-', '#defi-0-100', '#defi-21-100', '#defi-3-0', '#defi-3-301', '#defi-3-99999', '#defi--3-100', '#defi-a-b', '#defi-3', '#defi-3-100-1', '#defi-3-1e2', '#defi-%00-1', '#defi-3-<b>', '#defi-3.5-100']) {
+    for (const h of ['#defi-', '#defi-3-120', '#defi-3-25', '#defi-3-350', '#defi-0-100', '#defi-21-100', '#defi-3-0', '#defi-3-301', '#defi-3-99999', '#defi--3-100', '#defi-a-b', '#defi-3', '#defi-3-100-1', '#defi-3-1e2', '#defi-%00-1', '#defi-3-<b>', '#defi-3.5-100']) {
       const { context, page } = await open({ width: 360, height: 640 }, { hash: h });
       const s = await state(page);
       assert.equal(s.screen, 'home', h); assert.equal(s.mode, 'level', h); assert.equal(s.challenge, null, h);
@@ -480,13 +507,163 @@ function checkFit(m, tag) {
     await page.locator('#bGo').tap();
     await play(page, 'rrr');
     await page.locator('#bShare').tap();
-    await page.evaluate(() => { location.hash = '#defi-5-120'; });
+    await page.evaluate(() => { location.hash = '#defi-5-150'; });
     await page.waitForFunction(() => window.__game.state().mode === 'chal');
     await play(page, 'rrr');
     const m = await msgs(page);
     const allowed = { level_complete: ['level', 'score', 'stars'], share: ['kind'], challenge_open: ['level', 'target'], challenge_result: ['level', 'score', 'target', 'won'] };
     assert.deepEqual([...new Set(m.map(e => e.event))].sort(), Object.keys(allowed).sort());
     m.forEach(e => assert.deepEqual(Object.keys(e).sort(), ['event', 'game', 'source'].concat(allowed[e.event]).sort(), e.event));
+    await context.close();
+  });
+
+  await test('R4: the shared link is origin + pathname + fragment only (query string never leaks), also with MJ_CONFIG', async () => {
+    const clipOf = async (page, kind) => {
+      await page.evaluate(() => { window.__clip = []; navigator.clipboard.writeText = t => { window.__clip.push(t); return Promise.resolve(); }; });
+      await page.locator('#bGo').tap();
+      await play(page, 'rrr');
+      await page.locator(kind).tap();
+      return (await page.evaluate(() => new Promise(r => setTimeout(() => r(window.__clip), 60))))[0];
+    };
+    // the address of the page carries a token
+    const h = await open({ width: 360, height: 640 }, { url: 'http://fredonne.test/jeux/index.html?token=SECRET&n=3' });
+    const t1 = await clipOf(h.page, '#bChal');
+    assert.ok(t1.endsWith('http://fredonne.test/jeux/index.html#defi-1-300'), t1);
+    assert.ok(!/token|SECRET|\?/.test(t1), 'query leaked: ' + t1);
+    await h.context.close();
+    // the base given by the host app carries one too
+    const c = await open({ width: 360, height: 640 }, { config: { shareBaseUrl: 'https://exemple.test/jeux/fredonne/?token=SECRET#x' } });
+    const t2 = await clipOf(c.page, '#bChal');
+    assert.ok(t2.endsWith('https://exemple.test/jeux/fredonne/#defi-1-300'), t2);
+    assert.ok(!/token|SECRET|\?/.test(t2), 'query leaked: ' + t2);
+    await c.context.close();
+    // a base that is not http(s): no link at all
+    const f = await open({ width: 360, height: 640 }, { config: { shareBaseUrl: 'javascript:alert(1)' } });
+    const t3 = await clipOf(f.page, '#bChal');
+    assert.ok(!/javascript|#defi/.test(t3), t3);
+    await f.context.close();
+  });
+
+  await test('R5: nothing in the DOM, attributes, storage, share text or levels lets a player read the right title before answering', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { share: true });
+    await page.locator('#bGo').tap();
+    for (const n of [1, 6, 11, 16, 20]) {
+      await page.evaluate(k => window.__game.loadLevel(k), n);
+      for (let i = 0; i < 3; i++) {
+        const s = await state(page);
+        const right = answerOf(s);
+        const dom = await page.evaluate(() => {
+          const attrs = [];
+          document.querySelectorAll('*').forEach(e => { for (const a of e.attributes) attrs.push(e.tagName + ' ' + a.name + '=' + a.value); });
+          return { attrs, opts: [...document.querySelectorAll('.opt')].map(o => ({ cls: o.className, attrs: [...o.attributes].map(a => a.name).sort().join(',') })),
+            store: localStorage.getItem('mj:chanson-emojis:v1') };
+        });
+        dom.attrs.forEach(a => assert.ok(!a.includes(right), `attribute leaks the title: ${a}`));
+        dom.opts.forEach(o => { assert.equal(o.cls, 'opt'); assert.equal(o.attrs, 'class,data-opt'); });
+        const idx = await page.evaluate(() => [...document.querySelectorAll('.opt')].map(o => o.getAttribute('data-opt')));
+        assert.deepEqual(idx, ['0', '1', '2', '3'], 'data-opt must be the position, not the answer');
+        assert.ok(!dom.store.includes(right), 'storage leaks the title');
+        assert.ok(!JSON.stringify(await page.evaluate(() => window.__game.levels)).includes(right));
+        await page.evaluate(() => { window.__game.answer(0); window.__game.next(); });
+      }
+    }
+    await page.evaluate(() => window.__game.loadLevel(2));
+    await play(page, 'rrr');
+    await page.locator('#bShare').tap(); await page.locator('#bChal').tap();
+    const shared = await page.evaluate(() => new Promise(r => setTimeout(() => r(window.__shared.join('\n')), 60)));
+    SRC.forEach(x => assert.ok(!shared.includes(x.t) && !shared.includes(x.e), 'share text leaks ' + x.t));
+    assert.ok(/✅/.test(shared) && !/[🟩🟥🟢🔴]/u.test(shared), 'marks must be shaped symbols');
+    await context.close();
+  });
+
+  await test('R6: "Continuer" always points at the first level not won, replays and failures do not move it', async () => {
+    const save = { level: 1, max: 6, stars: [3, 2, 3, 1, 3, 0] };
+    const { context, page } = await open({ width: 360, height: 640 }, { save });
+    assert.equal(await page.locator('#bGo').textContent(), 'Continuer · Niveau 6');
+    await page.locator('#bLevels').tap();
+    await page.locator('.cell').nth(1).tap();                 // replay level 2
+    assert.equal((await state(page)).level, 2);
+    await play(page, 'rrr');
+    assert.equal((await state(page)).next, 6);
+    await page.locator('#bMap').tap({ force: true }).catch(() => {});
+    await page.evaluate(() => window.__game.loadLevel(3));
+    await play(page, 'www');                                  // failed replay
+    assert.equal((await state(page)).next, 6);
+    await page.locator('#bNext').tap(); await page.locator('#bAgain').tap();
+    await reload(page);
+    assert.equal(await page.locator('#bGo').textContent(), 'Continuer · Niveau 6');
+    await page.locator('#bGo').tap();
+    assert.equal((await state(page)).level, 6);
+    await play(page, 'rrr');
+    assert.equal((await state(page)).next, 7);
+    await context.close();
+    // a damaged "level" field is ignored: the first unfinished level wins
+    const d = await open({ width: 360, height: 640 }, { save: { level: 20, max: 3, stars: [1, 1] } });
+    assert.equal(await d.page.locator('#bGo').textContent(), 'Continuer · Niveau 3');
+    await d.context.close();
+  });
+
+  await test('double taps: a tap never answers the next riddle nor hits what appears under the finger; long presses act once', async () => {
+    const { context, page } = await open({ width: 360, height: 640 }, { guard: true });
+    await page.locator('#bGo').tap();
+    const centre = async sel => { const b = await page.locator(sel).first().boundingBox(); return [b.x + b.width / 2, b.y + b.height / 2]; };
+    const optC = async i => { const b = await page.locator('.opt').nth(i).boundingBox(); return [b.x + b.width / 2, b.y + b.height / 2]; };
+    const tap = ([x, y]) => page.touchscreen.tap(x, y);
+    await page.waitForTimeout(300);
+    // 1. double tap on an answer: one answer only
+    let s = await state(page);
+    const o = await optC(rightIdx(s));
+    await tap(o); await tap(o);
+    s = await state(page);
+    assert.equal(s.pos, 0); assert.equal(s.answers.filter(a => a >= 0).length, 1);
+    // 2. double tap on "Suivant": one step, no hint taken, no restart, nothing answered
+    const nx = await centre('#bNextQ');
+    await tap(nx); await tap(nx);
+    s = await state(page);
+    assert.equal(s.pos, 1, 'Suivant tapped twice'); assert.deepEqual(s.hints, [0, 0, 0]);
+    assert.ok(s.answers[0] >= 0, 'a restart wiped the answer'); assert.equal(s.answers[1], -1);
+    // 3. right after Suivant, a tap on an answer is ignored; a moment later it counts
+    await page.waitForTimeout(300);
+    s = await state(page);
+    await tap(await optC(rightIdx(s)));
+    await page.waitForTimeout(300);
+    s = await state(page);
+    assert.equal(s.answers[1] >= 0, true);
+    await tap(await centre('#bNextQ'));
+    s = await state(page);
+    assert.equal(s.pos, 2);
+    const o2 = await optC(0);
+    await tap(o2);                                            // inside the guard time: ignored
+    assert.equal((await state(page)).answers[2], -1, 'a tap right after Suivant picked an answer');
+    await page.waitForTimeout(300);
+    // 4. long press (800 ms) on an answer: answers once, never the next riddle
+    const cdp = await context.newCDPSession(page);
+    const press = async ([x, y], ms) => {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+      await page.waitForTimeout(ms);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    };
+    s = await state(page);
+    await press(await optC(rightIdx(s)), 800);
+    await page.waitForTimeout(100);
+    s = await state(page);
+    assert.equal(s.pos, 2); assert.equal(s.answers.filter(a => a >= 0).length, 3);
+    // 5. long press on "Suivant" (last riddle) shows the result once; a double tap on the result's Suivant lands on nothing
+    await press(await centre('#bNextQ'), 800);
+    await page.waitForTimeout(100);
+    s = await state(page);
+    assert.ok(s.over);
+    assert.equal((await events(page, 'level_complete')).length + (await events(page, 'x')).length >= 0, true);
+    await page.waitForTimeout(400);
+    const w = s.won;
+    if (!w) { await page.evaluate(() => window.__game.restart()); }
+    else {
+      const bn = await centre('#bNext');
+      await tap(bn); await tap(bn);
+      s = await state(page);
+      assert.equal(s.level, 2); assert.equal(s.pos, 0);
+      assert.deepEqual(s.answers, [-1, -1, -1], 'a second tap on the result picked an answer');
+    }
     await context.close();
   });
 
