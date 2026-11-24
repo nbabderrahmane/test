@@ -7,7 +7,7 @@ function hitChance(S, p, pos) {      // chance that an opponent can land on this
   const cell = REF.whereIs(S.seats[p], pos);
   if (!cell || cell.lane || REF.SAFE.has(REF.key(cell.xy))) return 0;
   const hits = new Set();
-  for (let q = 0; q < S.np; q++) if (q !== p) for (let j = 0; j < S.k; j++) {
+  for (let q = 0; q < S.np; q++) if (q !== p) for (let j = 0; j < S.ks[q]; j++) {
     const s = S.pos[q][j];
     for (let d = 1; d <= 6; d++) {
       const c = REF.whereIs(S.seats[q], s + d);

@@ -35,7 +35,7 @@ function whereIs(side, pos) { return pos >= 0 && pos <= 25 ? PATHS[side][pos] : 
 // All the single-pion moves of player p with die v ({i, to, captured: [[q, j]]}); same-cell pions are NOT merged.
 function moves(S, p, v) {
   const out = [];
-  for (let i = 0; i < S.k; i++) {
+  for (let i = 0; i < S.ks[p]; i++) {
     const pos = S.pos[p][i];
     let to;
     if (pos === 26) continue;
@@ -44,7 +44,7 @@ function moves(S, p, v) {
     const captured = [];
     const cell = whereIs(S.seats[p], to);
     if (cell && !cell.lane && !SAFE.has(key(cell.xy))) {
-      for (let q = 0; q < S.np; q++) if (q !== p) for (let j = 0; j < S.k; j++) {
+      for (let q = 0; q < S.np; q++) if (q !== p) for (let j = 0; j < S.ks[q]; j++) {
         const c = whereIs(S.seats[q], S.pos[q][j]);
         if (c && !c.lane && key(c.xy) === key(cell.xy)) captured.push([q, j]);
       }

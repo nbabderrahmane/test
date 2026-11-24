@@ -299,10 +299,26 @@ var ENGINE = (function () {
 
   // [pions, opponent strengths]; strength 0 plays at random ... 5 plays carefully (see TIERS).
   var LEVELS = [   // h: pions of the player, o: pions of each opponent, opp: strength of each opponent
-    { h: 2, o: 2, opp: [0] }, { h: 2, o: 2, opp: [0] }, { h: 2, o: 2, opp: [1] }, { h: 2, o: 2, opp: [2] }, { h: 2, o: 2, opp: [3] },
-    { h: 2, o: 2, opp: [1, 1] }, { h: 2, o: 2, opp: [2, 2] }, { h: 2, o: 2, opp: [3, 2] }, { h: 2, o: 2, opp: [2, 2] }, { h: 2, o: 2, opp: [4, 3] },
-    { h: 3, o: 3, opp: [2, 2] }, { h: 3, o: 3, opp: [3, 3] }, { h: 3, o: 3, opp: [4, 3] }, { h: 3, o: 3, opp: [2, 2, 2] }, { h: 3, o: 3, opp: [3, 3, 2] },
-    { h: 3, o: 3, opp: [4, 3, 3] }, { h: 3, o: 3, opp: [3, 3, 3] }, { h: 3, o: 3, opp: [4, 4, 3] }, { h: 3, o: 3, opp: [5, 4, 4] }, { h: 3, o: 3, opp: [5, 5, 5] }
+    { h: 1, o: 3, opp: [0] },
+    { h: 1, o: 2, opp: [0] },
+    { h: 1, o: 2, opp: [2] },
+    { h: 1, o: 2, opp: [5] },
+    { h: 1, o: 2, opp: [2, 2] },
+    { h: 1, o: 2, opp: [5, 5] },
+    { h: 2, o: 3, opp: [2] },
+    { h: 2, o: 3, opp: [5] },
+    { h: 2, o: 3, opp: [2, 2] },
+    { h: 2, o: 3, opp: [5, 5] },
+    { h: 2, o: 3, opp: [5, 5, 5] },
+    { h: 3, o: 3, opp: [0] },
+    { h: 2, o: 2, opp: [4] },
+    { h: 3, o: 3, opp: [5] },
+    { h: 3, o: 3, opp: [0, 0] },
+    { h: 3, o: 3, opp: [2, 2] },
+    { h: 2, o: 2, opp: [0, 0] },
+    { h: 3, o: 3, opp: [5, 5] },
+    { h: 3, o: 3, opp: [3, 3, 3] },
+    { h: 3, o: 3, opp: [4, 4, 4] }
   ];
   var TIERS = [
     { rand: 1 },

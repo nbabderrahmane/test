@@ -27,31 +27,38 @@ let browser;
 const problems = [];   // console errors, page errors, unexpected requests (all pages)
 const results = [];
 
-// Opens the game. opts.save seeds localStorage once (a reload keeps what the game stored); opts.raw
-// seeds a raw string; opts.config sets window.MJ_CONFIG; opts.hash opens a link; opts.broken makes
-// the storage throw. Every message to the host is collected in window.__msgs.
+// Opens the game. opts.save / opts.raw put a save in localStorage before the game boots (written from
+// the page, then the page is loaded again: an init script that reads localStorage at document start
+// sometimes sees nothing after a reload in Chromium); opts.config sets window.MJ_CONFIG; opts.hash
+// opens a link; opts.broken makes the storage throw. Every message to the host is collected in
+// window.__msgs.
 async function open(viewport = { width: 360, height: 640 }, opts = {}) {
   const context = opts.context || await browser.newContext({ ...MOBILE, viewport, ...(opts.extra || {}) });
-  await context.addInitScript(({ save, raw, key, config, broken }) => {
+  await context.addInitScript(({ config, broken }) => {
     window.__msgs = [];
     window.addEventListener('message', e => { if (e.data && e.data.source === 'mini-jeu') window.__msgs.push(e.data); });
-    try {
-      if (broken) {
+    if (broken) {
+      try {
         Storage.prototype.getItem = function () { throw new Error('no storage'); };
         Storage.prototype.setItem = function () { throw new Error('no storage'); };
-      } else if (!localStorage.getItem(key)) {
-        if (raw !== null) localStorage.setItem(key, raw);
-        else if (save) localStorage.setItem(key, JSON.stringify(save));
-      }
-    } catch (e) { /* ignore */ }
+      } catch (e) { /* ignore */ }
+    }
     if (config) window.MJ_CONFIG = config;
-  }, { save: opts.save || null, raw: opts.raw === undefined ? null : opts.raw, key: KEY, config: opts.config || null, broken: !!opts.broken });
+  }, { config: opts.config || null, broken: !!opts.broken });
   const page = await context.newPage();
   page.on('console', m => { if (m.type() === 'error') problems.push('console.error: ' + m.text()); });
   page.on('pageerror', e => problems.push('pageerror: ' + e.message));
   page.on('request', r => { if (r.url().split('#')[0] !== URL) problems.push('request: ' + r.url()); });
-  await page.goto(URL + (opts.hash || ''));
+  const seed = opts.raw !== undefined ? opts.raw : opts.save ? JSON.stringify(opts.save) : null;
+  if (seed !== null) {
+    await page.goto(URL);
+    await page.waitForFunction(() => !!window.__game);
+    await page.evaluate(([k, v]) => localStorage.setItem(k, v), [KEY, seed]);
+    await page.waitForTimeout(100);
+  }
+  await page.goto(URL + (seed === null ? opts.hash || '' : ''));   // a link is opened at boot unless a save had to be loaded first
   await page.waitForFunction(() => !!window.__game);
+  if (opts.hash && seed !== null) { await page.goto(URL + opts.hash); await page.waitForTimeout(50); }
   return { context, page };
 }
 const state = page => page.evaluate(() => window.__game.state());
