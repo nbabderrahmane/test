@@ -69,6 +69,7 @@ async function shot(page, name) {
   await page.screenshot({ path: path.join(SHOTS, name + '.png') });
 }
 async function test(name, fn) {
+  if (process.env.ONLY && !name.includes(process.env.ONLY)) return;
   const t = Date.now();
   try {
     await fn();

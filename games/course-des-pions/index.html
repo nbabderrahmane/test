@@ -79,7 +79,7 @@ header{display:flex;align-items:center;gap:8px;padding:6px 12px 2px;flex:none}
   position:absolute;left:0;top:0;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;
   pointer-events:none;z-index:2;will-change:transform;
 }
-.pion .d{width:var(--d,32px);height:var(--d,32px);border-radius:50%;display:flex;align-items:center;justify-content:center;
+.pion .d{position:relative;left:var(--dx,0);top:var(--dy,0);width:var(--d,32px);height:var(--d,32px);border-radius:50%;display:flex;align-items:center;justify-content:center;
   box-shadow:0 0 0 2px #131A2E,inset 0 -3px 0 rgba(0,0,0,.2)}
 .pion svg{width:62%;height:62%;fill:currentColor}
 .pion.p0 .d{background:var(--c0);color:var(--i0)}.pion.p1 .d{background:var(--c1);color:var(--i1)}
@@ -896,7 +896,11 @@ function renderPions() {
     g.forEach(function (pi, k) {
       var pp = pi[0], ii = pi[1], po = S.pos[pp][ii], el = pionEls[pp][ii], c = cellXY(pp, ii, po), o = OFFS[n][Math.min(k, 3)];
       var d = Math.round(C * (n === 1 ? 0.76 : n === 2 ? 0.62 : 0.54));
-      var tr = px([c[0] + o[0], c[1] + o[1]]);
+      // the 44 px touch zone never leaves the board; the disc keeps its own offset inside it
+      var cx = (c[0] + o[0]) * C, cy = (c[1] + o[1]) * C, bx = Math.max(22, Math.min(7 * C - 22, cx)), by = Math.max(22, Math.min(7 * C - 22, cy));
+      var tr = 'translate(' + (bx - 22) + 'px,' + (by - 22) + 'px)';
+      el.style.setProperty('--dx', (cx - bx) + 'px');
+      el.style.setProperty('--dy', (cy - by) + 'px');
       var go = pick && pp === S.turn && moves.some(function (m) { return S.pos[pp][m.i] === po; });
       el.style.setProperty('--d', d + 'px');
       el.className = 'pion p' + pp + (go ? ' go' : '') + (po === HOME ? ' fin' : '');
