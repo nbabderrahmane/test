@@ -569,7 +569,7 @@ function showResult() {
   // a challenge is played once per opening: no retry, only "Renvoyer le défi" (when met) and "Accueil"
   $('bNext').hidden = !(won && !chal);
   $('bNext').textContent = g.n < N ? 'Suivant' : 'Niveaux';
-  $('bShare').hidden = chal; $('bChal').hidden = !(won && (!chal || good));
+  $('bShare').hidden = chal || !won; $('bChal').hidden = !(won && (!chal || good));
   $('rowS').hidden = $('bShare').hidden && $('bChal').hidden;
   $('bChal').textContent = chal ? 'Renvoyer le défi' : 'Défier un ami';
   $('bShare').textContent = 'Partager';

@@ -383,7 +383,7 @@ function checkFit(m, tag) {
 
   // ---------------------------------------------------------------- resume, corrupted saves
   await test('reload: the game in progress is resumed identically (tiles, found families, errors, selection, tried guesses)', async () => {
-    const { context, page } = await open();
+    const { context, page } = await open({ width: 360, height: 640 }, { save: JSON.stringify({ max: 6, stars: [3, 3, 3, 3, 3], cur: null }) });
     await load(page, 6);
     await tapWords(page, fam(6, 1));                              // family found
     await tapWords(page, [fam(6, 0)[0], fam(6, 2)[0], fam(6, 3)[0]]);   // one error
@@ -656,14 +656,14 @@ function checkFit(m, tag) {
     const { context, page } = await open();
     assert.equal(await page.locator('#bRestart').count(), 0);
     assert.ok(!/Recommencer/.test(await page.evaluate(() => document.body.innerText)), 'no "Recommencer" anywhere');
-    await load(page, 6);
-    await tapWords(page, [fam(6, 0)[0], fam(6, 1)[0], fam(6, 2)[0]]);
+    await load(page, 1);
+    await tapWords(page, [fam(1, 0)[0], fam(1, 1)[0], fam(1, 2)[0]]);
     await tapButton(page, '#bClear');
-    await tapWords(page, fam(6, 3));
+    await tapWords(page, fam(1, 3));
     const before = await state(page);
     assert.equal(before.errors, 1);
     await page.locator('#bMap').tap();                              // levels, then the same level again
-    await page.locator('[data-level="6"]').tap();
+    await page.locator('[data-level="1"]').tap();
     let s = await state(page);
     assert.equal(s.errors, 1); assert.deepEqual(s.order, before.order); assert.equal(s.found.length, 1);
     await page.locator('#bMap').tap();

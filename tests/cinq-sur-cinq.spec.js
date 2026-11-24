@@ -683,7 +683,7 @@ function checkFit(m, label) {
         const dom = r.html.split('<script>')[0];
         for (const t of [q0.a, ...q0.w]) {
           const esc = t.replace(/&/g, '&amp;');
-          assert.equal(dom.split('>' + esc + '<').length - 1, 1, 'option text count: ' + t);
+          assert.equal(r.ans.split('>' + esc + '<').length - 1, 1, 'option text count: ' + t);
           assert.ok(!new RegExp('="[^"]*' + esc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[^"]*"').test(r.ans), 'text in an attribute: ' + t);
         }
         await page.evaluate(() => { window.__game.answer(0); window.__game.next(); });
