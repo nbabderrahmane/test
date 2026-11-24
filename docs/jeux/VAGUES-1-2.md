@@ -82,3 +82,26 @@ Chaque joueur fait le tour du plateau et rentre ses pions ; un 6 fait sortir un 
 - `les-familles` : les grilles 9, 10 et 12 ont une autre répartition légitime (tabouret/banc, piment/gingembre, soleil/orage) : changer un mot dans chacune ; la table « ce mot peut appartenir à ces familles » est relue en cherchant activement les autres lectures ; pas de famille entière réutilisée d'une grille à l'autre, et au plus un mot commun entre deux grilles.
 
 **R10. Dérogation assumée** : les touches lettres d'un clavier à l'écran peuvent faire moins de 44 px de large (jamais moins de 28) si elles font au moins 44 px de haut.
+
+## Décisions après deuxième revue (24 novembre) — s'appliquent aux huit jeux
+
+**R11. On ne gagne pas d'étoiles avec une solution déjà vue.** Dans les jeux à solution fixe (`mot-secret`, `les-familles`, `cap-sur`) :
+- les essais ou erreurs d'un niveau **se cumulent** d'une partie à l'autre jusqu'à la première victoire (une partie perdue puis « Réessayer » ne remet pas le compteur d'étoiles à zéro ; l'écran le dit : « Essais cumulés : 7 ») ;
+- les étoiles d'un niveau **se figent à la première victoire** ; « Rejouer » un niveau gagné est possible pour le plaisir et l'écran de résultat le dit, sans changer les étoiles ;
+- une partie de défi sur un niveau pas encore gagné compte dans ce cumul, qu'elle soit gagnée ou perdue.
+Dans les quiz (`cinq-sur-cinq`, `chanson-emojis`), où les réponses sont montrées : une nouvelle tentative après un échec plafonne à 2 étoiles, et les étoiles se figent à la première réussite.
+Dans les jeux sans solution cachée (`compte-rond`, `semailles`, `course-des-pions`), rejouer pour améliorer ses étoiles reste permis.
+
+**R12. Une partie en cours par niveau.** Dans les jeux soumis à R1, la partie en cours est sauvegardée par niveau : passer par la grille et ouvrir un autre niveau ne remet à zéro ni les essais ni les erreurs du premier. Le test passe par un autre niveau avant de revenir.
+
+**R13. R4 vaut aussi pour `MJ_CONFIG.shareBaseUrl`** : la base configurée est réduite à `origin + pathname`. Testé avec une base portant `?token=…`.
+
+**R14. Tests stables.** Le script d'initialisation des tests n'écrit la sauvegarde de départ qu'à la première navigation (drapeau en `sessionStorage`), jamais après un rechargement : sous Chromium en `file://`, `localStorage.getItem` rend parfois `null` juste après un rechargement et le script effaçait alors la partie en cours. Chaque suite passe 5 fois de suite.
+
+**R15. Un défi s'arrête à son objectif.** Quand l'objectif ne peut plus être atteint (essais ou erreurs dépassés), la partie de défi se termine, perdue ; un seul compteur à l'écran. Un défi en cours est repris après rechargement, et `challenge_result` part toujours une fois.
+
+**R16. Contenu, suite.**
+- `mot-secret` : la liste de blocage s'étend à l'alcool et au tabac, à l'armée, la police et la justice, à la violence, à l'origine et la politique, aux jeux d'argent, au porc ; la fiche dit que la liste n'est pas exhaustive ; « cuve » (niveau 5) est remplacé par un mot plus courant.
+- `les-familles` : la grille 18 a deux solutions (`maillot` est aussi du matériel de sport) : remplacer ; « sans erreur » au lieu de « en aucune erreur ».
+- `cap-sur` : Kinshasa et Brazzaville ne doivent pas être à 0 km l'une de l'autre (deux décimales) ; un test vérifie qu'aucune paire de villes n'est à moins de 5 km ; aucune ville dont le statut de capitale est en cours de changement n'est marquée capitale.
+- `compte-rond` : les grands nombres ne sont pas systématiquement 25, 50, 75, 100 : varier les jeux de nombres (par exemple 12, 15, 20, 30, 40, 60) pour avoir notre propre style ; régénérer en gardant la courbe.
