@@ -4,6 +4,7 @@
  * and by the test that recomputes the published rates.
  *   debutant   : 1 ply of search, 20 % of random moves
  *   bonJoueur  : 4 plies of search
+ *   hasard     : uniformly random moves (a third measure, to tell the very first levels apart)
  * Ties are broken by the seeded generator shared with the adversary, so games vary with the seed.
  */
 const G = require('./game-engine').load();
@@ -14,6 +15,7 @@ const debutant = (b, plies, rng) => {
   if (rng() < 0.2) return pickFrom(mv, rng);
   return pickFrom(G.bestMoves(b, 0, plies, 1, 1e6).moves, rng);
 };
+const hasard = (b, plies, rng) => pickFrom(G.moves(b, 0), rng);
 const bonJoueur = (b, plies, rng) => pickFrom(G.bestMoves(b, 0, plies, 4, 1e6).moves, rng);
 
 // One game of `player` (side 0, moves first) against the adversary of the level; returns the result.
@@ -33,4 +35,4 @@ function rate(level, player, n) {
   for (let s = 1; s <= n; s++) if (playGame(level, player, s).winner === 0) w++;
   return w / n;
 }
-module.exports = { G, debutant, bonJoueur, playGame, rate };
+module.exports = { G, debutant, bonJoueur, hasard, playGame, rate };
