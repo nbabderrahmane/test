@@ -148,8 +148,8 @@ footer{flex:none;display:flex;gap:10px;padding:4px 10px 12px}
 
 #grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,1fr));gap:8px;margin:12px 0}
 .cell{position:relative;min-height:48px;border-radius:14px;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;overflow:hidden}
-.cell .n{font-weight:800;font-size:19px;line-height:1;font-variant-numeric:tabular-nums}
-.cell .n svg{width:18px;height:18px;fill:#66739A}
+.cell .n{display:block;height:20px;font-weight:800;font-size:19px;line-height:20px;font-variant-numeric:tabular-nums}
+.cell .n svg{width:18px;height:18px;margin-top:1px;fill:#66739A}
 .cell .s{display:flex;gap:1px}
 .cell .s svg{width:14px;height:14px;fill:var(--off)}
 .cell .s svg.on{fill:var(--gold)}
@@ -421,8 +421,8 @@ function aiMove(b, t, plies, P, rng) {
 var S4 = [4,4,4,4,4,4,4,4,4,4,4,4];
 // 20 adversaries, weakest first. start = {p: 12 pits, s: seeds already captured, note}; the player moves first.
 var LEVELS = [
-  { nm: 'Pépin',     ai: { r: 1, d: 1, n: 100 }, p: [4,4,3,3,2,2, 1,2,1,2,2,2], s: [16,0], note: 'Départ avancé' },
-  { nm: 'Moineau',   ai: { r: 0.6, d: 1, n: 100 }, p: [4,4,4,3,2,2, 1,2,1,2,2,2], s: [14,0], note: 'Départ avancé' },
+  { nm: 'Pépin',     ai: { r: 1, d: 1, n: 100 }, p: [4,4,4,4,2,2, 1,2,1,2,2,4], s: [16,0], note: 'Départ avancé' },
+  { nm: 'Moineau',   ai: { r: 0.6, d: 1, n: 100 }, p: [4,4,4,4,3,3, 1,2,1,2,3,3], s: [14,0], note: 'Départ avancé' },
   { nm: 'Fourmi',    ai: { r: 0.3, d: 1, n: 100 }, p: S4, s: [0,0] },
   { nm: 'Tourterelle', ai: { r: 0.1, d: 1, n: 100 }, p: S4, s: [0,0] },
   { nm: 'Criquet',   ai: { r: 0, d: 1, n: 100 }, p: S4, s: [0,0] },
@@ -434,13 +434,13 @@ var LEVELS = [
   { nm: 'Varan',     ai: { r: 0, d: 4, n: 2000 }, p: [0,6,6,6,6,0, 0,6,6,6,6,0], s: [0,0], note: 'Quatre gros tas' },
   { nm: 'Buffle',    ai: { r: 0.08, d: 5, n: 3000 }, p: S4, s: [0,0] },
   { nm: 'Hyène',     ai: { r: 0, d: 5, n: 3000 }, p: S4, s: [0,0] },
-  { nm: 'Guépard',   ai: { r: 0.05, d: 6, n: 4000 }, p: S4, s: [0,0] },
-  { nm: 'Éléphant',  ai: { r: 0, d: 6, n: 5000 }, p: [2,2,2,2,2,2, 2,2,2,2,2,2], s: [14,10], note: 'Disette' },
-  { nm: 'Babouin',   ai: { r: 0, d: 6, n: 6000 }, p: S4, s: [0,0] },
-  { nm: 'Python',    ai: { r: 0, d: 7, n: 8000 }, p: S4, s: [0,0] },
-  { nm: 'Lionne',    ai: { r: 0, d: 7, n: 10000 }, p: [3,3,12,3,3,0, 0,3,3,12,3,3], s: [0,0], note: 'Gros tas' },
-  { nm: 'Griot',     ai: { r: 0, d: 8, n: 14000 }, p: S4, s: [0,0] },
-  { nm: 'Le Sage',   ai: { r: 0, d: 8, n: 20000 }, p: S4, s: [0,0] }
+  { nm: 'Guépard',   ai: { r: 0.05, d: 6, n: 3000 }, p: S4, s: [0,0] },
+  { nm: 'Éléphant',  ai: { r: 0, d: 6, n: 4000 }, p: [2,2,2,2,2,2, 2,2,2,2,2,2], s: [14,10], note: 'Disette' },
+  { nm: 'Babouin',   ai: { r: 0, d: 6, n: 5000 }, p: S4, s: [0,0] },
+  { nm: 'Python',    ai: { r: 0, d: 7, n: 6000 }, p: S4, s: [0,0] },
+  { nm: 'Lionne',    ai: { r: 0, d: 7, n: 7000 }, p: [3,3,12,3,3,0, 0,3,3,12,3,3], s: [0,0], note: 'Gros tas' },
+  { nm: 'Griot',     ai: { r: 0, d: 8, n: 8000 }, p: S4, s: [0,0] },
+  { nm: 'Le Sage',   ai: { r: 0, d: 8, n: 10000 }, p: S4, s: [0,0] }
 ];
 /*ENGINE:END*/
 

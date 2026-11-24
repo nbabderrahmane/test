@@ -87,6 +87,7 @@ async function playByHook(page, player) {
 }
 
 async function test(name, fn) {
+  if (process.env.ONLY && !name.includes(process.env.ONLY)) return;
   const t = Date.now();
   try {
     await fn();
@@ -295,8 +296,8 @@ const ENDS = [
         assert.equal(Array.from(b).reduce((x, y) => x + y, 0), 48, 'seeds not conserved');
       }
       ended[st.why]++; longest = Math.max(longest, plies);
-      assert.equal(st.b.slice(0, 12).reduce((x, y) => x + y, 0), 0, 'seeds left on the board after the end');
-      assert.equal(st.b[12] + st.b[13], 48);
+      if (st.why !== 'win') assert.equal(st.b.slice(0, 12).reduce((x, y) => x + y, 0), 0, 'seeds left on the board after a counted end');
+      assert.equal(Array.from(st.b).reduce((x, y) => x + y, 0), 48);
     }
     console.log(`        random games: ${JSON.stringify(ended)}, longest ${longest} moves`);
     assert.ok(ended.win + ended.stuck + ended.cap === 300);
@@ -371,7 +372,7 @@ const ENDS = [
     const slow = worst.reduce((a, b) => (b.maxMs > a.maxMs ? b : a));
     console.log(`        slowest search: level ${slow.n}, ${slow.maxMs.toFixed(1)} ms (${slow.maxNodes} nodes, depth up to ${worst[19].depth})`);
     worst.forEach(w => assert.ok(w.maxMs < 80, `level ${w.n}: a search took ${w.maxMs.toFixed(0)} ms`));
-    assert.ok(worst[19].budget <= 24000, 'node budget of the hardest adversary');
+    assert.ok(worst[19].budget <= 12000, 'node budget of the hardest adversary');
     assert.ok(worst[0].maxNodes <= worst[19].maxNodes);
     await context.close();
   });

@@ -74,8 +74,9 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
   return { context, page };
 }
 async function reload(page) {   // wait for the NEW document (the marker only exists on the old one)
+  // (page.reload() sometimes drops the last localStorage write of a file:// page in headless Chromium; a plain navigation does not)
   await page.evaluate(() => { window.__old = true; });
-  await page.reload();
+  await page.goto(URL);
   await page.waitForFunction(() => !window.__old && !!window.__game);
 }
 const state = page => page.evaluate(() => window.__game.state());
