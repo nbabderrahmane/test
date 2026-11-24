@@ -6,7 +6,7 @@ Petits jeux originaux, courts, à tester sur mobile puis à intégrer dans une s
 1. **Étude** → `docs/ETUDE.md` (ce qui retient, ce qui se partage).
 2. **Fiche du jeu** → `docs/jeux/<jeu>.md` : la règle en cinq lignes, validée avant le code.
 3. **Build** : un agent par jeu, dans `games/<jeu>/index.html`. Un agent ne touche qu'à son dossier.
-4. **Recette mobile** : `npm test` (Playwright, viewport téléphone, tactile). Rien n'est livré rouge.
+4. **Recette mobile** : `npm test` lance toutes les suites, `node tests/<jeu>.spec.js` une seule (Playwright, viewport téléphone, tactile). Rien n'est livré rouge.
 5. **Intégration** : seulement après validation du propriétaire du produit.
 
 ## Rôles (décision du propriétaire du produit, 24 novembre)
@@ -21,7 +21,7 @@ Un lot n'est livré que revue et contrôles passés.
 2. **Moins de 150 Ko**. Dessin par CSS, SVG ou canvas 2D ; pas de WebGL, pas de flou ni d'ombre coûteuse.
 3. **Mobile d'abord, portrait** : jouable de 320 à 430 px de large sans défilement, cibles tactiles ≥ 44 px, événements `pointer`, `touch-action: manipulation`, pas de zoom, pas de survol, zones sûres (`env(safe-area-inset-*)`).
 4. **Hors ligne** : progression en `localStorage` sous la clé `mj:<jeu>:v1`, toujours dans un `try/catch` ; le jeu marche sans stockage.
-5. **Tout niveau est gagnable**, et un test le prouve (solveur ou solution rejouée).
+5. **Tout niveau est gagnable**, et un test le prouve (solveur ou solution rejouée). Pour un jeu contre un adversaire ou avec du hasard : tout aléa vient d'un générateur à graine, et un test gagne chaque niveau avec une graine fixée.
 6. **Jeu original** : nom, habillage et niveaux à nous. On reprend un genre, jamais un jeu existant.
 7. **Texte en français**, court. Code et commentaires en anglais.
 8. **Couleurs jamais seules** : chaque couleur porte aussi un symbole (daltonisme, écrans faibles).

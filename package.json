@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Mini-jeux HTML5 (un fichier par jeu)",
   "scripts": {
-    "test": "node tests/tri-couleurs.spec.js",
+    "test": "node tests/run-all.js",
     "levels:tri-couleurs": "node tools/gen-levels.js --write"
   }
 }
