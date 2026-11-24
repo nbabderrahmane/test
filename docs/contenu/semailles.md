@@ -24,32 +24,38 @@
 - Égalité possible (24 – 24) : elle ne fait pas gagner le niveau.
 
 ## Niveaux, adversaires, étoiles
-- 20 niveaux, déblocage séquentiel. L'adversaire est choisi par la force de sa recherche (profondeur et budget de nœuds, jamais le temps, donc identique à graine égale) et par une part de coups au hasard.
-- Étoiles selon l'écart de graines à la fin : 1 étoile = gagner ; 2 étoiles = au moins 8 graines d'avance ; 3 étoiles = au moins 16. Critère affiché avant de jouer.
-- Score du défi : graines capturées à la fin de la partie (le jeu s'arrête à 25 ou à la fin de la partie, comme ci-dessus) ; égaler la cible suffit.
+- 20 niveaux, déblocage séquentiel. « Continuer » mène au premier niveau non gagné (rejouer un ancien niveau ne le déplace pas).
+- L'adversaire est réglé par la profondeur de sa recherche (budget de nœuds, jamais le temps : même graine, même partie) et par une part de coups au hasard tirée du générateur à graine. Au plus 5 demi-coups : à 8 demi-coups, presque personne ne gagnait.
+- Étoiles selon l'écart de graines à la fin : 1 = gagner ; 2 = au moins 8 d'avance ; 3 = au moins 16. Critère affiché avant de jouer. Si « Annuler » a servi dans la partie, 2 étoiles au plus (annoncé à l'écran à la première utilisation). Pas d'Annuler ni de Recommencer dans un défi.
+- Défi : score = graines capturées, plafonné à 25 (une partie s'arrête à 25) ; cible de 1 à 25, sinon le lien est ignoré ; un défi se joue une fois par ouverture (pas de « Rejouer » : « Renvoyer le défi » si gagné, « Accueil »). Le lien ne contient que origine + chemin + `#defi-N-S`.
 
-| N° | Adversaire | Force | Départ |
-|----|-----------|-------|--------|
-| 1 | Pépin | coups au hasard | départ avancé : 16 graines déjà prises, cases adverses fragiles |
-| 2 | Moineau | 60 % au hasard, sinon 1 coup d'avance | départ avancé : 14 graines déjà prises |
-| 3 | Fourmi | 30 % au hasard, sinon 1 coup | classique |
-| 4 | Tourterelle | 10 % au hasard, sinon 1 coup | classique |
-| 5 | Criquet | 1 coup | classique |
-| 6 | Hérisson | 15 % au hasard, sinon 2 coups | départ avancé : 5 graines d'avance |
-| 7 | Écureuil | 2 coups | classique |
-| 8 | Pintade | 10 % au hasard, sinon 3 coups | classique |
-| 9 | Chacal | 3 coups | classique |
-| 10 | Mangouste | 10 % au hasard, sinon 4 coups | classique |
-| 11 | Varan | 4 coups | « quatre gros tas » (6 graines dans les cases 2 à 5) |
-| 12 | Buffle | 8 % au hasard, sinon 5 coups | classique |
-| 13 | Hyène | 5 coups | classique |
-| 14 | Guépard | 5 % au hasard, sinon 6 coups | classique |
-| 15 | Éléphant | 6 coups | « disette » : 2 graines par case, 14 – 10 déjà prises |
-| 16 | Babouin | 6 coups, budget plus large | classique |
-| 17 | Python | 7 coups | classique |
-| 18 | Lionne | 7 coups, budget plus large | « gros tas » : une case de 12 graines |
-| 19 | Griot | 8 coups | classique |
-| 20 | Le Sage | 8 coups, plus grand budget | classique |
+### Courbe mesurée (taux de victoire du joueur, 200 parties par case, graines 1 à 200)
+Joueurs de référence (`tools/semailles/reference-players.js`) : **débutant** = 1 demi-coup + 20 % de coups au hasard ; **bon joueur** = 4 demi-coups ; **hasard** = coups au hasard (mesure ajoutée pour distinguer les tout premiers niveaux). Le joueur commence toujours. Mesures refaites par `node tools/semailles/calibrate.js 200` ; le test recalcule ces taux sur 100 parties avec une tolérance de 10 points.
+
+| N° | Adversaire | Profondeur / coups au hasard | Départ (annoncé avant la partie) | Hasard | Débutant | Bon joueur |
+|---|---|---|---|---|---|---|
+| 1 | Pépin | 1 demi-coup, 100 % au hasard | départ avancé : 16 graines déjà prises | 92 % | 100 % | 100 % |
+| 2 | Moineau | 1 demi-coup, 100 % au hasard | départ avancé : 10 graines déjà prises | 78 % | 100 % | 100 % |
+| 3 | Fourmi | 1 demi-coup, 100 % au hasard | départ avancé : 5 graines déjà prises | 59 % | 98 % | 100 % |
+| 4 | Tourterelle | 1 demi-coup, 100 % au hasard | classique | 45 % | 95 % | 100 % |
+| 5 | Criquet | 1 demi-coup, 90 % au hasard | classique | 31 % | 94 % | 100 % |
+| 6 | Hérisson | 1 demi-coup, 70 % au hasard | départ avancé : 12 graines déjà prises | 56 % | 95 % | 100 % |
+| 7 | Écureuil | 1 demi-coup, 70 % au hasard | classique | 14 % | 79 % | 100 % |
+| 8 | Pintade | 1 demi-coup, 50 % au hasard | classique | 8 % | 63 % | 100 % |
+| 9 | Chacal | 1 demi-coup, 35 % au hasard | classique | 4 % | 50 % | 100 % |
+| 10 | Mangouste | 1 demi-coup, 20 % au hasard | classique | 2 % | 39 % | 99 % |
+| 11 | Varan | 1 demi-coup, 30 % au hasard | quatre gros tas (6 graines dans les cases 2 à 5) | 3 % | 56 % | 100 % |
+| 12 | Buffle | 2 demi-coups, 30 % au hasard | classique | 1 % | 26 % | 100 % |
+| 13 | Hyène | 2 demi-coups, 15 % au hasard | classique | 0 % | 10 % | 99 % |
+| 14 | Guépard | 3 demi-coups, 15 % au hasard | classique | 0 % | 2 % | 91 % |
+| 15 | Éléphant | 3 demi-coups, 30 % au hasard | disette : 2 graines par case, 14 – 10 déjà prises | 13 % | 39 % | 95 % |
+| 16 | Babouin | 4 demi-coups, 20 % au hasard | classique | 1 % | 8 % | 88 % |
+| 17 | Python | 4 demi-coups, 10 % au hasard | classique | 0 % | 1 % | 74 % |
+| 18 | Lionne | 4 demi-coups, 20 % au hasard | gros tas : une case de 12 graines | 0 % | 5 % | 89 % |
+| 19 | Griot | 5 demi-coups, 20 % au hasard | classique | 0 % | 3 % | 74 % |
+| 20 | Le Sage | 5 demi-coups, 8 % au hasard | classique | 0 % | 1 % | 43 % |
+
+Cibles tenues : débutant ≥ 85 % aux niveaux 1-2 et ≥ 50 % jusqu'au 8 ; bon joueur ≥ 60 % jusqu'au 14 et ≥ 30 % au 20. Chaque niveau se distingue du précédent d'au moins 6 points chez l'un des trois joueurs ; respirations voulues aux niveaux 6, 11, 15 et 18 (départ avantageux ou adversaire plus faible que le précédent). Les points à 100 % du bon joueur (niveaux 1 à 12) sont tenus par le débutant et le hasard.
 
 ## Textes affichés (français, à relire)
 Aide : « Tu joues en bas, l'adversaire en haut. On sème dans le sens inverse des aiguilles d'une montre… », « Si ta dernière graine tombe chez l'adversaire et porte une case à 2 ou 3, tu prends ces graines… », « Une case de 12 graines ou plus saute sa case de départ. », « Si l'adversaire n'a plus de graines, tu dois lui en donner. Prendre toutes ses graines d'un coup ne rapporte rien. », « Le premier à 25 graines gagne… ».

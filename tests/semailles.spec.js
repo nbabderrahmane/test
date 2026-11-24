@@ -524,11 +524,11 @@ const ENDS = [
   // ------------------------------------------------------------------ play details
   await test('taps: opponent pits, empty pits and the obligation to feed are refused without changing anything; undo and restart', async () => {
     const { context, page } = await open();
-    await page.evaluate(() => { window.__game.still(true); window.__game.seed(4); window.__game.loadLevel(3); });
+    await page.evaluate(() => { window.__game.still(true); window.__game.seed(4); window.__game.loadLevel(4); });
     const s0 = await state(page);
     await pit(page, 8).tap();
     assert.deepEqual(await state(page), s0, 'opponent pit does nothing');
-    assert.match(await page.locator('#msg').innerText(), /Fourmi/);
+    assert.match(await page.locator('#msg').innerText(), /Tourterelle/);
     assert.equal(await page.locator('#bUndo').isDisabled(), true, 'nothing to undo yet');
     await tapPit(page, 2);
     const s1 = await state(page);
@@ -550,7 +550,7 @@ const ENDS = [
     await tapPit(page, 0);
     await page.locator('#bReset').tap();
     const r = await state(page);
-    assert.equal(r.plies, 0); assert.deepEqual(r.board, std()); assert.equal(r.level, 3);
+    assert.equal(r.plies, 0); assert.deepEqual(r.board, std()); assert.equal(r.level, 4);
     const sv = await saved(page);
     assert.equal(sv.cur, null, 'restart forgets the game in progress');
     await context.close();
@@ -696,7 +696,7 @@ const ENDS = [
     const ch = (await page.evaluate(() => window.__shared))[1];
     const m = /(https:\/\/exemple\.test\/jeux\/semailles\/)#(defi-[A-Za-z0-9-]+)$/.exec(ch);
     assert.ok(m, ch);
-    assert.equal(m[2], `defi-1-${s.store[0]}`);
+    assert.equal(m[2], `defi-1-${Math.min(25, s.store[0])}`);
     assert.ok(!/\bcoups?\b/.test(ch) || true);
     // 3) clipboard fallback
     await page.evaluate(() => {
@@ -797,13 +797,13 @@ const ENDS = [
   });
 
   await test('challenge: a challenge in progress is resumed after a reload; malformed fragments are ignored', async () => {
-    const { context, page } = await open({ width: 360, height: 640 }, { hash: '#defi-6-30' });
+    const { context, page } = await open({ width: 360, height: 640 }, { hash: '#defi-6-20' });
     await page.evaluate(() => { window.__game.still(true); window.__game.seed(2); });
     await tapPit(page, 1);
     const before = await state(page);
     await reload(page);
     const s = await state(page);
-    assert.equal(s.mode, 'challenge'); assert.equal(s.level, 6); assert.equal(s.challenge.target, 30); assert.equal(s.screen, 'game');
+    assert.equal(s.mode, 'challenge'); assert.equal(s.level, 6); assert.equal(s.challenge.target, 20); assert.equal(s.screen, 'game');
     assert.deepEqual([s.board, s.hist], [before.board, before.hist]);
     await context.close();
     const bad = ['#defi-', '#defi-0-5', '#defi-21-5', '#defi-3-0', '#defi-3-26', '#defi-3-48', '#defi-3-49', '#defi-3-x', '#defi-1-2-3', '#defi-99999999999-1', '#DEFI-3-5', '#defi-3', '#defi--3-5', '#defi-3-5%20', '#defi-3-5;alert(1)', '#defi-%3Cb%3E-5', '#autre'];
