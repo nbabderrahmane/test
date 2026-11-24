@@ -12,7 +12,7 @@ Aucune dépendance serveur ni super-app. Tout reste dans `games/tri-couleurs/ind
   | Tube haut | hauteur 5 au lieu de 4 |
   | Un seul tube vide | moins de marge |
   | Tube court | un tube de capacité 2 remplace un tube vide |
-  | Billes mystère | seule la bille du dessus est visible ; les autres se révèlent quand on les découvre, et restent révélées |
+  | Billes mystère | seule la bille du dessus est visible ; les autres se révèlent quand on les découvre, et restent révélées, y compris après Annuler, Recommencer et un rechargement |
 - **Table finale des mondes** (mesurée par `tools/gen-levels.js`, graine fixe ; « solution » = longueur de la solution du solveur, repère des étoiles ; « vides » = tubes vides de pleine hauteur) :
 
   | Monde | Nom | Mécaniques | Hauteur | Vides | Couleurs | Solution min-max | 1er → 20e |
@@ -39,7 +39,8 @@ Aucune dépendance serveur ni super-app. Tout reste dans `games/tri-couleurs/ind
 - Un seul résultat compte par jour (le premier gagné) ; rejouer reste possible sans effet sur la série.
 
 ## 3. Série
-- +1 par jour où le niveau du jour est gagné. Un jour manqué remet à zéro, sauf **joker** : 1 joker gagné tous les 7 jours de série, 2 en réserve au plus, consommé automatiquement.
+- +1 par jour où le niveau du jour est gagné. Un jour manqué remet à zéro, sauf **joker** : 1 joker gagné tous les 7 jours de série, 2 en réserve au plus, consommé automatiquement, un par jour manqué, dès l'ouverture du jeu (l'accueil affiche donc toujours les jokers réellement disponibles). Une série perdue remet les jokers à zéro.
+- Le niveau du jour commencé un jour et gagné le lendemain compte pour le jour où il a été commencé.
 - Horloge du téléphone : si la date recule, on n'ajoute rien et on ne casse rien.
 - Visible sur l'accueil (flamme + nombre), et rappel « niveau du jour pas encore joué ».
 
@@ -50,7 +51,7 @@ Aucune dépendance serveur ni super-app. Tout reste dans `games/tri-couleurs/ind
 ## 5. Défi à un ami
 - Depuis l'écran de victoire : « Défier un ami » partage un texte sans solution + un lien `…#defi-<niveau>-<coups>` (ou `#defi-jour-<numéro du jour>-<coups>`).
 - La base du lien vient de `window.MJ_CONFIG.shareBaseUrl`, sinon de l'adresse courante. Le fragment n'emploie que lettres, chiffres et tirets.
-- À l'ouverture d'un lien de défi : le niveau s'ouvre (même verrouillé) avec le bandeau « À battre : 23 coups » ; à la victoire, « Défi relevé » ou « Raté de 2 coups », et proposition de renvoyer le défi.
+- À l'ouverture d'un lien de défi : le niveau s'ouvre (même verrouillé) avec le bandeau « Objectif : 23 coups ou moins » (égaler suffit) ; à la victoire, « Défi relevé » ou « Raté de 2 coups », et proposition de renvoyer le défi.
 - Partage : `navigator.share`, repli presse-papiers.
 
 ## 6. Écrans
@@ -60,7 +61,7 @@ Accueil (niveau du jour, série, rang, « Continuer ») · mondes · grille des 
 Clé `mj:tri-couleurs:v1` conservée et étendue (étoiles par niveau, série, jokers, dernier jour joué, badges, rang vu). Une sauvegarde du lot 1 est lue sans perte.
 
 ## 8. Événements vers la page hôte
-`postMessage({source:'mini-jeu', game:'tri-couleurs', event, …})` pour : `level_complete` (level, moves, stars), `daily_complete` (day, moves, streak), `streak_lost`, `rank_up` (rank), `badge` (id), `share` (kind), `challenge_open` (level, target), `challenge_result` (level, moves, target, won). Aucune donnée personnelle.
+`postMessage({source:'mini-jeu', game:'tri-couleurs', event, …})` pour : `level_complete` (level, moves, stars), `daily_complete` (day, moves, streak), `streak_lost`, `rank_up` (rank), `badge` (id), `share` (kind), `challenge_open` (level, target), `challenge_result` (level, moves, target, won) — pour un défi du jour, `level` vaut 0 et un champ `day` est ajouté. Aucune donnée personnelle.
 
 ## 9. Crochets de test
 `window.__game` : `state()`, `levels` (200), `daily` (120), `loadLevel(n)`, `loadDaily(i)`, `applyMove(from,to)` (même logique que le tap, sans animation), `setToday('AAAA-MM-JJ')` (date simulée, pour les tests de série).
@@ -76,3 +77,9 @@ Clé `mj:tri-couleurs:v1` conservée et étendue (étoiles par niveau, série, j
 
 ## Hors périmètre
 Classement, identité, récompenses, son, notifications.
+
+## Décisions après revue (24 novembre)
+- Ouvrir un défi ne modifie jamais la progression ni la partie en cours ; seule une victoire écrit.
+- La partie en cours est reprise coup pour coup dans tous les modes (niveau, niveau du jour, défi).
+- Limite connue, acceptée : une victoire enregistrée avec une horloge avancée par erreur bloque la série jusqu'à cette date.
+- Les crochets de test exposent les couleurs cachées : accepté, ils ne sont pas accessibles à un joueur dans la webview.
