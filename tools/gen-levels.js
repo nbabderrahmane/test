@@ -238,6 +238,93 @@ function naiveWinRate(tubesArr, caps, par, rnd, games) {
   }
   return won / games;
 }
+// "Attentive" player (same policy as tools/qa/smart.js, not a human): greedy on the visible
+// information, 10 % noise, never plays into a position without legal move, uses Undo (backs up 3
+// moves) when stuck or looping. Budget 4 x par + 30 moves, undos included. On mystery levels it
+// only reads tops and balls already revealed. Returns the win rate.
+function above(t) {              // balls sitting above the bottom single-colour run of their tube
+  let s = 0;
+  for (const x of t) {
+    if (!x.length) continue;
+    let k = 1;
+    while (k < x.length && x[k] === x[0]) k++;
+    s += x.length - k;
+  }
+  return s;
+}
+function hasMove(t, caps) {
+  for (let a = 0; a < t.length; a++) if (t[a].length) for (let b = 0; b < t.length; b++) if (canMove(t, caps, a, b)) return true;
+  return false;
+}
+function attentiveWinRate(tubesArr, caps, par, mystery, rnd, games) {
+  let won = 0;
+  const budget = 4 * par + 30;
+  for (let g = 0; g < games; g++) {
+    const t = tubesArr.map(x => x.slice());
+    const hid = t.map(x => mystery ? Math.max(0, x.length - 1) : 0);
+    const hist = [], seen = new Map();
+    let used = 0;
+    for (;;) {
+      if (isWon(t, caps)) { won++; break; }
+      if (used >= budget) break;
+      const last = hist.length ? hist[hist.length - 1] : null;
+      const mv = [];
+      for (let a = 0; a < t.length; a++) for (let b = 0; b < t.length; b++)
+        if (canMove(t, caps, a, b) && !(last && last[0] === b && last[1] === a)) mv.push([a, b]);
+      const safe = mv.filter(([a, b]) => {
+        t[b].push(t[a].pop());
+        const ok = isWon(t, caps) || hasMove(t, caps);
+        t[a].push(t[b].pop());
+        return ok;
+      });
+      const k0 = t.map(x => x.join(',')).join('|');
+      seen.set(k0, (seen.get(k0) || 0) + 1);
+      if (!safe.length || seen.get(k0) > 2) {
+        let u = Math.min(3, hist.length);
+        if (!u) break;
+        while (u--) { const [a, b] = hist.pop(); t[a].push(t[b].pop()); used++; }
+        continue;
+      }
+      const h0 = mystery ? 0 : above(t);
+      let best = null, bs = -1e9;
+      for (const [a, b] of safe) {
+        const A = t[a], B = t[b], c = A[A.length - 1];
+        let sc = rnd() * 0.9;
+        sc += B.length ? 3 : 0;
+        const mono = A.every((x, k) => k >= hid[a] && x === A[0]);
+        if (mono && A.length === caps[a]) sc -= 6; else if (mono && !B.length) sc -= 3;
+        if (A.length === 1) sc += 2;
+        if (!mystery) { B.push(A.pop()); sc += (h0 - above(t)) * 2.5; A.push(B.pop()); }
+        else if (A.length >= 2 && A.length - 2 >= hid[a] && A[A.length - 2] === c && B.length) sc -= 1;
+        if (sc > bs) { bs = sc; best = [a, b]; }
+      }
+      if (rnd() < 0.1) best = safe[Math.floor(rnd() * safe.length)];
+      const [a, b] = best;
+      t[b].push(t[a].pop()); hist.push([a, b]); used++;
+      if (hid[a] > 0 && hid[a] === t[a].length) hid[a]--;
+    }
+  }
+  return won / games;
+}
+// Share of two-move openings (first move, then a second one that does not undo it) after which the
+// level is lost for good; mystery levels hide the outcome from the player, so it must stay small.
+function secondMoves(tubesArr, caps, budget) {
+  let pairs = 0, fatal = 0, unknown = 0;
+  for (let a = 0; a < tubesArr.length; a++) for (let b = 0; b < tubesArr.length; b++) {
+    if (!canMove(tubesArr, caps, a, b)) continue;
+    const t = tubesArr.map(x => x.slice());
+    t[b].push(t[a].pop());
+    for (let c = 0; c < t.length; c++) for (let d = 0; d < t.length; d++) {
+      if (!canMove(t, caps, c, d) || (c === b && d === a)) continue;
+      const u = t.map(x => x.slice());
+      u[d].push(u[c].pop());
+      pairs++;
+      const st = isWon(u, caps) ? 'yes' : status(u, caps, budget);
+      if (st === 'no') fatal++; else if (st === 'unknown') unknown++;
+    }
+  }
+  return { pairs, fatal, unknown };
+}
 // Composite difficulty: solution length + 40 x (1 - random-player win rate).
 const difficulty = (par, win) => par + 40 * (1 - win);
 
@@ -572,4 +659,4 @@ if (!isMainThread) {
     }
   })().catch(e => { console.error(e); process.exit(1); });
 }
-module.exports = { status, firstMoves, naiveWinRate, difficulty, mulberry32, randomLevel, looksGood, makePool, solve, optimize, verify, isWon, canMove, encode, decode, WORLDS };
+module.exports = { attentiveWinRate, secondMoves, status, firstMoves, naiveWinRate, difficulty, mulberry32, randomLevel, looksGood, makePool, solve, optimize, verify, isWon, canMove, encode, decode, WORLDS };

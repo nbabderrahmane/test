@@ -30,8 +30,8 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
   await context.addInitScript(({ save, key, config, share }) => {
     window.__msgs = []; window.__shared = [];
     window.addEventListener('message', e => { if (e.data && e.data.source === 'mini-jeu') window.__msgs.push(e.data); });
-    // seed once per tab (sessionStorage survives a reload): reading localStorage at document start is racy in Chromium
-    try { if (save !== null && !sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem(key, typeof save === 'string' ? save : JSON.stringify(save)); } } catch (e) { /* ignore */ }
+    // seed once per tab (window.name survives a reload): reading localStorage at document start is racy in Chromium
+    try { if (save !== null && window.name !== 'seeded') { window.name = 'seeded'; localStorage.setItem(key, typeof save === 'string' ? save : JSON.stringify(save)); } } catch (e) { /* ignore */ }
     if (config) window.MJ_CONFIG = config;
     if (share) navigator.share = t => { window.__shared.push(t.text); return Promise.resolve(); };
   }, { save: opts.save === undefined ? null : opts.save, key: KEY, config: opts.config || null, share: !!opts.share });
