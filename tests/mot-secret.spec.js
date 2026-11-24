@@ -23,7 +23,9 @@ const ADMITTED = fs.readFileSync(path.join(TOOLS, 'mots-admis.txt'), 'utf8').spl
 const ADMIT_SET = new Set(ADMITTED);
 const LEN = n => (n <= 5 ? 4 : n <= 11 ? 5 : n <= 16 ? 6 : 7);   // required word length of level n
 
-let browser;
+let browser, server, HTTP_URL;
+// Pages are served from a local http server by default: on file:// Chromium sometimes loses a localStorage write
+// across a reload (measured under load: ~1 to 2 in 100 on file://, 0 in 240 over http). opts.file forces file://.
 const problems = [];   // console errors, page errors, unexpected requests (all pages)
 const results = [];
 
@@ -46,8 +48,8 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
   const page = await context.newPage();
   page.on('console', m => { if (m.type() === 'error') problems.push('console.error: ' + m.text()); });
   page.on('pageerror', e => problems.push('pageerror: ' + e.message));
-  const base = opts.url || URL;
-  page.on('request', r => { const u = r.url().split('#')[0]; if (u !== base && !(opts.url && /\/favicon\.ico$/.test(u))) problems.push('request: ' + r.url()); });
+  const base = opts.url || (opts.file ? URL : HTTP_URL);
+  page.on('request', r => { const u = r.url().split('#')[0]; if (u !== base && !(/^http/.test(base) && /\/favicon\.ico$/.test(u))) problems.push('request: ' + r.url()); });
   // R14: the starting save is written once, from node, after a first load; never by a script that runs again on reload
   if (opts.save !== undefined && opts.save !== null && !opts.brokenStorage) {
     await page.goto(base);
@@ -58,10 +60,7 @@ async function open(viewport = { width: 360, height: 640 }, opts = {}) {
   await page.waitForFunction(() => !!window.__game);
   return { context, page };
 }
-// Chromium on file:// can lose a localStorage write made just before a reload (measured: 1 loss in 50 with no pause,
-// 0 in 50 with 400 ms). Let the write settle before reloading; this is a browser timing issue, not game logic.
 async function reload(page) {
-  await page.waitForTimeout(400);
   await page.reload();
   await page.waitForFunction(() => !!window.__game);
 }
@@ -116,6 +115,13 @@ async function test(name, fn) {
 }
 
 (async () => {
+  const html = fs.readFileSync(FILE);
+  server = http.createServer((req, res) => {
+    if (!/^\/index\.html/.test(req.url)) { res.statusCode = 404; return res.end(); }
+    res.setHeader('content-type', 'text/html; charset=utf-8'); res.end(html);
+  });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  HTTP_URL = 'http://127.0.0.1:' + server.address().port + '/index.html';
   browser = await chromium.launch();
 
   await test('data: 20 levels, lengths 4/5/6/7, answers admitted, unique, plain letters', async () => {
@@ -405,7 +411,7 @@ async function test(name, fn) {
       await context.close();
     }
     // no base on file://: text only, no link
-    const { page, context } = await open({ width: 360, height: 640 }, { share: 'share', extra: { reducedMotion: 'reduce' } });
+    const { page, context } = await open({ width: 360, height: 640 }, { file: true, share: 'share', extra: { reducedMotion: 'reduce' } });
     await page.evaluate(() => { window.__game.loadLevel(1); window.__game.play('chat'); });
     await waitScreen(page, 'result');
     await tapBtn(page, 'bChal');
@@ -822,6 +828,7 @@ async function test(name, fn) {
   });
 
   await browser.close();
+  server.close();
   const failed = results.filter(r => !r.ok);
   console.log('\n' + (results.length - failed.length) + '/' + results.length + ' passed');
   process.exit(failed.length ? 1 : 0);
